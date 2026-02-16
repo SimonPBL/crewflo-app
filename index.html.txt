@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="CrewFlo" />
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/hammer.svg">
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       /* Custom scrollbar */
