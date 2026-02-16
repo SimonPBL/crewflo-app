@@ -16,9 +16,7 @@
     "jspdf": "^2.5.1",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
+    "react-dom": "^18.2.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.2.0",
