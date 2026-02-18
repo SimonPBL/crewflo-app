@@ -869,10 +869,9 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chantier</label>
                     <select
                     value={newTask.projectId || ''}
-                    disabled={isViewOnly}
-                  onChange={e => setNewTask({...newTask, projectId: e.target.value})}
+                    disabled={isViewOnly || (!!currentProjectId && !editingTaskId)}
+                    onChange={e => setNewTask({...newTask, projectId: e.target.value})}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none truncate"
-                    disabled={!!currentProjectId && !editingTaskId}
                     >
                     <option value="" disabled>Choisir...</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
