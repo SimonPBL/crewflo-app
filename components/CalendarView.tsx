@@ -394,6 +394,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>
                                             {project?.name}
                                         </div>
+                                        {project?.address && (
+                                          <div className={`opacity-75 leading-tight break-words ${isPdf ? 'text-[9px]' : 'text-[9px] mt-0.5'}`}>
+                                              📍 {project.address}
+                                          </div>
+                                        )}
                                     </div>
                                 </div>
                                 );
@@ -517,8 +522,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     if (editingTaskId) {
       setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...newTask } as Task : t));
     } else {
-      const { id, ...taskWithoutId } = newTask as Task;
-      setTasks([...tasks, { id: crypto.randomUUID(), ...taskWithoutId }]);
+      setTasks([...tasks, { id: crypto.randomUUID(), ...newTask as Task }]);
     }
     setIsModalOpen(false);
                 setIsViewOnly(false);
@@ -872,9 +876,10 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chantier</label>
                     <select
                     value={newTask.projectId || ''}
-                    disabled={isViewOnly || (!!currentProjectId && !editingTaskId)}
+                    disabled={isViewOnly}
                   onChange={e => setNewTask({...newTask, projectId: e.target.value})}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none truncate"
+                    disabled={!!currentProjectId && !editingTaskId}
                     >
                     <option value="" disabled>Choisir...</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
