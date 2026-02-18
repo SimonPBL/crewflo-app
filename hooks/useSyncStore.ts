@@ -3,13 +3,16 @@ import { getSupabase, getSupabaseConfig } from '../services/supabase';
 
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-// Ce hook gère la synchronisation Hybride (Local ou Cloud) avec Historique (Undo)
 export function useSyncStore<T>(baseKey: string, initialValue: T) {
   const supabase = getSupabase();
   const { companyId } = getSupabaseConfig();
   const isCloud = !!supabase;
 
-  const effectiveKey = companyId ? `${companyId}_${baseKey}` : baseKey;
+  const sanitize = (str: string) => str.trim().replace(/\s+/g, '_');
+
+  const effectiveKey = companyId 
+    ? `${sanitize(companyId)}_${baseKey}` 
+    : baseKey;
 
   const getSavedValue = () => {
     try {
@@ -23,36 +26,32 @@ export function useSyncStore<T>(baseKey: string, initialValue: T) {
 
   const [value, setValue] = useState<T>(getSavedValue);
   const [status, setStatus] = useState<SyncStatus>('idle');
-  
   const [history, setHistory] = useState<T[]>([]);
   const [lastModified, setLastModified] = useState<number>(0);
-
   const isRemoteUpdate = useRef(false);
 
-  // FIX: upsert au lieu de update pour créer la ligne si elle n'existe pas
   const persistData = useCallback((newData: T) => {
-      try {
-        localStorage.setItem(effectiveKey, JSON.stringify(newData));
-      } catch (e) { console.error(e); }
+    try {
+      localStorage.setItem(effectiveKey, JSON.stringify(newData));
+    } catch (e) { console.error(e); }
 
-      if (isCloud && supabase) {
-        setStatus('saving');
-        supabase
-            .from('crewflo_sync')
-            .upsert({ key: effectiveKey, data: newData as any })
-            .then(({ error }) => {
-                if(error) {
-                    console.error("Erreur sync", error);
-                    setStatus('error'); 
-                } else {
-                    setStatus('saved');
-                    setTimeout(() => setStatus('idle'), 2000);
-                }
-            });
-      }
+    if (isCloud && supabase) {
+      setStatus('saving');
+      supabase
+        .from('crewflo_sync')
+        .upsert({ key: effectiveKey, data: newData as any })
+        .then(({ error }) => {
+          if (error) {
+            console.error("Erreur sync", error);
+            setStatus('error');
+          } else {
+            setStatus('saved');
+            setTimeout(() => setStatus('idle'), 2000);
+          }
+        });
+    }
   }, [effectiveKey, isCloud, supabase]);
 
-  // Charger la donnée initiale depuis Supabase
   useEffect(() => {
     if (!isCloud || !supabase) return;
 
@@ -70,15 +69,13 @@ export function useSyncStore<T>(baseKey: string, initialValue: T) {
         isRemoteUpdate.current = false;
         setStatus('saved');
       } else if (error && error.code === 'PGRST116') {
-        // La ligne n'existe pas, on l'initie avec upsert
         await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: value as any });
       }
     };
 
     fetchInitial();
-  }, [effectiveKey, isCloud]); 
+  }, [effectiveKey, isCloud]);
 
-  // Écouter les changements en temps réel
   useEffect(() => {
     if (!isCloud || !supabase) return;
 
@@ -110,30 +107,25 @@ export function useSyncStore<T>(baseKey: string, initialValue: T) {
     };
   }, [effectiveKey, isCloud]);
 
-  // Mettre à jour la donnée (Ajoute à l'historique)
   const setAndSyncValue = useCallback((newValue: T | ((val: T) => T)) => {
     setValue((currentValue) => {
       const valueToStore = newValue instanceof Function ? newValue(currentValue) : newValue;
-      
       if (!isRemoteUpdate.current) {
-          setHistory(prev => [...prev.slice(-19), currentValue]);
-          setLastModified(Date.now());
+        setHistory(prev => [...prev.slice(-19), currentValue]);
+        setLastModified(Date.now());
       }
-
       persistData(valueToStore);
       return valueToStore;
     });
   }, [persistData]);
 
-  // Undo
   const undo = useCallback(() => {
     if (history.length === 0) return;
-
     const previousValue = history[history.length - 1];
     setHistory(prev => prev.slice(0, -1));
     setValue(previousValue);
     persistData(previousValue);
-    setLastModified(Date.now()); 
+    setLastModified(Date.now());
   }, [history, persistData]);
 
   const canUndo = history.length > 0;
