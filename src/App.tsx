@@ -45,7 +45,16 @@ const App = () => {
       if (!error && data) {
         setRole(data.role || '');
         localStorage.setItem(STORE_KEY_ROLE, data.role || '');
-        if (data.company_id) localStorage.setItem('crewflo_company_id', data.company_id);
+        if (data.company_id) {
+          const existing = localStorage.getItem('crewflo_company_id');
+          localStorage.setItem('crewflo_company_id', data.company_id);
+          // Si le company_id n'était pas encore set (session restaurée), recharger
+          // pour que useSyncStore s'initialise avec le bon préfixe de clé
+          if (!existing) {
+            window.location.reload();
+            return;
+          }
+        }
       }
     } catch (e) {
       // ignore
