@@ -9,10 +9,11 @@ import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
 import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, Hammer, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
 import { getSupabase } from "../services/supabase";
+// @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 // VERSION DE L'APPLICATION
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.1.1";
 
 const STORE_KEY_ROLE = "crewflo_role";
 
@@ -22,7 +23,7 @@ const UpdateBanner = () => {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegistered(r) {
+    onRegistered(r: ServiceWorkerRegistration | undefined) {
       // Vérifie une mise à jour toutes les 60 secondes
       r && setInterval(() => r.update(), 60_000);
     },
