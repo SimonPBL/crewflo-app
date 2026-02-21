@@ -9,11 +9,40 @@ import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
 import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, Hammer, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
 import { getSupabase } from "../services/supabase";
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 // VERSION DE L'APPLICATION
 const APP_VERSION = "2.1.0";
 
 const STORE_KEY_ROLE = "crewflo_role";
+
+// ── Bannière de mise à jour PWA ──────────────────────────────────────────────
+const UpdateBanner = () => {
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      // Vérifie une mise à jour toutes les 60 secondes
+      r && setInterval(() => r.update(), 60_000);
+    },
+  });
+
+  if (!needRefresh) return null;
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl border border-blue-500 animate-in slide-in-from-bottom">
+      <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+      <span className="text-sm font-medium">Nouvelle version disponible</span>
+      <button
+        onClick={() => updateServiceWorker(true)}
+        className="ml-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg transition-colors"
+      >
+        Mettre à jour
+      </button>
+    </div>
+  );
+};
 
 const App = () => {
   const supabase = getSupabase();
@@ -48,8 +77,6 @@ const App = () => {
         if (data.company_id) {
           const existing = localStorage.getItem('crewflo_company_id');
           localStorage.setItem('crewflo_company_id', data.company_id);
-          // Si le company_id n'était pas encore set (session restaurée), recharger
-          // pour que useSyncStore s'initialise avec le bon préfixe de clé
           if (!existing) {
             window.location.reload();
             return;
@@ -251,7 +278,6 @@ const App = () => {
     event.target.value = ''; 
   };
 
-  // Afficher AuthScreen si pas connecté
   if (sessionChecked && !isLoggedIn) {
     return <AuthScreen />;
   }
@@ -290,6 +316,9 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* Bannière mise à jour PWA */}
+      <UpdateBanner />
+
       <CloudSetup 
         isOpen={isCloudModalOpen} 
         onClose={() => setIsCloudModalOpen(false)} 
