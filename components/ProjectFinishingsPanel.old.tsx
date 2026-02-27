@@ -55,40 +55,6 @@ function setArea(data: FinishingData, cat: string, room: string, area: string, v
   return setRoom(data, cat, room, { ...r, areas: { ...r.areas, [area]: val } });
 }
 
-// ── Types mis à jour ─────────────────────────────────────────────────────────
-
-// Composant inline pour ajouter une option custom
-interface AddCustomProps {
-  onAdd: (val: string) => void;
-  placeholder?: string;
-}
-const AddCustomInline: React.FC<AddCustomProps> = ({ onAdd, placeholder = 'Ex: option personnalisée...' }) => {
-  const [open, setOpen] = useState(false);
-  const [val, setVal] = useState('');
-  const confirm = () => { if (val.trim()) { onAdd(val.trim()); setVal(''); setOpen(false); } };
-  if (!open) return (
-    <button onClick={() => setOpen(true)} className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 font-medium mt-1">
-      <Plus className="w-3 h-3" /> Ajouter une option
-    </button>
-  );
-  return (
-    <div className="flex gap-2 items-center mt-1">
-      <input autoFocus type="text" value={val}
-        onChange={e => setVal(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') { setOpen(false); setVal(''); } }}
-        placeholder={placeholder}
-        className="flex-1 p-1.5 text-xs border border-blue-300 rounded-lg outline-none focus:border-blue-500 bg-white"
-      />
-      <button onClick={confirm} disabled={!val.trim()} className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">
-        <Check className="w-3.5 h-3.5" />
-      </button>
-      <button onClick={() => { setOpen(false); setVal(''); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
-        <X className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-};
-
 // ── Composant détails d'une zone ─────────────────────────────────────────────
 
 interface AreaDetailProps {
@@ -99,6 +65,8 @@ interface AreaDetailProps {
 }
 
 const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange }) => {
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [newCustom, setNewCustom] = useState('');
 
   const togglePreset = (preset: string) => {
     if (!canEdit) return;
@@ -119,59 +87,36 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
 
   const toggleMaterial = (matKey: string) => {
     if (!canEdit) return;
-    const current: string[] = (value as any).selectedMaterials ?? (value.selectedMaterial ? [value.selectedMaterial] : []);
-    const next = current.includes(matKey) ? current.filter((k: string) => k !== matKey) : [...current, matKey];
-    onChange({ ...value, selectedMaterial: next[0] ?? '', selectedMaterials: next } as any);
+    onChange({ ...value, selectedMaterial: value.selectedMaterial === matKey ? '' : matKey });
   };
 
-  // Support multi-select matériaux
-  const selectedMaterials: string[] = (value as any).selectedMaterials
-    ?? (value.selectedMaterial ? [value.selectedMaterial] : []);
-
-  // Custom presets par matériau : Record<matKey, string[]>
-  const customMatPresets: Record<string, string[]> = (value as any).customMatPresets ?? {};
-
-  const addCustomMatPreset = (matKey: string, preset: string) => {
-    const current = customMatPresets[matKey] ?? [];
-    onChange({ ...value, customMatPresets: { ...customMatPresets, [matKey]: [...current, preset] } } as any);
+  const addCustom = () => {
+    if (!newCustom.trim()) return;
+    onChange({ ...value, customPresets: [...value.customPresets, newCustom.trim()] });
+    setNewCustom(''); setAddingCustom(false);
   };
-  const removeCustomMatPreset = (matKey: string, preset: string) => {
-    const next = (customMatPresets[matKey] ?? []).filter(p => p !== preset);
-    const matPresets = value.materialPresets[matKey]?.filter(p => p !== preset) ?? [];
+
+  const removeCustom = (preset: string) => {
     onChange({
       ...value,
-      customMatPresets: { ...customMatPresets, [matKey]: next },
-      materialPresets: { ...value.materialPresets, [matKey]: matPresets },
-    } as any);
-  };
-
-  // Custom presets simples
-  const addCustomPreset = (preset: string) => {
-    onChange({ ...value, customPresets: [...(value.customPresets ?? []), preset] });
-  };
-  const removeCustomPreset = (preset: string) => {
-    onChange({
-      ...value,
-      customPresets: (value.customPresets ?? []).filter(p => p !== preset),
+      customPresets: value.customPresets.filter(p => p !== preset),
       presets: value.presets.filter(p => p !== preset),
     });
   };
 
-  const allSimplePresets = [...(area.presets ?? []), ...(value.customPresets ?? [])];
+  const allPresets = [...(area.presets ?? []), ...value.customPresets];
 
   return (
     <div className="pl-2 space-y-3">
-      {/* Cas 1 : Choix de matériau */}
+      {/* Cas 1 : Choix de matériau (ex: douche céramique/acrylique) */}
       {area.materialChoices && area.materialChoices.length > 0 && (
         <div className="space-y-2">
           {area.materialChoices.map(mat => {
-            const isSelected = selectedMaterials.includes(mat.key);
+            const isSelected = value.selectedMaterial === mat.key;
             const matPresets = value.materialPresets[mat.key] ?? [];
-            const allMatPresets = [...mat.presets, ...(customMatPresets[mat.key] ?? [])];
-
             return (
               <div key={mat.key} className={`rounded-xl border transition-all ${isSelected ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}>
-                {/* Bouton sélection matériau */}
+                {/* Bouton matériau */}
                 <button
                   disabled={!canEdit}
                   onClick={() => toggleMaterial(mat.key)}
@@ -183,39 +128,21 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
                   {mat.label}
                 </button>
 
-                {/* Presets + custom si matériau sélectionné */}
+                {/* Presets du matériau sélectionné */}
                 {isSelected && (
-                  <div className="px-3 pb-3 space-y-2">
+                  <div className="px-3 pb-3">
                     <div className="flex flex-wrap gap-2">
-                      {allMatPresets.map(p => (
-                        <div key={p} className="relative group">
-                          <button
-                            disabled={!canEdit}
-                            onClick={() => toggleMatPreset(mat.key, p)}
-                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
-                              ${matPresets.includes(p) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}
-                          >
-                            {matPresets.includes(p) && '✓ '}{p}
-                          </button>
-                          {/* Supprimer custom */}
-                          {canEdit && (customMatPresets[mat.key] ?? []).includes(p) && (
-                            <button
-                              onClick={() => removeCustomMatPreset(mat.key, p)}
-                              className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
-                            >
-                              <X className="w-2.5 h-2.5" />
-                            </button>
-                          )}
-                        </div>
+                      {mat.presets.map(p => (
+                        <button
+                          key={p}
+                          disabled={!canEdit}
+                          onClick={() => toggleMatPreset(mat.key, p)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${matPresets.includes(p) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}
+                        >
+                          {matPresets.includes(p) && '✓ '}{p}
+                        </button>
                       ))}
                     </div>
-                    {/* Bouton + pour ce matériau */}
-                    {canEdit && (
-                      <AddCustomInline
-                        onAdd={p => addCustomMatPreset(mat.key, p)}
-                        placeholder="Ex: Acacia, Chêne fumé..."
-                      />
-                    )}
                   </div>
                 )}
               </div>
@@ -224,24 +151,21 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
         </div>
       )}
 
-      {/* Cas 2 : Presets simples */}
-      {!area.materialChoices && allSimplePresets.length > 0 && (
+      {/* Cas 2 : Presets simples (checkboxes) */}
+      {!area.materialChoices && allPresets.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {allSimplePresets.map(p => (
+          {allPresets.map(p => (
             <div key={p} className="relative group">
               <button
                 disabled={!canEdit}
                 onClick={() => togglePreset(p)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
-                  ${value.presets.includes(p) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${value.presets.includes(p) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}
               >
                 {value.presets.includes(p) && '✓ '}{p}
               </button>
-              {canEdit && (value.customPresets ?? []).includes(p) && (
-                <button
-                  onClick={() => removeCustomPreset(p)}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
-                >
+              {/* Supprimer option custom */}
+              {canEdit && value.customPresets.includes(p) && (
+                <button onClick={() => removeCustom(p)} className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center">
                   <X className="w-2.5 h-2.5" />
                 </button>
               )}
@@ -250,9 +174,29 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
         </div>
       )}
 
-      {/* Bouton + Ajouter option pour presets simples */}
-      {canEdit && !area.materialChoices && (
-        <AddCustomInline onAdd={addCustomPreset} placeholder="Ex: 18x18, Travertin..." />
+      {/* Bouton + Ajouter option custom */}
+      {canEdit && (
+        addingCustom ? (
+          <div className="flex gap-2 items-center">
+            <input
+              autoFocus type="text" value={newCustom}
+              onChange={e => setNewCustom(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addCustom(); if (e.key === 'Escape') { setAddingCustom(false); setNewCustom(''); } }}
+              placeholder="Ex: 18x18, Travertin..."
+              className="flex-1 p-1.5 text-xs border border-blue-300 rounded-lg outline-none focus:border-blue-500 bg-white"
+            />
+            <button onClick={addCustom} disabled={!newCustom.trim()} className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => { setAddingCustom(false); setNewCustom(''); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setAddingCustom(true)} className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 font-medium">
+            <Plus className="w-3 h-3" /> Ajouter une option
+          </button>
+        )
       )}
 
       {/* Champs Modèle / Couleur / Notes */}

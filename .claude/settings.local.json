@@ -1,9 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add .)",
-      "Bash(git commit -m \"feat: finitions template hiérarchique avec choix prédéfinis\")",
-      "Bash(git push)"
+      "Bash(git *)",
+      "Bash(vercel *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(git commit -m \"feat: planchers QC + fix ajouter option custom\")"
     ]
   }
 }

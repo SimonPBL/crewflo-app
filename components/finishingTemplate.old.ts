@@ -94,26 +94,10 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
         areas: [{
           key: 'type', label: 'Type de plancher',
           materialChoices: [
-            {
-              key: 'bois_franc', label: 'Bois franc',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Bambou', 'Autres'],
-            },
-            {
-              key: 'ingenierie', label: 'Bois d\'ingénierie',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Bambou', 'Autres'],
-            },
-            {
-              key: 'stratifie', label: 'Stratifié',
-              presets: ['7mm', '8mm', '10mm', '12mm', '14mm', 'Autres'],
-            },
-            {
-              key: 'vinyle_lvp', label: 'Vinyle / LVP',
-              presets: ['4mm', '6mm', '8mm', '10mm', '12mm', 'Autres'],
-            },
-            {
-              key: 'tapis', label: 'Tapis',
-              presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé', 'Autres'],
-            },
+            { key: 'bois_franc',  label: 'Bois franc',   presets: ['3"', '4"', '5"', '6"', 'Larges lattes'] },
+            { key: 'stratifie',   label: 'Stratifié',    presets: ['Standard', 'Imperméable AC3', 'Imperméable AC4', 'Imperméable AC5'] },
+            { key: 'vinyle_lvp',  label: 'Vinyle / LVP', presets: ['4mm', '6mm', '8mm', '12mm'] },
+            { key: 'tapis',       label: 'Tapis',        presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé'] },
           ],
         }],
       },
@@ -122,26 +106,10 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
         areas: [{
           key: 'type', label: 'Type de plancher',
           materialChoices: [
-            {
-              key: 'bois_franc', label: 'Bois franc',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Autres'],
-            },
-            {
-              key: 'ingenierie', label: 'Bois d\'ingénierie',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Autres'],
-            },
-            {
-              key: 'stratifie', label: 'Stratifié',
-              presets: ['7mm', '8mm', '10mm', '12mm', '14mm', 'Autres'],
-            },
-            {
-              key: 'vinyle_lvp', label: 'Vinyle / LVP',
-              presets: ['4mm', '6mm', '8mm', '10mm', '12mm', 'Autres'],
-            },
-            {
-              key: 'tapis', label: 'Tapis',
-              presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé', 'Autres'],
-            },
+            { key: 'bois_franc',  label: 'Bois franc',   presets: ['3"', '4"', '5"', '6"'] },
+            { key: 'stratifie',   label: 'Stratifié',    presets: ['Standard', 'Imperméable AC3', 'AC4'] },
+            { key: 'vinyle_lvp',  label: 'Vinyle / LVP', presets: ['4mm', '6mm', '8mm'] },
+            { key: 'tapis',       label: 'Tapis',        presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé'] },
           ],
         }],
       },
@@ -150,44 +118,19 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
         areas: [{
           key: 'type', label: 'Type de plancher',
           materialChoices: [
-            {
-              key: 'vinyle_lvp', label: 'Vinyle / LVP',
-              presets: ['4mm', '6mm', '8mm', '10mm', '12mm', 'Autres'],
-            },
-            {
-              key: 'stratifie', label: 'Stratifié',
-              presets: ['7mm', '8mm', '10mm', '12mm', '14mm', 'Autres'],
-            },
-            {
-              key: 'tapis', label: 'Tapis',
-              presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé', 'Autres'],
-            },
-            {
-              key: 'ceramique', label: 'Céramique',
-              presets: ceramiquePresets,
-            },
-            {
-              key: 'beton_poli', label: 'Béton poli',
-              presets: ['Mat', 'Satiné', 'Brillant', 'Avec granulats', 'Autres'],
-            },
-            {
-              key: 'epoxy', label: 'Époxy',
-              presets: ['Standard uni', 'Métallique', 'Flocons', 'Quartz', 'Autres'],
-            },
+            { key: 'vinyle_lvp',  label: 'Vinyle / LVP',        presets: ['4mm', '6mm', '8mm', '12mm'] },
+            { key: 'stratifie',   label: 'Stratifié',           presets: ['Standard', 'Imperméable'] },
+            { key: 'tapis',       label: 'Tapis',               presets: ['Berber', 'Coupé', 'Frisé'] },
+            { key: 'ceramique',   label: 'Céramique',           presets: ceramiquePresets },
+            { key: 'beton',       label: 'Béton / Époxy',       presets: ['Peint', 'Époxy standard', 'Époxy métallique', 'Polished'] },
           ],
         }],
       },
       {
         key: 'escalier', label: 'Escalier',
         areas: [
-          {
-            key: 'teinte', label: 'Teinte / Couleur',
-            presets: ['Naturel', 'Chêne pâle', 'Chêne foncé', 'Noyer', 'Blanc peint', 'Noir peint', 'Même que plancher', 'Autres'],
-          },
-          {
-            key: 'nez_marche', label: 'Nez de marche',
-            presets: ['Droit', 'Bullnose', 'Carré', 'Même matériau', 'Autres'],
-          },
+          { key: 'teinte',      label: 'Teinte / Couleur',  presets: ['Naturel', 'Chêne pâle', 'Chêne foncé', 'Noyer', 'Blanc peint', 'Noir peint', 'Même que plancher', 'Autres'] },
+          { key: 'nez_marche',  label: 'Nez de marche',     presets: ['Droit', 'Bullnose', 'Carré', 'Même matériau', 'Autres'] },
         ],
       },
     ],
