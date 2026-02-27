@@ -1,14 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git *)",
-      "Bash(vercel *)",
-      "Bash(npm *)",
-      "Bash(node *)",
-      "Bash(git commit -m \"feat: planchers QC + fix ajouter option custom\")",
-      "Bash(vercel ls)",
-      "Bash(vercel --prod --yes)",
-      "Bash(git commit -m \"fix: sync timeout retry keepalive reconnect\")"
+      "Bash(*)"
     ]
   }
 }

@@ -10,13 +10,15 @@ import {
 
 type AreaValue = {
   confirmed: boolean;
-  selectedMaterial: string;              // clé du matériau choisi (si materialChoices)
-  materialPresets: Record<string, string[]>; // presets sélectionnés par matériau
-  presets: string[];                     // presets sélectionnés (si pas materialChoices)
+  selectedMaterial: string;
+  selectedMaterials: string[];              // multi-select matériaux
+  materialPresets: Record<string, string[]>;
+  customMatPresets: Record<string, string[]>; // options custom par matériau
+  presets: string[];
+  customPresets: string[];
   model: string;
   color: string;
   notes: string;
-  customPresets: string[];               // options ajoutées par l'admin pour CE chantier
 };
 
 type RoomValue = {
@@ -29,12 +31,14 @@ type FinishingData = Record<string, Record<string, RoomValue>>;
 const defaultArea = (): AreaValue => ({
   confirmed: false,
   selectedMaterial: '',
+  selectedMaterials: [],
   materialPresets: {},
+  customMatPresets: {},
   presets: [],
+  customPresets: [],
   model: '',
   color: '',
   notes: '',
-  customPresets: [],
 });
 
 const defaultRoom = (): RoomValue => ({ confirmed: false, areas: {} });
@@ -119,36 +123,35 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
 
   const toggleMaterial = (matKey: string) => {
     if (!canEdit) return;
-    const current: string[] = (value as any).selectedMaterials ?? (value.selectedMaterial ? [value.selectedMaterial] : []);
-    const next = current.includes(matKey) ? current.filter((k: string) => k !== matKey) : [...current, matKey];
-    onChange({ ...value, selectedMaterial: next[0] ?? '', selectedMaterials: next } as any);
+    const current = value.selectedMaterials ?? [];
+    const next = current.includes(matKey)
+      ? current.filter(k => k !== matKey)
+      : [...current, matKey];
+    onChange({ ...value, selectedMaterials: next, selectedMaterial: next[0] ?? '' });
   };
 
-  // Support multi-select matériaux
-  const selectedMaterials: string[] = (value as any).selectedMaterials
-    ?? (value.selectedMaterial ? [value.selectedMaterial] : []);
-
-  // Custom presets par matériau : Record<matKey, string[]>
-  const customMatPresets: Record<string, string[]> = (value as any).customMatPresets ?? {};
+  const selectedMaterials = value.selectedMaterials ?? [];
+  const customMatPresets  = value.customMatPresets ?? {};
 
   const addCustomMatPreset = (matKey: string, preset: string) => {
     const current = customMatPresets[matKey] ?? [];
-    onChange({ ...value, customMatPresets: { ...customMatPresets, [matKey]: [...current, preset] } } as any);
-  };
-  const removeCustomMatPreset = (matKey: string, preset: string) => {
-    const next = (customMatPresets[matKey] ?? []).filter(p => p !== preset);
-    const matPresets = value.materialPresets[matKey]?.filter(p => p !== preset) ?? [];
-    onChange({
-      ...value,
-      customMatPresets: { ...customMatPresets, [matKey]: next },
-      materialPresets: { ...value.materialPresets, [matKey]: matPresets },
-    } as any);
+    onChange({ ...value, customMatPresets: { ...customMatPresets, [matKey]: [...current, preset] } });
   };
 
-  // Custom presets simples
+  const removeCustomMatPreset = (matKey: string, preset: string) => {
+    const nextCustom = (customMatPresets[matKey] ?? []).filter(p => p !== preset);
+    const nextSelected = (value.materialPresets[matKey] ?? []).filter(p => p !== preset);
+    onChange({
+      ...value,
+      customMatPresets: { ...customMatPresets, [matKey]: nextCustom },
+      materialPresets: { ...value.materialPresets, [matKey]: nextSelected },
+    });
+  };
+
   const addCustomPreset = (preset: string) => {
     onChange({ ...value, customPresets: [...(value.customPresets ?? []), preset] });
   };
+
   const removeCustomPreset = (preset: string) => {
     onChange({
       ...value,

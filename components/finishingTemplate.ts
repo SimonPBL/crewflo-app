@@ -90,17 +90,25 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
     emoji: '🪵',
     rooms: [
       {
-        key: 'salon', label: 'Salon / Couloir / Aire ouverte',
+        key: 'rdc', label: 'RDC',
         areas: [{
           key: 'type', label: 'Type de plancher',
           materialChoices: [
             {
               key: 'bois_franc', label: 'Bois franc',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Bambou', 'Autres'],
+              presets: ['Chêne', 'Érable', 'Merisier', 'Chêne rouge', 'Chêne blanc', 'Frêne', 'Pin', 'Exotique'],
             },
             {
-              key: 'ingenierie', label: 'Bois d\'ingénierie',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Bambou', 'Autres'],
+              key: 'bois_franc_largeur', label: 'Bois franc — Largeur',
+              presets: ['2 1/4" (57mm)', '3 1/4" (82mm)', '4 1/4" (108mm)', '5" (127mm)', '6" (152mm)', '7" (178mm)', '8" (203mm)', 'Autres'],
+            },
+            {
+              key: 'ingenierie', label: 'Bois d\'ingénierie — Essence',
+              presets: ['Chêne', 'Érable', 'Merisier', 'Chêne rouge', 'Chêne blanc', 'Frêne', 'Pin', 'Exotique'],
+            },
+            {
+              key: 'ingenierie_largeur', label: 'Bois d\'ingénierie — Largeur',
+              presets: ['3 1/4" (82mm)', '4 1/4" (108mm)', '5" (127mm)', '6 1/2" (165mm)', '7 1/2" (190mm)', '8" (203mm)', '9" (228mm)', '10" (254mm)', 'Autres'],
             },
             {
               key: 'stratifie', label: 'Stratifié',
@@ -108,27 +116,43 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
             },
             {
               key: 'vinyle_lvp', label: 'Vinyle / LVP',
-              presets: ['4mm', '6mm', '8mm', '10mm', '12mm', 'Autres'],
+              presets: ['2mm', '3mm', '4mm', '5mm', '5.5mm', '6mm', '6.5mm', '7mm', '8mm', 'Autres'],
             },
             {
               key: 'tapis', label: 'Tapis',
               presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé', 'Autres'],
+            },
+            {
+              key: 'beton_poli', label: 'Béton poli',
+              presets: ['Mat', 'Satiné', 'Brillant', 'Avec granulats', 'Autres'],
+            },
+            {
+              key: 'epoxy', label: 'Époxy',
+              presets: ['Standard uni', 'Métallique', 'Flocons', 'Quartz', 'Autres'],
             },
           ],
         }],
       },
       {
-        key: 'chambres', label: 'Chambres',
+        key: 'deuxieme', label: '2ième étage',
         areas: [{
           key: 'type', label: 'Type de plancher',
           materialChoices: [
             {
-              key: 'bois_franc', label: 'Bois franc',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Autres'],
+              key: 'bois_franc', label: 'Bois franc — Essence',
+              presets: ['Chêne', 'Érable', 'Merisier', 'Chêne rouge', 'Chêne blanc', 'Frêne', 'Pin', 'Exotique'],
             },
             {
-              key: 'ingenierie', label: 'Bois d\'ingénierie',
-              presets: ['Érable', 'Chêne rouge', 'Chêne blanc', 'Bouleau', 'Noyer', 'Cerisier', 'Frêne', 'Pin', 'Hickory / Caryer', 'Autres'],
+              key: 'bois_franc_largeur', label: 'Bois franc — Largeur',
+              presets: ['2 1/4" (57mm)', '3 1/4" (82mm)', '4 1/4" (108mm)', '5" (127mm)', '6" (152mm)', '7" (178mm)', '8" (203mm)', 'Autres'],
+            },
+            {
+              key: 'ingenierie', label: 'Bois d\'ingénierie — Essence',
+              presets: ['Chêne', 'Érable', 'Merisier', 'Chêne rouge', 'Chêne blanc', 'Frêne', 'Pin', 'Exotique'],
+            },
+            {
+              key: 'ingenierie_largeur', label: 'Bois d\'ingénierie — Largeur',
+              presets: ['3 1/4" (82mm)', '4 1/4" (108mm)', '5" (127mm)', '6 1/2" (165mm)', '7 1/2" (190mm)', '8" (203mm)', '9" (228mm)', '10" (254mm)', 'Autres'],
             },
             {
               key: 'stratifie', label: 'Stratifié',
@@ -136,11 +160,19 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
             },
             {
               key: 'vinyle_lvp', label: 'Vinyle / LVP',
-              presets: ['4mm', '6mm', '8mm', '10mm', '12mm', 'Autres'],
+              presets: ['2mm', '3mm', '4mm', '5mm', '5.5mm', '6mm', '6.5mm', '7mm', '8mm', 'Autres'],
             },
             {
               key: 'tapis', label: 'Tapis',
               presets: ['Berber', 'Coupé poil court', 'Coupé poil long', 'Frisé', 'Autres'],
+            },
+            {
+              key: 'beton_poli', label: 'Béton poli',
+              presets: ['Mat', 'Satiné', 'Brillant', 'Avec granulats', 'Autres'],
+            },
+            {
+              key: 'epoxy', label: 'Époxy',
+              presets: ['Standard uni', 'Métallique', 'Flocons', 'Quartz', 'Autres'],
             },
           ],
         }],
@@ -152,7 +184,7 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
           materialChoices: [
             {
               key: 'vinyle_lvp', label: 'Vinyle / LVP',
-              presets: ['4mm', '6mm', '8mm', '10mm', '12mm', 'Autres'],
+              presets: ['2mm', '3mm', '4mm', '5mm', '5.5mm', '6mm', '6.5mm', '7mm', '8mm', 'Autres'],
             },
             {
               key: 'stratifie', label: 'Stratifié',
@@ -181,12 +213,33 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
         key: 'escalier', label: 'Escalier',
         areas: [
           {
+            key: 'structure', label: 'Type de structure',
+            materialChoices: [
+              {
+                key: 'limon_central', label: 'Limon central',
+                presets: ['Bois', 'Acier', 'Béton', 'Autres'],
+              },
+              {
+                key: 'standard_ouvert', label: 'Escalier standard — Ouvert',
+                presets: ['Bois massif', 'Bois + métal', 'Bois + verre', 'Autres'],
+              },
+              {
+                key: 'standard_ferme', label: 'Escalier standard — Fermé',
+                presets: ['Bois massif', 'MDF peint', 'Autres'],
+              },
+            ],
+          },
+          {
             key: 'teinte', label: 'Teinte / Couleur',
             presets: ['Naturel', 'Chêne pâle', 'Chêne foncé', 'Noyer', 'Blanc peint', 'Noir peint', 'Même que plancher', 'Autres'],
           },
           {
             key: 'nez_marche', label: 'Nez de marche',
             presets: ['Droit', 'Bullnose', 'Carré', 'Même matériau', 'Autres'],
+          },
+          {
+            key: 'rampe', label: 'Rampe / Balustrade',
+            presets: ['Bois classique', 'Bois + métal', 'Métal noir', 'Verre + métal', 'Inox', 'Câble tendu', 'Autres'],
           },
         ],
       },
