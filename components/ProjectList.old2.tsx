@@ -6,9 +6,10 @@ import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 interface ProjectListProps {
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  canEdit?: boolean;
 }
 
-export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects, canEdit = true }) => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
 
@@ -17,6 +18,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
   const [editForm, setEditForm] = useState<Partial<Project>>({});
 
   const addProject = () => {
+    if (!canEdit) return;
     if (!name.trim()) return;
     const newProject: Project = {
       id: crypto.randomUUID(),
@@ -30,11 +32,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
   };
 
   const deleteProject = (id: string) => {
+    if (!canEdit) return;
     setProjects(projects.filter(p => p.id !== id));
   };
 
   // Fonctions d'édition
   const startEditing = (project: Project) => {
+    if (!canEdit) return;
     setEditingId(project.id);
     setEditForm({ ...project });
   };
@@ -45,6 +49,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
   };
 
   const saveEditing = () => {
+    if (!canEdit) return;
     if (!editForm.name?.trim()) return;
     
     setProjects(projects.map(p => 
@@ -71,6 +76,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={!canEdit}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-slate-900"
                 placeholder="Ex: Résidence Belle-Vue Phase 1"
               />
@@ -81,12 +87,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                disabled={!canEdit}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-slate-900"
                 placeholder="Ex: 123 Rue Principale"
               />
             </div>
             <button
-              onClick={addProject}
+              onClick={canEdit ? addProject : undefined}
+              disabled={!canEdit}
               className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" /> Créer
@@ -116,6 +124,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                                   type="text" 
                                   value={editForm.name || ''} 
                                   onChange={e => setEditForm({...editForm, name: e.target.value})}
+                                  disabled={!canEdit}
                                   className="w-full p-2 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none bg-white text-slate-900"
                               />
                           </div>
@@ -125,6 +134,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                                   type="text" 
                                   value={editForm.address || ''} 
                                   onChange={e => setEditForm({...editForm, address: e.target.value})}
+                                  disabled={!canEdit}
                                   className="w-full p-2 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none bg-white text-slate-900"
                               />
                           </div>
@@ -137,8 +147,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                                 <X className="w-3 h-3" /> Annuler
                             </button>
                             <button 
-                              onClick={saveEditing} 
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                              onClick={canEdit ? saveEditing : undefined}
+                              disabled={!canEdit} 
+                              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded ${canEdit ? "text-white bg-green-600 hover:bg-green-700" : "text-slate-300 bg-slate-100 cursor-not-allowed"}`}
                             >
                                 <Check className="w-3 h-3" /> Enregistrer
                             </button>
@@ -151,7 +162,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                           <h4 className="font-bold text-slate-800 text-lg">{project.name}</h4>
                           <button 
                               onClick={() => startEditing(project)} 
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              disabled={!canEdit}
+                              className={`p-1.5 rounded transition-colors ${canEdit ? "text-slate-400 hover:text-blue-600 hover:bg-blue-50" : "text-slate-200 cursor-not-allowed"}`}
                               title="Modifier"
                           >
                               <Pencil className="w-4 h-4" />
@@ -174,7 +186,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects 
                 </div>
                 
                 {/* Bouton Supprimer (masqué pendant l'édition pour éviter la confusion) */}
-                {!isEditing && (
+                {!isEditing && canEdit && (
                   <div className="w-full lg:w-auto min-w-[200px] flex justify-end">
                       <SwipeToConfirmButton onConfirm={() => deleteProject(project.id)} className="lg:max-w-[220px]" />
                   </div>

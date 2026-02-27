@@ -276,9 +276,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
             </div>
 
             {/* Contenu onglets */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
               {activeTab === 'infos' && (
-                <div className="p-5 space-y-4 overflow-y-auto h-full">
+                <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-slate-50 rounded-xl p-4">
                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Nom du projet</p>
