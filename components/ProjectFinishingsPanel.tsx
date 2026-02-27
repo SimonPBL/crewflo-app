@@ -135,7 +135,7 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit }) 
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Header stats */}
       <div className="p-4 border-b border-slate-100 bg-slate-50">
         {!canEdit && (
@@ -167,7 +167,7 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit }) 
       </div>
 
       {/* Liste par catégorie */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="p-4 space-y-3">
         {grouped.length === 0 && (
           <div className="text-center py-10 text-slate-400 text-sm">Aucun résultat pour "{search}"</div>
         )}

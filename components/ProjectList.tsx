@@ -242,7 +242,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
       {/* ── MODAL FINITIONS ─────────────────────────────────────── */}
       {selectedProject && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[85vh] overflow-hidden">
+          <div style={{height: "90vh", maxHeight: "90vh"}} className="bg-white w-full sm:max-w-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
             {/* Header modal */}
             <div className="flex items-start justify-between p-4 border-b border-slate-200 flex-shrink-0">
@@ -276,9 +276,9 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
             </div>
 
             {/* Contenu onglets */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto">
               {activeTab === 'infos' && (
-                <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div className="p-5 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-slate-50 rounded-xl p-4">
                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Nom du projet</p>
