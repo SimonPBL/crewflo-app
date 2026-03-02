@@ -5,6 +5,8 @@ import { ConflictAlert } from './ConflictAlert';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { getSupabase, getSupabaseConfig } from '../services/supabase';
+import { FINISHING_TEMPLATE } from './finishingTemplate';
 
 interface CalendarViewProps {
   projects: Project[];
@@ -37,6 +39,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [showNotes, setShowNotes] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [finishingsMap, setFinishingsMap] = useState<Record<string, any>>({});
 
   // États pour le Drag & Drop de sélection de date (Main View)
   const [isDragging, setIsDragging] = useState(false);
@@ -565,8 +568,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const downloadAllPDF = async () => {
-    setIsExporting(true);
     try {
+      // Récupérer les finitions de tous les chantiers depuis Supabase
+      const supabase = getSupabase();
+      const { companyId } = getSupabaseConfig();
+      const finMap: Record<string, any> = {};
+      if (supabase && companyId) {
+        const { data: finRows } = await supabase
+          .from('project_finishing_data')
+          .select('project_id, data')
+          .eq('company_id', companyId);
+        if (finRows) {
+          for (const row of finRows) finMap[row.project_id] = row.data;
+        }
+      }
+      setFinishingsMap(finMap);
+      setIsExporting(true);
       await new Promise(resolve => setTimeout(resolve, 500));
       if (!pdfContainerRef.current) throw new Error("Container not found");
       
@@ -603,6 +620,69 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
   };
 
+
+const FinishingsPdfPage: React.FC<{ project: Project; finData: any }> = ({ project, finData }) => {
+  if (!finData) return <div className="text-slate-400 text-sm italic mt-4">Aucune finition enregistrée pour ce chantier.</div>;
+
+  const catsWithData = FINISHING_TEMPLATE.flatMap(cat => {
+    const catData = finData[cat.key];
+    if (!catData) return [];
+    const roomsWithData = cat.rooms.flatMap(room => {
+      const roomData = catData[room.key];
+      if (!roomData) return [];
+      const areasWithData = room.areas.flatMap(area => {
+        const av = roomData.areas?.[area.key];
+        if (!av) return [];
+        const lines: string[] = [];
+        if (area.materialChoices) {
+          area.materialChoices.forEach(mat => {
+            const mp = av.materialPresets?.[mat.key];
+            if (mp?.length) lines.push(`${mat.label}: ${mp.join(', ')}`);
+          });
+        }
+        if (av.presets?.length) lines.push(av.presets.join(' · '));
+        if (av.selectedMaterial) lines.push(`Matériau: ${av.selectedMaterial}`);
+        if (av.selectedMaterials?.length) lines.push(av.selectedMaterials.join(' · '));
+        if (av.model) lines.push(`Modèle: ${av.model}`);
+        if (av.color) lines.push(`Couleur: ${av.color}`);
+        if (av.notes) lines.push(`Note: ${av.notes}`);
+        if (!lines.length) return [];
+        return [{ label: area.label, lines, confirmed: av.confirmed }];
+      });
+      if (!areasWithData.length) return [];
+      return [{ label: room.label, areas: areasWithData, confirmed: roomData.confirmed }];
+    });
+    if (!roomsWithData.length) return [];
+    return [{ label: cat.label, emoji: cat.emoji, rooms: roomsWithData }];
+  });
+
+  if (!catsWithData.length) return <div className="text-slate-400 text-sm italic mt-4">Aucune finition enregistrée pour ce chantier.</div>;
+
+  return (
+    <div className="grid grid-cols-2 gap-4 mt-2">
+      {catsWithData.map(cat => (
+        <div key={cat.label} className="border border-slate-200 rounded-lg overflow-hidden">
+          <div className="bg-slate-800 text-white px-3 py-1.5 text-xs font-bold">{cat.emoji} {cat.label}</div>
+          {cat.rooms.map(room => (
+            <div key={room.label} className="px-3 py-2 border-b border-slate-100 last:border-0">
+              <div className={`text-xs font-bold mb-1 ${room.confirmed ? 'text-green-700' : 'text-slate-700'}`}>
+                {room.confirmed ? '✓ ' : ''}{room.label}
+              </div>
+              {room.areas.map(area => (
+                <div key={area.label} className="ml-2 mb-1">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">{area.label}</span>
+                  {area.lines.map((line, i) => (
+                    <div key={i} className="text-xs text-slate-800 ml-2">→ {line}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) => {
   const sorted = [...tasksForPage].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -769,6 +849,20 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             </div>
             <TaskDetailsTable tasksForPage={tasks.filter(t => t.projectId === project.id)} />
             <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
+          </div>
+
+          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]">
+            <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">Finitions choisies</h1>
+                <div className="text-slate-500 text-sm">{project.name}{project.address ? ` — ${project.address}` : ''}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{allMonthsData[0]?.monthLabel}</div>
+              </div>
+            </div>
+            <FinishingsPdfPage project={project} finData={finishingsMap[project.id]} />
+            <div className="mt-6 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
           </div>
         </React.Fragment>
       ))}
