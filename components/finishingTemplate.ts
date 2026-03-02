@@ -62,7 +62,7 @@ const escalierAreas = (): AreaDef[] => [
   {
     key: 'structure', label: 'Type de structure',
     materialChoices: [
-      { key: 'limon_central',   label: 'Limon central',              presets: ['5x5', '6x6', 'Marche 1.75"', 'Marche 2"', 'Bonhomme vertical', 'Bonhomme diagonal'] },
+      { key: 'limon_central',   label: 'Limon central — Sélectionner 3 options s.v.p.',  presets: ['5x5', '6x6', 'Marche 1.75"', 'Marche 2"', 'Bonhomme vertical', 'Bonhomme diagonal'] },
       { key: 'standard_ouvert', label: 'Escalier standard — Ouvert', presets: ['Bois massif', 'Bois + métal', 'Bois + verre'] },
       { key: 'standard_ferme',  label: 'Escalier standard — Fermé',  presets: ['Bois massif', 'MDF peint'] },
     ],
