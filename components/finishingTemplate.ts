@@ -133,9 +133,6 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
         key: 'soussol', label: 'Sous-sol',
         areas: [{ key: 'type', label: 'Type de plancher', materialChoices: plancherChoices() }],
       },
-      { key: 'escalier_entree', label: 'Escalier entrée',      areas: escalierAreas() },
-      { key: 'escalier_2e',     label: 'Escalier 2ième étage', areas: escalierAreas() },
-      { key: 'escalier_ss',     label: 'Escalier sous-sol',    areas: escalierAreas() },
     ],
   },
 
@@ -247,6 +244,18 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
           { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
         ],
       },
+    ],
+  },
+
+  // ── ESCALIERS ET RAMPES ──────────────────────────────────────
+  {
+    key: 'escaliers',
+    label: 'Escaliers et rampes',
+    emoji: '🪜',
+    rooms: [
+      { key: 'escalier_entree', label: 'Escalier entrée',      areas: escalierAreas() },
+      { key: 'escalier_2e',     label: 'Escalier 2ième étage', areas: escalierAreas() },
+      { key: 'escalier_ss',     label: 'Escalier sous-sol',    areas: escalierAreas() },
     ],
   },
 
