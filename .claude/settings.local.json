@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*)"
+      "Bash(*)",
+      "Bash(git commit -m \"feat: finitions template v3 refonte complete\")"
     ]
   }
 }
