@@ -59,7 +59,7 @@ export const AuthScreen: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold">CF</div>
+          <img src="/icon-192.png" alt="CrewFlo" className="w-10 h-10 rounded-xl" />
           <div>
             <div className="text-lg font-bold text-slate-900">CrewFlo</div>
             <div className="text-xs text-slate-500">Connexion</div>
