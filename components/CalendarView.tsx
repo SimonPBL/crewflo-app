@@ -388,16 +388,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     </div>
                                     )}
                                     <div className="flex flex-col gap-0.5">
-                                        <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
-                                            {formatLabel(supplier?.name)}
-                                        </div>
-                                        <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>
-                                            {project?.name}
-                                        </div>
-                                        {project?.address && (
-                                          <div className={`opacity-75 leading-tight break-words ${isPdf ? 'text-[9px]' : 'text-[9px] mt-0.5'}`}>
-                                              📍 {project.address}
-                                          </div>
+                                        {currentProjectId ? (
+                                          // Vue par chantier : titre de la tâche + fournisseur
+                                          <>
+                                            <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
+                                              {formatLabel(task.title)}
+                                            </div>
+                                            <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>
+                                              {formatLabel(supplier?.name)}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          // Vue globale : fournisseur + nom chantier + adresse
+                                          <>
+                                            <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
+                                              {formatLabel(supplier?.name)}
+                                            </div>
+                                            <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>
+                                              {project?.name}
+                                            </div>
+                                            {project?.address && (
+                                              <div className={`opacity-75 leading-tight break-words ${isPdf ? 'text-[9px]' : 'text-[9px] mt-0.5'}`}>
+                                                📍 {project.address}
+                                              </div>
+                                            )}
+                                          </>
                                         )}
                                     </div>
                                 </div>
