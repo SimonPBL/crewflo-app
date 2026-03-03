@@ -311,6 +311,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                 <ProjectFinishingsPanel
                   projectId={selectedProject.id}
                   canEdit={canEdit}
+                  allProjects={projects.filter(p => p.id !== selectedProject!.id).map(p => ({ id: p.id, name: p.name }))}
                 />
               )}
             </div>

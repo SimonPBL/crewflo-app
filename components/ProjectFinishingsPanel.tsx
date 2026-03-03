@@ -3,7 +3,8 @@ import { getSupabase, getSupabaseConfig } from '../services/supabase';
 import { FINISHING_TEMPLATE, CategoryDef, AreaDef } from './finishingTemplate';
 import {
   ChevronDown, ChevronUp, Loader2, WifiOff,
-  Check, X, Plus, Search,
+  Check, X, Plus, Search, Copy, ChevronDown as ChevDown,
+  AlertCircle,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -295,9 +296,10 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
 interface Props {
   projectId: string;
   canEdit: boolean;
+  allProjects?: { id: string; name: string }[];
 }
 
-export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit }) => {
+export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit, allProjects = [] }) => {
   const supabase = getSupabase();
   const { companyId } = getSupabaseConfig();
 
@@ -308,6 +310,10 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit }) 
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copySourceId, setCopySourceId] = useState<string>('');
+  const [copying, setCopying] = useState(false);
+  const [copyDone, setCopyDone] = useState(false);
 
   // ── Charger ────────────────────────────────────────────────────────────────
 
@@ -362,6 +368,40 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit }) 
     save(newData);
   };
 
+  // ── Copier depuis un autre chantier ───────────────────────────────────────
+
+  const copyFrom = useCallback(async () => {
+    if (!supabase || !copySourceId) return;
+    setCopying(true);
+    try {
+      const { data: row } = await supabase
+        .from('project_finishing_data')
+        .select('data')
+        .eq('project_id', copySourceId)
+        .eq('company_id', companyId || 'default')
+        .single();
+
+      if (row?.data) {
+        const copied = row.data as FinishingData;
+        setData(copied);
+        await supabase.from('project_finishing_data').upsert({
+          project_id: projectId,
+          company_id: companyId || 'default',
+          data: copied,
+        }, { onConflict: 'project_id,company_id' });
+        setCopyDone(true);
+        setTimeout(() => {
+          setShowCopyModal(false);
+          setCopyDone(false);
+          setCopySourceId('');
+        }, 1800);
+      }
+    } catch (e) {
+      console.error('copyFrom error', e);
+    }
+    setCopying(false);
+  }, [supabase, copySourceId, projectId, companyId]);
+
   // ── Stats ──────────────────────────────────────────────────────────────────
 
   const totalRooms = FINISHING_TEMPLATE.reduce((s, cat) => s + cat.rooms.length, 0);
@@ -415,8 +455,91 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit }) 
           <div className="flex items-center gap-2">
             {saving && <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin" />}
             <span className="text-sm font-bold text-blue-600">{pct}%</span>
+            {canEdit && allProjects.length > 0 && (
+              <button
+                onClick={() => setShowCopyModal(true)}
+                className="flex items-center gap-1 text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors border border-slate-200"
+                title="Copier les finitions d'un autre chantier"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copier depuis...
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Modal copie */}
+        {showCopyModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-blue-100 p-2 rounded-xl">
+                  <Copy className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800">Copier les finitions</h3>
+                  <p className="text-xs text-slate-500">Les finitions actuelles seront remplacées</p>
+                </div>
+              </div>
+
+              {copyDone ? (
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <Check className="w-6 h-6 text-green-600" />
+                  </div>
+                  <p className="text-sm font-medium text-green-700">Finitions copiées avec succès !</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-600 mb-2">
+                      Copier depuis quel chantier ?
+                    </label>
+                    <select
+                      value={copySourceId}
+                      onChange={e => setCopySourceId(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white text-slate-800 focus:border-blue-400 outline-none"
+                    >
+                      <option value="">-- Choisir un chantier --</option>
+                      {allProjects.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {copySourceId && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700">
+                        Toutes les finitions de ce chantier seront <strong>remplacées</strong> par celles du chantier sélectionné. Cette action ne peut pas être annulée.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setShowCopyModal(false); setCopySourceId(''); }}
+                      className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={copyFrom}
+                      disabled={!copySourceId || copying}
+                      className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {copying ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Copie...</>
+                      ) : (
+                        <><Copy className="w-4 h-4" /> Copier</>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
         <div className="w-full bg-slate-200 rounded-full h-2">
           <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
