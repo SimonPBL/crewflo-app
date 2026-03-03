@@ -7,7 +7,7 @@ import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
-import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, Hammer, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
 import { getSupabase } from "../services/supabase";
 // @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -17,15 +17,35 @@ const APP_VERSION = "2.1.1";
 
 const STORE_KEY_ROLE = "crewflo_role";
 
-// ── Bannière de mise à jour PWA ──────────────────────────────────────────────
+// ── Bannière de mise à jour PWA (fonctionne sur iOS Safari) ─────────────────
 const UpdateBanner = () => {
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: ServiceWorkerRegistration | undefined) {
-      // Vérifie une mise à jour toutes les 60 secondes
-      r && setInterval(() => r.update(), 60_000);
+      if (!r) return;
+
+      // Vérification toutes les 30s (plus fréquent qu'avant)
+      setInterval(() => r.update(), 30_000);
+
+      // iOS Safari ne détecte pas les mises à jour automatiquement —
+      // on force une vérification à chaque fois que l'app reprend le focus
+      // ou redevient visible (ex: retour d'une autre app).
+      const forceCheck = () => {
+        r.update().catch(() => {});
+      };
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') forceCheck();
+      });
+      window.addEventListener('focus', forceCheck);
+      window.addEventListener('pageshow', forceCheck);
+    },
+
+    // Sur iOS, le SW ne peut pas prendre le contrôle sans que l'utilisateur
+    // recharge. On affiche donc la bannière dès que needRefresh est true.
+    onNeedRefresh() {
+      // déclenché automatiquement par useRegisterSW
     },
   });
 
@@ -356,7 +376,7 @@ const App = () => {
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex flex-col`}>
         <div className="p-4 border-b border-slate-800 flex items-center justify-between flex-none">
           <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <img src="/icon-192.png" alt="CrewFlo" className="w-8 h-8 rounded-lg" />
+            <div className="bg-blue-600 p-1.5 rounded-lg"><Hammer className="w-5 h-5 text-white" /></div>
             <span>CrewFlo</span>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white"><X className="w-6 h-6" /></button>

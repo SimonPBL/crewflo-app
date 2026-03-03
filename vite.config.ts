@@ -36,6 +36,9 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           navigateFallback: 'index.html',
+          skipWaiting: false,          // contrôlé manuellement via updateServiceWorker(true)
+          clientsClaim: true,          // le nouveau SW prend le contrôle dès activation
+          cleanupOutdatedCaches: true, // supprime les anciens caches automatiquement
         },
       }),
     ],

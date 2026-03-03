@@ -163,27 +163,41 @@ export function useSyncStore<T>(baseKey: string, initialValue: T) {
     return () => { if (keepaliveRef.current) clearInterval(keepaliveRef.current); };
   }, [effectiveKey, isCloud, supabase]);
 
-  // ── Resync au retour de veille / focus ────────────────────────────────────
+  // ── Resync au retour de veille / focus / retour en ligne ────────────────
   useEffect(() => {
     if (!isCloud) return;
 
-    const handleVisible = () => {
-      if (document.visibilityState === 'visible') {
+    // Priorité : envoyer d'abord les changements locaux en attente,
+    // ENSUITE seulement fetcher depuis le cloud pour ne pas les écraser.
+    const syncOnResume = async () => {
+      if (pendingData.current) {
+        // On a des changements locaux non envoyés → les envoyer en premier
+        await saveToCloud(pendingData.current);
+      } else {
+        // Rien en attente → safe de fetcher la version du serveur
         fetchFromCloud();
-        if (pendingData.current) saveToCloud(pendingData.current);
-        setupChannel();
       }
+      setupChannel();
     };
-    const handleFocus = () => {
-      fetchFromCloud();
-      if (pendingData.current) saveToCloud(pendingData.current);
+
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') syncOnResume();
+    };
+    const handleFocus = () => syncOnResume();
+
+    // Retour en ligne (après mode avion / perte réseau)
+    const handleOnline = () => {
+      console.log('[SyncStore] retour en ligne → envoi des données en attente');
+      syncOnResume();
     };
 
     document.addEventListener('visibilitychange', handleVisible);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
     return () => {
       document.removeEventListener('visibilitychange', handleVisible);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
     };
   }, [isCloud, fetchFromCloud, saveToCloud, setupChannel]);
 
