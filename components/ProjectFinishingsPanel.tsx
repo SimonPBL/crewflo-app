@@ -4,8 +4,9 @@ import { FINISHING_TEMPLATE, CategoryDef, AreaDef } from './finishingTemplate';
 import {
   ChevronDown, ChevronUp, Loader2, WifiOff,
   Check, X, Plus, Search, Copy, ChevronDown as ChevDown,
-  AlertCircle,
+  AlertCircle, FileDown,
 } from 'lucide-react';
+import { exportFinishingsPDF } from './FinishingsPDFExport';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -295,11 +296,13 @@ const AreaDetail: React.FC<AreaDetailProps> = ({ area, value, canEdit, onChange 
 
 interface Props {
   projectId: string;
+  projectName?: string;
+  projectAddress?: string;
   canEdit: boolean;
   allProjects?: { id: string; name: string }[];
 }
 
-export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit, allProjects = [] }) => {
+export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, projectName = 'Chantier', projectAddress = '', canEdit, allProjects = [] }) => {
   const supabase = getSupabase();
   const { companyId } = getSupabaseConfig();
 
@@ -402,6 +405,19 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit, al
     setCopying(false);
   }, [supabase, copySourceId, projectId, companyId]);
 
+  // ── Export PDF ────────────────────────────────────────────────────────────
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleExportPDF = useCallback(async () => {
+    setPdfLoading(true);
+    try {
+      await exportFinishingsPDF(projectName, projectAddress, data);
+    } catch (e) {
+      console.error('PDF export error', e);
+    }
+    setPdfLoading(false);
+  }, [projectName, projectAddress, data]);
+
   // ── Stats ──────────────────────────────────────────────────────────────────
 
   const totalRooms = FINISHING_TEMPLATE.reduce((s, cat) => s + cat.rooms.length, 0);
@@ -455,6 +471,18 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, canEdit, al
           <div className="flex items-center gap-2">
             {saving && <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin" />}
             <span className="text-sm font-bold text-blue-600">{pct}%</span>
+            <button
+              onClick={handleExportPDF}
+              disabled={pdfLoading}
+              className="flex items-center gap-1 text-xs px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors border border-blue-200 disabled:opacity-50"
+              title="Exporter les finitions en PDF"
+            >
+              {pdfLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <FileDown className="w-3.5 h-3.5" />
+              }
+              PDF
+            </button>
             {canEdit && allProjects.length > 0 && (
               <button
                 onClick={() => setShowCopyModal(true)}
