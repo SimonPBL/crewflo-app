@@ -17,35 +17,15 @@ const APP_VERSION = "2.1.1";
 
 const STORE_KEY_ROLE = "crewflo_role";
 
-// ── Bannière de mise à jour PWA (fonctionne sur iOS Safari) ─────────────────
+// ── Bannière de mise à jour PWA ──────────────────────────────────────────────
 const UpdateBanner = () => {
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: ServiceWorkerRegistration | undefined) {
-      if (!r) return;
-
-      // Vérification toutes les 30s (plus fréquent qu'avant)
-      setInterval(() => r.update(), 30_000);
-
-      // iOS Safari ne détecte pas les mises à jour automatiquement —
-      // on force une vérification à chaque fois que l'app reprend le focus
-      // ou redevient visible (ex: retour d'une autre app).
-      const forceCheck = () => {
-        r.update().catch(() => {});
-      };
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') forceCheck();
-      });
-      window.addEventListener('focus', forceCheck);
-      window.addEventListener('pageshow', forceCheck);
-    },
-
-    // Sur iOS, le SW ne peut pas prendre le contrôle sans que l'utilisateur
-    // recharge. On affiche donc la bannière dès que needRefresh est true.
-    onNeedRefresh() {
-      // déclenché automatiquement par useRegisterSW
+      // Vérifie une mise à jour toutes les 60 secondes
+      r && setInterval(() => r.update(), 60_000);
     },
   });
 
@@ -77,8 +57,9 @@ const App = () => {
   const configCompanyId = (localStorage.getItem("crewflo_company_id") || "").trim();
 
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [roleChecked, setRoleChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [role, setRole] = useState<string>(localStorage.getItem(STORE_KEY_ROLE) || '');
+  const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
 
   const fetchUserRole = async () => {
     if (!supabase) return;
@@ -93,8 +74,7 @@ const App = () => {
         .single();
 
       if (!error && data) {
-        setRole(data.role || '');
-        localStorage.setItem(STORE_KEY_ROLE, data.role || '');
+        setRole(data.role || ''); // rôle validé par Supabase — jamais depuis localStorage
         if (data.company_id) {
           const existing = localStorage.getItem('crewflo_company_id');
           localStorage.setItem('crewflo_company_id', data.company_id);
@@ -128,6 +108,7 @@ const App = () => {
         localStorage.removeItem(STORE_KEY_ROLE);
       }
 
+      setRoleChecked(true);
       setSessionChecked(true);
     };
 
@@ -138,9 +119,11 @@ const App = () => {
 
       if (sess) {
         await fetchUserRole();
+        setRoleChecked(true);
       } else {
         setRole('');
         localStorage.removeItem(STORE_KEY_ROLE);
+        setRoleChecked(true);
       }
     });
 
@@ -151,7 +134,8 @@ const App = () => {
     };
   }, []);
 
-  const canEdit = role === 'admin';
+  // canEdit est false tant que le rôle n'est pas confirmé par Supabase
+  const canEdit = roleChecked && role === 'admin';
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -299,8 +283,33 @@ const App = () => {
     event.target.value = ''; 
   };
 
-  if (sessionChecked && !isLoggedIn) {
+  // Écran de chargement — attend la confirmation du rôle depuis Supabase
+  // Empêche tout accès à l'UI avant que le serveur ait répondu
+  if (!sessionChecked) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-slate-400 text-sm">Vérification en cours...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
     return <AuthScreen />;
+  }
+
+  // Session valide mais rôle pas encore confirmé → spinner court
+  if (!roleChecked) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-slate-400 text-sm">Chargement du profil...</span>
+        </div>
+      </div>
+    );
   }
 
   const renderContent = () => {
