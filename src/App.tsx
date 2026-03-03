@@ -24,8 +24,20 @@ const UpdateBanner = () => {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: ServiceWorkerRegistration | undefined) {
-      // Vérifie une mise à jour toutes les 60 secondes
-      r && setInterval(() => r.update(), 60_000);
+      if (!r) return;
+
+      // Vérification toutes les 30s (plus fréquent qu'avant)
+      setInterval(() => r.update(), 30_000);
+
+      // iOS Safari ne détecte pas les mises à jour automatiquement —
+      // on force une vérification à chaque fois que l'app reprend le focus
+      // ou redevient visible (ex: retour d'une autre app).
+      const forceCheck = () => { r.update().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') forceCheck();
+      });
+      window.addEventListener('focus', forceCheck);
+      window.addEventListener('pageshow', forceCheck); // crucial pour iOS
     },
   });
 
