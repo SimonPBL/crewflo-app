@@ -7,7 +7,7 @@ import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
-import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, Hammer, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
 import { getSupabase } from "../services/supabase";
 // @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -385,7 +385,7 @@ const App = () => {
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform transition-transform duration-200 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} flex flex-col`}>
         <div className="p-4 border-b border-slate-800 flex items-center justify-between flex-none">
           <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <div className="bg-blue-600 p-1.5 rounded-lg"><Hammer className="w-5 h-5 text-white" /></div>
+            <img src="/icon-192.png" alt="CrewFlo" className="w-8 h-8 rounded-lg" />
             <span>CrewFlo</span>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white"><X className="w-6 h-6" /></button>
