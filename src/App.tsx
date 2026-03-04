@@ -419,7 +419,15 @@ const App = () => {
     if (!isCloudConnected) return null;
     if (globalStatus === 'saving') return <div className="flex items-center gap-2 text-yellow-500 text-[10px] font-bold animate-pulse"><Loader2 className="w-3 h-3 animate-spin" /> Envoi...</div>;
     if (globalStatus === 'saved') return <div className="flex items-center gap-2 text-green-500 text-[10px] font-bold"><CheckCircle2 className="w-3 h-3" /> Synchronisé</div>;
-    if (globalStatus === 'error') return <div className="flex items-center gap-2 text-orange-500 text-[10px] font-bold" title="Pas de connexion internet."><AlertTriangle className="w-3 h-3" /> Hors ligne (Local)</div>;
+    if (globalStatus === 'error') return (
+      <button
+        onClick={() => window.location.reload()}
+        className="flex items-center gap-1.5 text-red-500 text-[10px] font-bold hover:text-red-400 transition-colors"
+        title="Session expirée ou erreur réseau — cliquez pour rechargement"
+      >
+        <AlertTriangle className="w-3 h-3" /> Session expirée · Recharger
+      </button>
+    );
     return <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold"><Wifi className="w-3 h-3" /> Connecté</div>;
   };
 

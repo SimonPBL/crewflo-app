@@ -83,6 +83,15 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     } catch (err: any) {
       console.warn(`[SyncStore] save attempt ${attempt} failed:`, err?.message ?? err);
 
+      // Erreur d'auth (JWT expiré, RLS, permission refusée) → échec immédiat, pas de retry
+      const msg = (err?.message ?? '').toLowerCase();
+      const isAuthError = msg.includes('jwt') || msg.includes('auth') || msg.includes('security policy') || err?.code === '42501' || err?.status === 401 || err?.status === 403;
+      if (isAuthError) {
+        console.error('[SyncStore] auth error — session invalide, rechargement requis.');
+        setStatus('error');
+        return;
+      }
+
       if (attempt < MAX_RETRIES) {
         const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
         saveTimeoutRef.current = setTimeout(() => saveToCloud(dataToSave, attempt + 1), delay);
