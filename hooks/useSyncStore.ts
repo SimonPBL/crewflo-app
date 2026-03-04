@@ -7,7 +7,7 @@ const SAVE_TIMEOUT_MS  = 10_000; // 10s — si pas de réponse, on retry
 const MAX_RETRIES      = 3;
 const KEEPALIVE_MS     = 25_000; // ping toutes les 25s pour garder la connexion vivante
 
-export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean = true) {
+export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean = true, readOnly: boolean = false) {
   const supabase        = getSupabase();
   const { companyId }   = getSupabaseConfig();
   const isCloud         = !!supabase;
@@ -35,7 +35,7 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
   const channelRef      = useRef<any>(null);
 
   // ── Fetch depuis Supabase ─────────────────────────────────────────────────
-  const fetchFromCloud = useCallback(async () => {
+  const fetchFromCloud = useCallback(async (isReadOnly = false) => {
     if (!supabase) return;
     try {
       const { data, error } = await supabase
@@ -51,8 +51,12 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
         isRemoteUpdate.current = false;
         setStatus('saved');
       } else if (error?.code === 'PGRST116') {
-        const local = getSavedValue();
-        await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
+        if (!isReadOnly) {
+          // Seulement l'admin peut créer la ligne initiale
+          const local = getSavedValue();
+          await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
+        }
+        // Supplier : pas de données trouvées → normal, on attend que l'admin sync
       }
     } catch (e) {
       console.warn('[SyncStore] fetchFromCloud error:', e);
@@ -61,7 +65,7 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
 
   // ── Save avec timeout + retry ─────────────────────────────────────────────
   const saveToCloud = useCallback(async (dataToSave: T, attempt = 1): Promise<void> => {
-    if (!supabase) return;
+    if (!supabase || readOnly) return;
     setStatus('saving');
 
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -100,7 +104,7 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
         setStatus('error');
       }
     }
-  }, [effectiveKey, supabase]);
+  }, [effectiveKey, supabase, readOnly]);
 
   // ── persistData ───────────────────────────────────────────────────────────
   const persistData = useCallback((newData: T) => {
@@ -109,17 +113,17 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
       localStorage.setItem(effectiveKey, JSON.stringify(newData));
     } catch (e) { console.error(e); }
 
-    if (isCloud && supabase) {
+    if (isCloud && supabase && !readOnly) {
       pendingData.current = newData;
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveToCloud(newData);
     }
-  }, [effectiveKey, isCloud, supabase, saveToCloud]);
+  }, [effectiveKey, isCloud, supabase, readOnly, saveToCloud]);
 
   // ── Chargement initial — attend que la session soit confirmée (ready=true) ──
   useEffect(() => {
     if (!isCloud || !ready) return;
-    fetchFromCloud();
+    fetchFromCloud(readOnly);
   }, [effectiveKey, isCloud, ready]);
 
   // ── Canal Realtime avec reconnexion auto ──────────────────────────────────
@@ -176,15 +180,11 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
   useEffect(() => {
     if (!isCloud) return;
 
-    // Priorité : envoyer d'abord les changements locaux en attente,
-    // ENSUITE seulement fetcher depuis le cloud pour ne pas les écraser.
     const syncOnResume = async () => {
       if (pendingData.current) {
-        // On a des changements locaux non envoyés → les envoyer en premier
         await saveToCloud(pendingData.current);
       } else {
-        // Rien en attente → safe de fetcher la version du serveur
-        fetchFromCloud();
+        fetchFromCloud(readOnly);
       }
       setupChannel();
     };
@@ -194,7 +194,6 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     };
     const handleFocus = () => syncOnResume();
 
-    // Retour en ligne (après mode avion / perte réseau)
     const handleOnline = () => {
       console.log('[SyncStore] retour en ligne → envoi des données en attente');
       syncOnResume();
@@ -208,7 +207,7 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
     };
-  }, [isCloud, fetchFromCloud, saveToCloud, setupChannel]);
+  }, [isCloud, fetchFromCloud, saveToCloud, setupChannel, readOnly]);
 
   // ── API publique ──────────────────────────────────────────────────────────
   const setAndSyncValue = useCallback((newValue: T | ((val: T) => T)) => {

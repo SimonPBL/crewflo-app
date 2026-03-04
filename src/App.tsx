@@ -74,6 +74,7 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
   const [userEmail, setUserEmail] = useState<string>('');
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const fetchUserRole = async () => {
     if (!supabase) return;
@@ -88,16 +89,17 @@ const App = () => {
         .eq('id', user.id)
         .single();
 
-      if (!error && data) {
-        setRole(data.role || ''); // rôle validé par Supabase — jamais depuis localStorage
-        if (data.company_id) {
-          const existing = localStorage.getItem('crewflo_company_id');
-          localStorage.setItem('crewflo_company_id', data.company_id);
-          if (!existing) {
-            window.location.reload();
-            return;
-          }
-        }
+      if (error || !data || !data.company_id) {
+        setProfileIncomplete(true);
+        return;
+      }
+
+      setRole(data.role || ''); // rôle validé par Supabase — jamais depuis localStorage
+      const existing = localStorage.getItem('crewflo_company_id');
+      localStorage.setItem('crewflo_company_id', data.company_id);
+      if (!existing) {
+        window.location.reload();
+        return;
       }
     } catch (e) {
       // ignore
@@ -218,9 +220,11 @@ const App = () => {
     },
   ];
 
-  const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects, roleChecked);
-  const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers, roleChecked);
-  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked);
+  const isSupplier = roleChecked && role === 'supplier';
+
+  const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects, roleChecked, isSupplier);
+  const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers, roleChecked, isSupplier);
+  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked, false); // tasks: fournisseur peut écrire (confirm/refus/notes)
 
   const isCloudConnected = isCloudP || isCloudS || isCloudT;
 
@@ -370,6 +374,28 @@ const App = () => {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-slate-400 text-sm">Chargement du profil...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Profil sans company_id → compte non associé à une compagnie
+  if (profileIncomplete) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-sm text-center space-y-3 shadow-2xl">
+          <div className="text-4xl">⚠️</div>
+          <h2 className="font-bold text-slate-800 text-lg">Profil incomplet</h2>
+          <p className="text-sm text-slate-500">
+            Votre compte n'est pas encore associé à une compagnie.
+            Contactez votre administrateur.
+          </p>
+          <button
+            onClick={() => supabase?.auth.signOut().then(() => window.location.reload())}
+            className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-700"
+          >
+            Se déconnecter
+          </button>
         </div>
       </div>
     );
