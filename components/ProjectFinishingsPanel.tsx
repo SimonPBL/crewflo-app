@@ -320,17 +320,43 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, projectName
 
   // ── Charger ────────────────────────────────────────────────────────────────
 
-  const load = useCallback(async () => {
-    if (!supabase) return;
-    const { data: row, error: err } = await supabase
-      .from('project_finishing_data')
-      .select('data')
-      .eq('project_id', projectId)
-      .eq('company_id', companyId || 'default')
-      .single();
+  const load = useCallback(async (attempt = 1) => {
+    if (!supabase) { setLoading(false); return; }
 
-    if (err && err.code !== 'PGRST116') { setError('Erreur de chargement.'); }
-    else if (row?.data) { setData(row.data as FinishingData); }
+    // Timeout de 8s — évite le spinner infini si Supabase est lent
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 8000)
+    );
+
+    try {
+      const queryPromise = supabase
+        .from('project_finishing_data')
+        .select('data')
+        .eq('project_id', projectId)
+        .eq('company_id', companyId || 'default')
+        .single();
+
+      const { data: row, error: err } = await Promise.race([queryPromise, timeout]) as any;
+
+      if (err && err.code !== 'PGRST116') {
+        // Retry automatique jusqu'à 3 fois si erreur réseau
+        if (attempt < 3 && (err.message?.includes('fetch') || err.message?.includes('network'))) {
+          setTimeout(() => load(attempt + 1), attempt * 1500);
+          return;
+        }
+        setError('Erreur de chargement. Vérifiez votre connexion.');
+      } else if (row?.data) {
+        setData(row.data as FinishingData);
+        setError(null);
+      }
+    } catch (e: any) {
+      if (attempt < 3) {
+        // Retry sur timeout
+        setTimeout(() => load(attempt + 1), attempt * 2000);
+        return;
+      }
+      setError('Délai dépassé. Appuyez sur Actualiser.');
+    }
     setLoading(false);
   }, [projectId, companyId, supabase]);
 
@@ -454,6 +480,18 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, projectName
   if (loading) return (
     <div className="p-6 flex items-center justify-center gap-2 text-slate-400">
       <Loader2 className="w-5 h-5 animate-spin" /> Chargement...
+    </div>
+  );
+
+  if (error) return (
+    <div className="p-6 text-center flex flex-col items-center gap-3">
+      <p className="text-sm text-red-500">{error}</p>
+      <button
+        onClick={() => { setError(null); setLoading(true); load(); }}
+        className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+      >
+        Actualiser
+      </button>
     </div>
   );
 

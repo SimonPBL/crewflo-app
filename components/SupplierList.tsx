@@ -10,9 +10,8 @@ interface SupplierListProps {
 }
 
 export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppliers, canEdit: canEditProp }) => {
-  // Enforce role-based read-only (defense-in-depth)
-  const role = (localStorage.getItem("crewflo_role") || "").toLowerCase();
-  const canEdit = !!canEditProp && role === "admin";
+  // canEdit vient de App.tsx qui valide le rôle côté serveur — pas besoin de relire localStorage
+  const canEdit = !!canEditProp;
   // State pour l'ajout
   const [newSupplierName, setNewSupplierName] = useState('');
   const [newSupplierTrade, setNewSupplierTrade] = useState(TRADES[0]);
