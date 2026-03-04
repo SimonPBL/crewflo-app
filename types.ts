@@ -21,8 +21,9 @@ export interface Task {
   title: string;
   description?: string;
   notes?: string;
-  start: string; // ISO Date String
-  end: string;   // ISO Date String
+  start: string;      // ISO Date String
+  end: string;        // ISO Date String
+  createdAt?: string; // ISO Date String — set at creation, never modified
 }
 
 export interface Conflict {

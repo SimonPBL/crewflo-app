@@ -40,6 +40,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [finishingsMap, setFinishingsMap] = useState<Record<string, any>>({});
+  const [filterSupplierId, setFilterSupplierId] = useState<string>('all');
 
   // États pour le Drag & Drop de sélection de date (Main View)
   const [isDragging, setIsDragging] = useState(false);
@@ -391,8 +392,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 const colorClass = supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
                                 const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
 
+                                const isNew = !isPdf && task.createdAt
+                                  ? (Date.now() - new Date(task.createdAt).getTime()) < 48 * 60 * 60 * 1000
+                                  : false;
+
                                 return (
-                                <div 
+                                <div
                                     key={task.id}
                                     onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => { e.stopPropagation(); if (isPdf) return; handleEditTask(e, task); }}
@@ -407,6 +412,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     {hasConflict && (
                                     <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 z-20 shadow-sm border border-white">
                                         <AlertTriangle className="w-2 h-2" />
+                                    </div>
+                                    )}
+                                    {isNew && (
+                                    <div className="absolute -top-1.5 -left-1 bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded z-20 leading-none shadow-sm">
+                                        Nouveau
                                     </div>
                                     )}
                                     <div className="flex flex-col gap-0.5">
@@ -559,7 +569,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     if (editingTaskId) {
       setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...newTask } as Task : t));
     } else {
-      setTasks([...tasks, { id: crypto.randomUUID(), ...newTask as Task }]);
+      setTasks([...tasks, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...newTask as Task }]);
     }
     setIsModalOpen(false);
                 setIsViewOnly(false);
@@ -743,9 +753,10 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   const visibleTasks = useMemo(() => {
     let filtered = tasks;
-    if (currentProjectId) filtered = tasks.filter(t => t.projectId === currentProjectId);
+    if (currentProjectId) filtered = filtered.filter(t => t.projectId === currentProjectId);
+    if (filterSupplierId !== 'all') filtered = filtered.filter(t => t.supplierId === filterSupplierId);
     return filtered;
-  }, [tasks, currentProjectId]);
+  }, [tasks, currentProjectId, filterSupplierId]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
@@ -762,7 +773,18 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           <button onClick={goToToday} className="text-xs font-medium text-blue-600 hover:text-blue-800 underline">Aujourd'hui</button>
         </div>
 
-        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-between md:justify-end flex-wrap">
+            {/* Filtre par fournisseur */}
+            <select
+              value={filterSupplierId}
+              onChange={e => setFilterSupplierId(e.target.value)}
+              className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none max-w-[150px] truncate"
+            >
+              <option value="all">Tous les fournisseurs</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
             {/* Navigation Multi-Mois - Visible sur mobile aussi maintenant */}
             <div className="flex bg-slate-100 rounded-lg p-1 overflow-x-auto">
                 {[1, 3, 6, 12].map(num => (
