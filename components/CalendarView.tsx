@@ -351,10 +351,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             `}
                             onClick={(e) => {
                               if (isPdf) return;
-                              // En mode fournisseur (lecture seule), clic sur la journée = liste des tâches du jour
                               if (!canEdit) {
+                                // Fournisseur : voir les tâches du jour
                                 e.stopPropagation();
                                 openDayDetails(day);
+                              } else if (!isDragging) {
+                                // Admin : tap sur une case = ouvrir modale avec date pré-remplie
+                                e.stopPropagation();
+                                const start = new Date(day);
+                                const end = new Date(day);
+                                start.setHours(7, 0, 0, 0);
+                                end.setHours(17, 0, 0, 0);
+                                const startIso = start.toISOString();
+                                const endIso = end.toISOString();
+                                setNewTask({
+                                  projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''),
+                                  start: startIso,
+                                  end: endIso,
+                                  supplierId: suppliers.length > 0 ? suppliers[0].id : '',
+                                });
+                                setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
+                                setEditingTaskId(null);
+                                setIsViewOnly(false);
+                                setIsModalOpen(true);
                               }
                             }}
                             onMouseDown={(e) => interactive && handleDayMouseDown(day, e)}
