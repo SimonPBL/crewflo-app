@@ -77,12 +77,22 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     );
 
     try {
-      const savePromise = supabase
+      // Essayer UPDATE d'abord (fonctionne pour admin et fournisseur)
+      const updatePromise = supabase
         .from('crewflo_sync')
-        .upsert({ key: effectiveKey, data: dataToSave as any });
+        .update({ data: dataToSave as any })
+        .eq('key', effectiveKey);
 
-      const { error } = await Promise.race([savePromise, timeoutPromise]) as any;
-      if (error) throw error;
+      const { error: updateError } = await Promise.race([updatePromise, timeoutPromise]) as any;
+
+      if (updateError) {
+        // Si UPDATE échoue, essayer upsert (admin seulement — création de nouvelle ligne)
+        const upsertPromise = supabase
+          .from('crewflo_sync')
+          .upsert({ key: effectiveKey, data: dataToSave as any });
+        const { error: upsertError } = await Promise.race([upsertPromise, timeoutPromise]) as any;
+        if (upsertError) throw upsertError;
+      }
 
       pendingData.current = null;
       isSavingRef.current = false;
