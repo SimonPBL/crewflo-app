@@ -24,7 +24,8 @@ export interface Task {
   start: string;      // ISO Date String
   end: string;        // ISO Date String
   createdAt?: string; // ISO Date String — set at creation, never modified
-  confirmedBySupplier?: boolean;
+  confirmedBySupplier?: boolean; // legacy — kept for backward compat
+  taskStatus?: 'pending' | 'confirmed' | 'declined'; // réponse du fournisseur
   supplierNotes?: {
     text: string;
     authorName: string; // nom du fournisseur qui a écrit

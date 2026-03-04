@@ -250,7 +250,21 @@ const App = () => {
     : null;
 
   const handleConfirmTask = (taskId: string) => {
-    setTasks((prev: Task[]) => prev.map(t => t.id === taskId ? { ...t, confirmedBySupplier: true } : t));
+    setTasks((prev: Task[]) => prev.map(t =>
+      t.id === taskId ? { ...t, confirmedBySupplier: true, taskStatus: 'confirmed' as const } : t
+    ));
+  };
+
+  const handleDeclineTask = (taskId: string) => {
+    setTasks((prev: Task[]) => prev.map(t =>
+      t.id === taskId ? { ...t, taskStatus: 'declined' as const } : t
+    ));
+  };
+
+  const handleResetTask = (taskId: string) => {
+    setTasks((prev: Task[]) => prev.map(t =>
+      t.id === taskId ? { ...t, taskStatus: 'pending' as const, confirmedBySupplier: false } : t
+    ));
   };
 
   const handleUpdateSupplierNote = (
@@ -391,6 +405,8 @@ const App = () => {
             supplierSelf={supplierSelf}
             canEdit={canEdit}
             onConfirmTask={handleConfirmTask}
+            onDeclineTask={handleDeclineTask}
+            onResetTask={handleResetTask}
             onUpdateSupplierNote={handleUpdateSupplierNote}
           />
         );

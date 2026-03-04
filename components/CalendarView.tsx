@@ -410,7 +410,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     ${isPdf ? 'p-1 mb-1 border-l-2' : 'p-1 text-[10px]'}
                                     ${interactive ? 'cursor-pointer hover:brightness-95 hover:scale-[1.02] z-10' : ''}
                                     ${colorClass}
-                                    ${hasConflict ? 'ring-2 ring-red-500 ring-offset-0 z-20' : ''}
+                                    ${hasConflict ? 'ring-2 ring-red-500 ring-offset-0 z-20' : task.taskStatus === 'declined' ? 'ring-2 ring-red-400 ring-offset-0' : ''}
                                     `}
                                 >
                                     {hasConflict && (
@@ -439,6 +439,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         <rect x="2" y="1.5" width="6" height="1" rx="0.5"/>
                                         <rect x="2" y="3.5" width="6" height="1" rx="0.5"/>
                                         <rect x="2" y="5.5" width="4" height="1" rx="0.5"/>
+                                        </svg>
+                                    </span>
+                                    )}
+                                    {task.taskStatus === 'declined' && !isPdf && (
+                                    <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center z-20" title="Refusé par le fournisseur">
+                                        <svg viewBox="0 0 10 10" className="w-2 h-2 stroke-white stroke-2 fill-none">
+                                        <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
+                                        <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
                                         </svg>
                                     </span>
                                     )}
@@ -1014,6 +1022,26 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Bannière refus fournisseur — visible admin uniquement */}
+              {newTask.taskStatus === 'declined' && !isViewOnly && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3">
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <X className="w-4 h-4 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-red-700">Ce fournisseur a refusé cette tâche</p>
+                    {newTask.supplierNotes?.text && (
+                      <p className="text-sm text-red-600 mt-1">"{newTask.supplierNotes.text}"</p>
+                    )}
+                    {newTask.supplierNotes?.updatedAt && (
+                      <p className="text-xs text-red-400 mt-1">
+                        — {newTask.supplierNotes.authorName} · {new Date(newTask.supplierNotes.updatedAt).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Titre</label>
                 <input

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, Supplier, Project } from '../types';
-import { Check, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Pencil, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 interface MyTasksViewProps {
   tasks: Task[];
@@ -9,6 +9,8 @@ interface MyTasksViewProps {
   supplierSelf: Supplier | null; // null = admin, voit toutes les tâches
   canEdit: boolean;
   onConfirmTask: (taskId: string) => void;
+  onDeclineTask: (taskId: string) => void;
+  onResetTask: (taskId: string) => void;
   onUpdateSupplierNote: (taskId: string, note: { text: string; authorName: string; authorId: string; updatedAt: string }) => void;
 }
 
@@ -21,11 +23,15 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
   projects,
   supplierSelf,
   onConfirmTask,
+  onDeclineTask,
+  onResetTask,
   onUpdateSupplierNote,
 }) => {
   const [showPast, setShowPast] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState('');
+  const [decliningTaskId, setDecliningTaskId] = useState<string | null>(null);
+  const [declineNoteValue, setDeclineNoteValue] = useState('');
 
   const filtered = supplierSelf
     ? tasks.filter(t => t.supplierId === supplierSelf.id)
@@ -55,11 +61,15 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
     const supplier = suppliers.find(s => s.id === task.supplierId);
     const project = projects.find(p => p.id === task.projectId);
     const isEditing = editingNoteId === task.id;
+    const isDeclining = decliningTaskId === task.id;
 
     const sameDay = task.start.slice(0, 10) === task.end.slice(0, 10);
     const dateDisplay = sameDay
       ? formatDate(task.start)
       : `${formatDate(task.start)} → ${formatDate(task.end)}`;
+
+    // Dériver le statut effectif (taskStatus prioritaire, confirmedBySupplier pour compat)
+    const effectiveStatus = task.taskStatus ?? (task.confirmedBySupplier ? 'confirmed' : 'pending');
 
     const startEditNote = () => {
       setNoteValue(task.supplierNotes?.text || '');
@@ -74,6 +84,20 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         updatedAt: new Date().toISOString(),
       });
       setEditingNoteId(null);
+    };
+
+    const handleDeclineConfirm = () => {
+      if (declineNoteValue.trim()) {
+        onUpdateSupplierNote(task.id, {
+          text: declineNoteValue.trim(),
+          authorName: supplierSelf?.name ?? 'Fournisseur',
+          authorId: supplierSelf?.id ?? '',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      onDeclineTask(task.id);
+      setDecliningTaskId(null);
+      setDeclineNoteValue('');
     };
 
     return (
@@ -150,29 +174,90 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
           </div>
         )}
 
-        {/* Bottom row */}
-        <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
-          {task.confirmedBySupplier ? (
-            <span className="flex items-center gap-1 text-xs font-bold text-green-600">
-              <Check className="w-3.5 h-3.5" /> Confirmé
-            </span>
+        {/* Bottom row — statut 3 états */}
+        <div className="mt-3 pt-2 border-t border-slate-100">
+          {effectiveStatus === 'declined' ? (
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-red-600">
+                <X className="w-3.5 h-3.5" /> Refusé
+              </span>
+              <button
+                onClick={() => onResetTask(task.id)}
+                className="text-xs px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Annuler le refus
+              </button>
+            </div>
+          ) : effectiveStatus === 'confirmed' ? (
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1 text-xs font-bold text-green-600">
+                <Check className="w-3.5 h-3.5" /> Confirmé
+              </span>
+              <button
+                onClick={() => onResetTask(task.id)}
+                className="text-xs px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
           ) : (
-            <button
-              onClick={() => onConfirmTask(task.id)}
-              className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-            >
-              <Check className="w-3.5 h-3.5" /> Confirmer ✓
-            </button>
+            <>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onConfirmTask(task.id)}
+                  className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" /> Confirmer
+                </button>
+                <button
+                  onClick={() => { setDecliningTaskId(task.id); setDeclineNoteValue(''); }}
+                  className="flex-1 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <X className="w-4 h-4" /> Refuser
+                </button>
+              </div>
+
+              {/* Étape de confirmation du refus */}
+              {isDeclining && (
+                <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+                  <p className="text-xs text-red-700 font-medium">Laisser une note de disponibilité (optionnel) :</p>
+                  <textarea
+                    value={declineNoteValue}
+                    onChange={e => setDeclineNoteValue(e.target.value)}
+                    className="w-full p-2 text-sm border border-red-200 rounded-lg bg-white focus:ring-2 focus:ring-red-300 outline-none min-h-[60px]"
+                    placeholder="Ex: Non disponible cette semaine, retour le 23 juin..."
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setDecliningTaskId(null); setDeclineNoteValue(''); }}
+                      className="flex-1 py-1.5 text-sm text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleDeclineConfirm}
+                      className="flex-1 py-1.5 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg font-medium"
+                    >
+                      Confirmer le refus
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {!isEditing && (
-            <button
-              onClick={startEditNote}
-              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-              title="Ajouter / modifier ma note"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
+          {/* Bouton note — visible quand pas en mode édition ni refusé */}
+          {!isEditing && effectiveStatus !== 'declined' && (
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={startEditNote}
+                className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                title="Ajouter / modifier ma note"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
         </div>
       </div>
