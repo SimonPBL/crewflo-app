@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Supplier, TRADES, COLORS } from '../types';
 import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2 } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
-import { getSupabase, getSupabaseConfig } from '../services/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../services/supabase';
 
 interface SupplierListProps {
   suppliers: Supplier[];
@@ -14,9 +15,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   // canEdit vient de App.tsx qui valide le rôle côté serveur — pas besoin de relire localStorage
   const canEdit = !!canEditProp;
 
-  // Supabase
-  const supabase = getSupabase();
-  const { companyId } = getSupabaseConfig();
+  // Supabase config (url/key seulement — on NE lit PAS le singleton pour ne pas affecter la session admin)
+  const { url: supabaseUrl, key: supabaseKey, companyId } = getSupabaseConfig();
 
   // State pour l'ajout
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -41,19 +41,20 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
     // Si un email + mot de passe sont fournis, créer un compte Supabase Auth
     if (newSupplierEmail.trim() && newSupplierPassword.trim()) {
-      if (!supabase) {
+      if (!supabaseUrl || !supabaseKey) {
         setCreateError('Supabase non configuré.');
         return;
       }
       setIsCreating(true);
 
       try {
-        // 1. Sauvegarder la session admin courante
-        const { data: sessionData } = await supabase.auth.getSession();
-        const adminSession = sessionData?.session;
+        // Client temporaire isolé — NE touche PAS au singleton principal ni à sa session admin
+        const tempClient = createClient(supabaseUrl, supabaseKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
 
-        // 2. Créer le compte fournisseur avec timeout 15s
-        const signUpPromise = supabase.auth.signUp({
+        // 1. Créer le compte fournisseur avec timeout 15s
+        const signUpPromise = tempClient.auth.signUp({
           email: newSupplierEmail.trim(),
           password: newSupplierPassword.trim(),
         });
@@ -66,20 +67,9 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
         const newUserId = signUpData.user?.id;
 
-        // 3. Restaurer la session admin immédiatement (timeout 5s — on continue même si ça traîne)
-        if (adminSession) {
-          await Promise.race([
-            supabase.auth.setSession({
-              access_token: adminSession.access_token,
-              refresh_token: adminSession.refresh_token,
-            }),
-            new Promise<void>(resolve => setTimeout(resolve, 5_000)),
-          ]);
-        }
-
-        // 4. Insérer la ligne profiles avec le rôle supplier
+        // 2. Insérer la ligne profiles via le client temporaire (session du nouveau compte)
         if (newUserId && companyId) {
-          const { error: profileError } = await supabase
+          const { error: profileError } = await tempClient
             .from('profiles')
             .upsert({
               id: newUserId,
