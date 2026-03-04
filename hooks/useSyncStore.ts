@@ -33,6 +33,8 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
   const saveTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keepaliveRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef      = useRef<any>(null);
+  const isSavingRef     = useRef(false);
+  const lastSyncRef     = useRef<number>(0);
 
   // ── Fetch depuis Supabase ─────────────────────────────────────────────────
   const fetchFromCloud = useCallback(async (isReadOnly = false) => {
@@ -66,6 +68,8 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
   // ── Save avec timeout + retry ─────────────────────────────────────────────
   const saveToCloud = useCallback(async (dataToSave: T, attempt = 1): Promise<void> => {
     if (!supabase || readOnly) return;
+    if (isSavingRef.current) return; // appel concurrent — ignorer
+    isSavingRef.current = true;
     setStatus('saving');
 
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -81,6 +85,7 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
       if (error) throw error;
 
       pendingData.current = null;
+      isSavingRef.current = false;
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 2000);
 
@@ -92,15 +97,18 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
       const isAuthError = msg.includes('jwt') || msg.includes('auth') || msg.includes('security policy') || err?.code === '42501' || err?.status === 401 || err?.status === 403;
       if (isAuthError) {
         console.error('[SyncStore] auth error — session invalide, rechargement requis.');
+        isSavingRef.current = false;
         setStatus('error');
         return;
       }
 
       if (attempt < MAX_RETRIES) {
         const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        isSavingRef.current = false; // libérer le verrou pour que le retry puisse s'exécuter
         saveTimeoutRef.current = setTimeout(() => saveToCloud(dataToSave, attempt + 1), delay);
       } else {
         console.error('[SyncStore] save failed after', MAX_RETRIES, 'attempts.');
+        isSavingRef.current = false;
         setStatus('error');
       }
     }
@@ -192,7 +200,12 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     const handleVisible = () => {
       if (document.visibilityState === 'visible') syncOnResume();
     };
-    const handleFocus = () => syncOnResume();
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastSyncRef.current < 30_000) return; // max 1 resync par 30s via focus
+      lastSyncRef.current = now;
+      syncOnResume();
+    };
 
     const handleOnline = () => {
       console.log('[SyncStore] retour en ligne → envoi des données en attente');
