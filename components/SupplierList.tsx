@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Supplier, TRADES, COLORS } from '../types';
-import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2 } from 'lucide-react';
+import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2, Eye, EyeOff } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseConfig } from '../services/supabase';
@@ -21,6 +21,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   // State pour l'ajout
   const [newSupplierName, setNewSupplierName] = useState('');
   const [newSupplierPassword, setNewSupplierPassword] = useState('');
+  const [newSupplierPasswordConfirm, setNewSupplierPasswordConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -38,6 +40,11 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
     setCreateError(null);
     setCreateSuccess(null);
+
+    if (newSupplierPasswordConfirm && newSupplierPassword !== newSupplierPasswordConfirm) {
+      setCreateError('Les mots de passe ne correspondent pas.');
+      return;
+    }
 
     // Si un email + mot de passe sont fournis, créer un compte Supabase Auth
     if (newSupplierEmail.trim() && newSupplierPassword.trim()) {
@@ -102,6 +109,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     setNewSupplierName('');
     setNewSupplierEmail('');
     setNewSupplierPassword('');
+    setNewSupplierPasswordConfirm('');
+    setShowPassword(false);
     setNewSupplierColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
   };
 
@@ -229,21 +238,62 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
             {/* Mot de passe pour compte Supabase */}
             <div className="lg:col-span-12">
-              <label className="block text-sm font-medium text-slate-600 mb-1">
-                Mot de passe (optionnel — crée un compte de connexion)
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                Mot de passe <span className="text-slate-400 font-normal normal-case">(optionnel — pour créer un accès)</span>
               </label>
-              <input
-                type="password"
-                value={newSupplierPassword}
-                onChange={(e) => setNewSupplierPassword(e.target.value)}
-                disabled={!canEdit}
-                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-                placeholder="Laisser vide pour ne pas créer de compte"
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                Si vous remplissez email + mot de passe, un compte fournisseur Supabase sera créé automatiquement.
-              </p>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={newSupplierPassword}
+                  onChange={e => setNewSupplierPassword(e.target.value)}
+                  disabled={!canEdit}
+                  className="w-full p-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-slate-900 text-sm"
+                  placeholder="Min. 6 caractères"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
+
+            {/* Confirmation mot de passe */}
+            {newSupplierPassword.length > 0 && (
+              <div className="lg:col-span-12">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmer le mot de passe</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newSupplierPasswordConfirm}
+                    onChange={e => setNewSupplierPasswordConfirm(e.target.value)}
+                    disabled={!canEdit}
+                    className={`w-full p-2 pr-10 border rounded-lg focus:ring-2 outline-none bg-white text-slate-900 text-sm ${
+                      newSupplierPasswordConfirm.length > 0 && newSupplierPasswordConfirm !== newSupplierPassword
+                        ? 'border-red-300 focus:ring-red-400'
+                        : newSupplierPasswordConfirm.length > 0 && newSupplierPasswordConfirm === newSupplierPassword
+                        ? 'border-green-300 focus:ring-green-400'
+                        : 'border-slate-300 focus:ring-blue-500'
+                    }`}
+                    placeholder="Répéter le mot de passe"
+                  />
+                  {newSupplierPasswordConfirm.length > 0 && (
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2">
+                      {newSupplierPasswordConfirm === newSupplierPassword
+                        ? <Check className="w-4 h-4 text-green-500" />
+                        : <X className="w-4 h-4 text-red-400" />
+                      }
+                    </span>
+                  )}
+                </div>
+                {newSupplierPasswordConfirm.length > 0 && newSupplierPasswordConfirm !== newSupplierPassword && (
+                  <p className="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas.</p>
+                )}
+              </div>
+            )}
 
             {/* Sélecteur de couleur */}
             <div className="lg:col-span-12">
