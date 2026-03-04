@@ -45,6 +45,11 @@ export const AuthScreen: React.FC = () => {
       setCompanyId(profile.company_id);
       localStorage.setItem(STORE_KEY_ROLE, profile.role);
 
+      // Vider le cache localStorage des données crewflo pour forcer un fetch propre depuis Supabase
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(profile.company_id) || k === 'crewflo_projects' || k === 'crewflo_suppliers' || k === 'crewflo_tasks')
+        .forEach(k => localStorage.removeItem(k));
+
       // Recharger pour réinitialiser les stores (companyId change les clés de sync)
       window.location.reload();
     } catch (e: any) {

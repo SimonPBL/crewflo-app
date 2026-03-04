@@ -73,12 +73,14 @@ const App = () => {
   const [roleChecked, setRoleChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
+  const [userEmail, setUserEmail] = useState<string>('');
 
   const fetchUserRole = async () => {
     if (!supabase) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      if (user?.email) setUserEmail(user.email.toLowerCase());
 
       const { data, error } = await supabase
         .from('profiles')
@@ -243,9 +245,8 @@ const App = () => {
 
   const canGlobalUndo = canUndoP || canUndoS || canUndoT;
 
-  const supplierSelf = role === 'supplier'
-    ? (suppliers.find(s => s.email && supabase &&
-        s.email.toLowerCase() === (supabase as any).auth?._session?.user?.email?.toLowerCase()) ?? null)
+  const supplierSelf = role === 'supplier' && userEmail
+    ? (suppliers.find(s => s.email?.toLowerCase() === userEmail) ?? null)
     : null;
 
   const handleConfirmTask = (taskId: string) => {

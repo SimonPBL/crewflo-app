@@ -426,6 +426,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         </svg>
                                     </span>
                                     )}
+                                    {task.supplierNotes && !isPdf && (
+                                    <span
+                                        className="absolute bottom-0.5 left-0.5 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center z-20"
+                                        title={task.supplierNotes}
+                                    >
+                                        <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-white">
+                                        <rect x="2" y="1.5" width="6" height="1" rx="0.5"/>
+                                        <rect x="2" y="3.5" width="6" height="1" rx="0.5"/>
+                                        <rect x="2" y="5.5" width="4" height="1" rx="0.5"/>
+                                        </svg>
+                                    </span>
+                                    )}
                                     <div className="flex flex-col gap-0.5">
                                         {currentProjectId ? (
                                           // Vue par chantier : titre de la tâche + fournisseur
