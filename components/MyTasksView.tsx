@@ -1,0 +1,221 @@
+import React, { useState } from 'react';
+import { Task, Supplier, Project } from '../types';
+import { Check, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+
+interface MyTasksViewProps {
+  tasks: Task[];
+  suppliers: Supplier[];
+  projects: Project[];
+  supplierSelf: Supplier | null; // null = admin, voit toutes les tâches
+  canEdit: boolean;
+  onConfirmTask: (taskId: string) => void;
+  onUpdateSupplierNote: (taskId: string, note: string) => void;
+}
+
+const formatDate = (isoStr: string) =>
+  new Date(isoStr).toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'long' });
+
+export const MyTasksView: React.FC<MyTasksViewProps> = ({
+  tasks,
+  suppliers,
+  projects,
+  supplierSelf,
+  onConfirmTask,
+  onUpdateSupplierNote,
+}) => {
+  const [showPast, setShowPast] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteValue, setNoteValue] = useState('');
+
+  const filtered = supplierSelf
+    ? tasks.filter(t => t.supplierId === supplierSelf.id)
+    : tasks;
+
+  const sorted = [...filtered].sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+  );
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const in14days = new Date(today); in14days.setDate(in14days.getDate() + 14);
+
+  const upcomingGroup = sorted.filter(
+    t => new Date(t.end) >= today && new Date(t.start) <= in14days
+  );
+  const futureGroup = sorted.filter(
+    t => new Date(t.end) >= today && new Date(t.start) > in14days
+  );
+  const pastGroup = [...sorted]
+    .filter(t => new Date(t.end) < today)
+    .reverse(); // plus récent en premier pour les passées
+
+  const isNewTask = (task: Task) =>
+    !!task.createdAt && Date.now() - new Date(task.createdAt).getTime() < 48 * 60 * 60 * 1000;
+
+  const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
+    const supplier = suppliers.find(s => s.id === task.supplierId);
+    const project = projects.find(p => p.id === task.projectId);
+    const isEditing = editingNoteId === task.id;
+
+    const sameDay = task.start.slice(0, 10) === task.end.slice(0, 10);
+    const dateDisplay = sameDay
+      ? formatDate(task.start)
+      : `${formatDate(task.start)} → ${formatDate(task.end)}`;
+
+    const startEditNote = () => {
+      setNoteValue(task.supplierNotes || '');
+      setEditingNoteId(task.id);
+    };
+
+    const saveNote = () => {
+      onUpdateSupplierNote(task.id, noteValue);
+      setEditingNoteId(null);
+    };
+
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
+        {/* Top row */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          {supplier && (
+            <span className={`px-2 py-0.5 rounded text-xs font-bold ${supplier.color}`}>
+              {supplier.name}
+            </span>
+          )}
+          <span className="text-xs text-slate-500 truncate flex-1">{project?.name}</span>
+          {isNewTask(task) && (
+            <span className="bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+              Nouveau
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <div className="font-bold text-slate-800 mb-1">{task.title}</div>
+
+        {/* Date range */}
+        <div className="text-xs text-slate-500 mb-3">{dateDisplay}</div>
+
+        {/* Admin notes */}
+        {task.notes && (
+          <div className="bg-slate-50 rounded-lg p-2 mb-2">
+            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Note admin</div>
+            <div className="text-sm text-slate-600">{task.notes}</div>
+          </div>
+        )}
+
+        {/* Supplier notes display */}
+        {task.supplierNotes && !isEditing && (
+          <div className="bg-amber-50 rounded-lg p-2 mb-2">
+            <div className="text-[10px] font-bold text-amber-500 uppercase mb-1">Ma note</div>
+            <div className="text-sm text-amber-800">{task.supplierNotes}</div>
+          </div>
+        )}
+
+        {/* Edit note inline */}
+        {isEditing && (
+          <div className="mb-2">
+            <textarea
+              value={noteValue}
+              onChange={e => setNoteValue(e.target.value)}
+              className="w-full p-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 outline-none focus:ring-2 focus:ring-amber-400 min-h-[80px]"
+              placeholder="Ajouter une note..."
+              autoFocus
+            />
+            <div className="flex gap-2 mt-1 justify-end">
+              <button
+                onClick={() => setEditingNoteId(null)}
+                className="text-xs px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={saveNote}
+                className="text-xs px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom row */}
+        <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
+          {task.confirmedBySupplier ? (
+            <span className="flex items-center gap-1 text-xs font-bold text-green-600">
+              <Check className="w-3.5 h-3.5" /> Confirmé
+            </span>
+          ) : (
+            <button
+              onClick={() => onConfirmTask(task.id)}
+              className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+            >
+              <Check className="w-3.5 h-3.5" /> Confirmer ✓
+            </button>
+          )}
+
+          {!isEditing && (
+            <button
+              onClick={startEditNote}
+              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+              title="Ajouter / modifier ma note"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+    <div className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3">{title}</div>
+  );
+
+  return (
+    <div className="h-full overflow-y-auto bg-slate-50">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto pb-20 sm:pb-6">
+        <h2 className="text-2xl font-bold mb-6 text-slate-800">Mes Tâches</h2>
+
+        {upcomingGroup.length === 0 && futureGroup.length === 0 && pastGroup.length === 0 && (
+          <div className="text-center py-16 text-slate-400 text-lg">
+            Aucune tâche à venir 🎉
+          </div>
+        )}
+
+        {upcomingGroup.length > 0 && (
+          <div className="mb-6">
+            <SectionHeader title="Cette semaine & semaine prochaine" />
+            <div className="space-y-3">
+              {upcomingGroup.map(task => <TaskCard key={task.id} task={task} />)}
+            </div>
+          </div>
+        )}
+
+        {futureGroup.length > 0 && (
+          <div className="mb-6">
+            <SectionHeader title="À venir" />
+            <div className="space-y-3">
+              {futureGroup.map(task => <TaskCard key={task.id} task={task} />)}
+            </div>
+          </div>
+        )}
+
+        {pastGroup.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowPast(!showPast)}
+              className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-wide mb-3 hover:text-slate-700 transition-colors"
+            >
+              {showPast ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              Passées ({pastGroup.length})
+            </button>
+            {showPast && (
+              <div className="space-y-3">
+                {pastGroup.map(task => <TaskCard key={task.id} task={task} />)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

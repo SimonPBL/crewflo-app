@@ -7,8 +7,9 @@ import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
-import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building, ClipboardList } from 'lucide-react';
 import { getSupabase } from "../services/supabase";
+import { MyTasksView } from '../components/MyTasksView';
 // @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
@@ -242,7 +243,27 @@ const App = () => {
 
   const canGlobalUndo = canUndoP || canUndoS || canUndoT;
 
+  const supplierSelf = role === 'supplier'
+    ? (suppliers.find(s => s.email && supabase &&
+        s.email.toLowerCase() === (supabase as any).auth?._session?.user?.email?.toLowerCase()) ?? null)
+    : null;
+
+  const handleConfirmTask = (taskId: string) => {
+    setTasks((prev: Task[]) => prev.map(t => t.id === taskId ? { ...t, confirmedBySupplier: true } : t));
+  };
+
+  const handleUpdateSupplierNote = (taskId: string, note: string) => {
+    setTasks((prev: Task[]) => prev.map(t => t.id === taskId ? { ...t, supplierNotes: note } : t));
+  };
+
   const [currentView, setCurrentView] = useState<ViewMode>('calendar');
+
+  useEffect(() => {
+    if (roleChecked && role === 'supplier') {
+      setCurrentView('mytasks');
+    }
+  }, [roleChecked, role]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
@@ -355,6 +376,18 @@ const App = () => {
         return <ProjectList projects={projects} setProjects={setProjects} canEdit={canEdit} />;
       case 'ai':
         return <AIAssistant tasks={tasks} suppliers={suppliers} projects={projects} />;
+      case 'mytasks':
+        return (
+          <MyTasksView
+            tasks={tasks}
+            suppliers={suppliers}
+            projects={projects}
+            supplierSelf={supplierSelf}
+            canEdit={canEdit}
+            onConfirmTask={handleConfirmTask}
+            onUpdateSupplierNote={handleUpdateSupplierNote}
+          />
+        );
       default:
         return <div>Vue inconnue</div>;
     }
@@ -440,6 +473,12 @@ const App = () => {
         )}
 
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
+          <button
+            onClick={() => { setCurrentView('mytasks'); setSelectedProjectId(null); setIsSidebarOpen(false); }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'mytasks' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+          >
+            <ClipboardList className="w-5 h-5" /> Mes Tâches
+          </button>
           <button onClick={() => { setCurrentView('calendar'); setSelectedProjectId(null); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'calendar' && !selectedProjectId ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
             <CalendarIcon className="w-5 h-5" /> Calendrier Global
           </button>

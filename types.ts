@@ -24,6 +24,8 @@ export interface Task {
   start: string;      // ISO Date String
   end: string;        // ISO Date String
   createdAt?: string; // ISO Date String — set at creation, never modified
+  confirmedBySupplier?: boolean;
+  supplierNotes?: string;
 }
 
 export interface Conflict {
@@ -33,7 +35,7 @@ export interface Conflict {
   message: string;
 }
 
-export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai';
+export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks';
 
 export const TRADES = [
   'Électricien',

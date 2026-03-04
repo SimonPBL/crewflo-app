@@ -419,6 +419,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         Nouveau
                                     </div>
                                     )}
+                                    {task.confirmedBySupplier && !isPdf && (
+                                    <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center z-20">
+                                        <svg viewBox="0 0 10 10" className="w-2 h-2 text-white fill-none stroke-current stroke-2">
+                                        <polyline points="1.5,5 4,7.5 8.5,2.5" />
+                                        </svg>
+                                    </span>
+                                    )}
                                     <div className="flex flex-col gap-0.5">
                                         {currentProjectId ? (
                                           // Vue par chantier : titre de la tâche + fournisseur
@@ -1013,6 +1020,29 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     />
   </div>
 </div>
+
+{/* Notes fournisseur */}
+{!isViewOnly && newTask.supplierNotes && (
+  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+    <div className="text-[10px] font-bold text-amber-500 uppercase mb-1">Note du fournisseur</div>
+    {newTask.supplierNotes}
+  </div>
+)}
+{isViewOnly && (
+  <div className="border border-amber-200 rounded-xl overflow-hidden">
+    <div className="px-3 py-2 bg-amber-50 border-b border-amber-200">
+      <span className="text-xs font-bold text-amber-600 uppercase">Ma note</span>
+    </div>
+    <div className="p-3 bg-white">
+      <textarea
+        value={newTask.supplierNotes || ''}
+        onChange={e => setNewTask({ ...newTask, supplierNotes: e.target.value })}
+        className="w-full min-h-[80px] p-2 bg-amber-50 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none text-sm text-amber-800"
+        placeholder="Ajouter une note…"
+      />
+    </div>
+  </div>
+)}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
