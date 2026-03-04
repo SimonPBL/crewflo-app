@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Supplier, TRADES, COLORS } from '../types';
-import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils } from 'lucide-react';
+import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2 } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
+import { getSupabase, getSupabaseConfig } from '../services/supabase';
 
 interface SupplierListProps {
   suppliers: Supplier[];
@@ -12,8 +13,17 @@ interface SupplierListProps {
 export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppliers, canEdit: canEditProp }) => {
   // canEdit vient de App.tsx qui valide le rôle côté serveur — pas besoin de relire localStorage
   const canEdit = !!canEditProp;
+
+  // Supabase
+  const supabase = getSupabase();
+  const { companyId } = getSupabaseConfig();
+
   // State pour l'ajout
   const [newSupplierName, setNewSupplierName] = useState('');
+  const [newSupplierPassword, setNewSupplierPassword] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [newSupplierTrade, setNewSupplierTrade] = useState(TRADES[0]);
   const [newSupplierEmail, setNewSupplierEmail] = useState('');
   const [newSupplierColor, setNewSupplierColor] = useState(COLORS[0]);
@@ -22,10 +32,67 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Supplier>>({});
 
-  const addSupplier = () => {
+  const addSupplier = async () => {
     if (!canEdit) return;
     if (!newSupplierName.trim()) return;
-    
+
+    setCreateError(null);
+    setCreateSuccess(null);
+
+    // Si un email + mot de passe sont fournis, créer un compte Supabase Auth
+    if (newSupplierEmail.trim() && newSupplierPassword.trim()) {
+      if (!supabase) {
+        setCreateError('Supabase non configuré.');
+        return;
+      }
+      setIsCreating(true);
+
+      try {
+        // 1. Sauvegarder la session admin courante
+        const { data: sessionData } = await supabase.auth.getSession();
+        const adminSession = sessionData?.session;
+
+        // 2. Créer le compte fournisseur
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: newSupplierEmail.trim(),
+          password: newSupplierPassword.trim(),
+        });
+
+        if (signUpError) throw signUpError;
+
+        const newUserId = signUpData.user?.id;
+
+        // 3. Restaurer la session admin immédiatement
+        if (adminSession) {
+          await supabase.auth.setSession({
+            access_token: adminSession.access_token,
+            refresh_token: adminSession.refresh_token,
+          });
+        }
+
+        // 4. Insérer la ligne profiles avec le rôle supplier
+        if (newUserId && companyId) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: newUserId,
+              company_id: companyId,
+              role: 'supplier',
+            });
+          if (profileError) console.warn('[SupplierList] profiles upsert:', profileError.message);
+        }
+
+        setCreateSuccess(`Compte créé pour ${newSupplierEmail.trim()}. Le fournisseur peut maintenant se connecter.`);
+      } catch (err: any) {
+        setCreateError(err.message ?? 'Erreur lors de la création du compte.');
+        setIsCreating(false);
+        return;
+      }
+
+      setIsCreating(false);
+    }
+
+    // Ajouter le fournisseur dans la liste locale (avec ou sans compte)
     const newSupplier: Supplier = {
       id: crypto.randomUUID(),
       name: newSupplierName,
@@ -34,11 +101,12 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
       color: newSupplierColor,
     };
     setSuppliers([...suppliers, newSupplier]);
-    
+
     // Reset form
     setNewSupplierName('');
     setNewSupplierEmail('');
-    setNewSupplierColor(COLORS[Math.floor(Math.random() * COLORS.length)]); // Pick random for next one
+    setNewSupplierPassword('');
+    setNewSupplierColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
   };
 
   const deleteSupplier = (id: string) => {
@@ -138,14 +206,14 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             </div>
             
             <div className="lg:col-span-4">
-              <label className="block text-sm font-medium text-slate-600 mb-1">Emails (séparés par virgule)</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Email (connexion fournisseur)</label>
               <input
                 type="text"
                 value={newSupplierEmail}
                 onChange={(e) => setNewSupplierEmail(e.target.value)}
                 disabled={!canEdit}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-                placeholder="ex: contact@abc.com, comptabilite@abc.com"
+                placeholder="ex: contact@abc.com"
               />
             </div>
 
@@ -163,6 +231,24 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
               </select>
             </div>
 
+            {/* Mot de passe pour compte Supabase */}
+            <div className="lg:col-span-12">
+              <label className="block text-sm font-medium text-slate-600 mb-1">
+                Mot de passe (optionnel — crée un compte de connexion)
+              </label>
+              <input
+                type="password"
+                value={newSupplierPassword}
+                onChange={(e) => setNewSupplierPassword(e.target.value)}
+                disabled={!canEdit}
+                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                placeholder="Laisser vide pour ne pas créer de compte"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Si vous remplissez email + mot de passe, un compte fournisseur Supabase sera créé automatiquement.
+              </p>
+            </div>
+
             {/* Sélecteur de couleur */}
             <div className="lg:col-span-12">
               <label className="block text-sm font-medium text-slate-600 mb-1 flex items-center gap-2">
@@ -175,13 +261,28 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             )}
             </div>
 
+            {/* Messages succès / erreur */}
+            {createSuccess && (
+              <div className="lg:col-span-12 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                {createSuccess}
+              </div>
+            )}
+            {createError && (
+              <div className="lg:col-span-12 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                {createError}
+              </div>
+            )}
+
             <div className="lg:col-span-12 flex justify-end mt-2">
               <button
-                  onClick={canEdit ? addSupplier : undefined}
-                  disabled={!canEdit}
-                  className={`w-full sm:w-auto px-6 py-2.5 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm ${canEdit ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-200 text-slate-500 cursor-not-allowed"}`}
+                onClick={canEdit && !isCreating ? addSupplier : undefined}
+                disabled={!canEdit || isCreating}
+                className={`w-full sm:w-auto px-6 py-2.5 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm ${canEdit && !isCreating ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-200 text-slate-500 cursor-not-allowed"}`}
               >
-                  <Plus className="w-4 h-4" /> Ajouter le fournisseur
+                {isCreating
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Création du compte...</>
+                  : <><Plus className="w-4 h-4" /> Ajouter le fournisseur</>
+                }
               </button>
             </div>
           </div>
