@@ -52,22 +52,29 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
         const { data: sessionData } = await supabase.auth.getSession();
         const adminSession = sessionData?.session;
 
-        // 2. Créer le compte fournisseur
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        // 2. Créer le compte fournisseur avec timeout 15s
+        const signUpPromise = supabase.auth.signUp({
           email: newSupplierEmail.trim(),
           password: newSupplierPassword.trim(),
         });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Délai dépassé — réessayez.')), 15_000)
+        );
+        const { data: signUpData, error: signUpError } = await Promise.race([signUpPromise, timeoutPromise]) as Awaited<typeof signUpPromise>;
 
         if (signUpError) throw signUpError;
 
         const newUserId = signUpData.user?.id;
 
-        // 3. Restaurer la session admin immédiatement
+        // 3. Restaurer la session admin immédiatement (timeout 5s — on continue même si ça traîne)
         if (adminSession) {
-          await supabase.auth.setSession({
-            access_token: adminSession.access_token,
-            refresh_token: adminSession.refresh_token,
-          });
+          await Promise.race([
+            supabase.auth.setSession({
+              access_token: adminSession.access_token,
+              refresh_token: adminSession.refresh_token,
+            }),
+            new Promise<void>(resolve => setTimeout(resolve, 5_000)),
+          ]);
         }
 
         // 4. Insérer la ligne profiles avec le rôle supplier
@@ -85,11 +92,10 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
         setCreateSuccess(`Compte créé pour ${newSupplierEmail.trim()}. Le fournisseur peut maintenant se connecter.`);
       } catch (err: any) {
         setCreateError(err.message ?? 'Erreur lors de la création du compte.');
-        setIsCreating(false);
         return;
+      } finally {
+        setIsCreating(false);
       }
-
-      setIsCreating(false);
     }
 
     // Ajouter le fournisseur dans la liste locale (avec ou sans compte)
