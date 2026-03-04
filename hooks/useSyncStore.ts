@@ -7,7 +7,7 @@ const SAVE_TIMEOUT_MS  = 10_000; // 10s — si pas de réponse, on retry
 const MAX_RETRIES      = 3;
 const KEEPALIVE_MS     = 25_000; // ping toutes les 25s pour garder la connexion vivante
 
-export function useSyncStore<T>(baseKey: string, initialValue: T) {
+export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean = true) {
   const supabase        = getSupabase();
   const { companyId }   = getSupabaseConfig();
   const isCloud         = !!supabase;
@@ -107,11 +107,11 @@ export function useSyncStore<T>(baseKey: string, initialValue: T) {
     }
   }, [effectiveKey, isCloud, supabase, saveToCloud]);
 
-  // ── Chargement initial ────────────────────────────────────────────────────
+  // ── Chargement initial — attend que la session soit confirmée (ready=true) ──
   useEffect(() => {
-    if (!isCloud) return;
+    if (!isCloud || !ready) return;
     fetchFromCloud();
-  }, [effectiveKey, isCloud]);
+  }, [effectiveKey, isCloud, ready]);
 
   // ── Canal Realtime avec reconnexion auto ──────────────────────────────────
   const setupChannel = useCallback(() => {

@@ -218,9 +218,9 @@ const App = () => {
     },
   ];
 
-  const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects);
-  const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers);
-  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks);
+  const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects, roleChecked);
+  const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers, roleChecked);
+  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked);
 
   const isCloudConnected = isCloudP || isCloudS || isCloudT;
 
