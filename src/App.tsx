@@ -253,7 +253,10 @@ const App = () => {
     setTasks((prev: Task[]) => prev.map(t => t.id === taskId ? { ...t, confirmedBySupplier: true } : t));
   };
 
-  const handleUpdateSupplierNote = (taskId: string, note: string) => {
+  const handleUpdateSupplierNote = (
+    taskId: string,
+    note: { text: string; authorName: string; authorId: string; updatedAt: string }
+  ) => {
     setTasks((prev: Task[]) => prev.map(t => t.id === taskId ? { ...t, supplierNotes: note } : t));
   };
 
@@ -362,13 +365,15 @@ const App = () => {
     switch (currentView) {
       case 'calendar':
         return (
-          <CalendarView 
+          <CalendarView
             canEdit={canEdit}
             projects={projects}
             suppliers={suppliers}
             tasks={tasks}
             setTasks={setTasks}
             currentProjectId={selectedProjectId}
+            onUpdateSupplierNote={handleUpdateSupplierNote}
+            supplierSelf={supplierSelf}
           />
         );
       case 'suppliers':

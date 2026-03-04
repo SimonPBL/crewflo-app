@@ -15,6 +15,8 @@ interface CalendarViewProps {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   currentProjectId: string | null; // null means 'all projects' (Master View)
   canEdit: boolean;
+  onUpdateSupplierNote?: (taskId: string, note: { text: string; authorName: string; authorId: string; updatedAt: string }) => void;
+  supplierSelf?: { id: string; name: string } | null;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -23,7 +25,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   tasks,
   setTasks,
   currentProjectId,
-  canEdit
+  canEdit,
+  onUpdateSupplierNote,
+  supplierSelf
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthsToShow, setMonthsToShow] = useState<number>(1); // 1, 3, 6, 12
@@ -426,10 +430,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         </svg>
                                     </span>
                                     )}
-                                    {task.supplierNotes && !isPdf && (
+                                    {task.supplierNotes?.text && !isPdf && (
                                     <span
                                         className="absolute bottom-0.5 left-0.5 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center z-20"
-                                        title={task.supplierNotes}
+                                        title={task.supplierNotes.text}
                                     >
                                         <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-white">
                                         <rect x="2" y="1.5" width="6" height="1" rx="0.5"/>
@@ -972,6 +976,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                               <div className="text-xs text-slate-500 truncate">{project?.name || 'Chantier'}</div>
                               {t.title && <div className="text-xs text-slate-700 mt-1">{t.title}</div>}
                               {t.notes && <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.notes}</div>}
+                              {t.supplierNotes?.text && (
+                                <div className="mt-1 text-xs bg-amber-50 border border-amber-100 rounded px-2 py-1 text-amber-800">
+                                  <span className="font-bold">{t.supplierNotes.authorName}</span>: {t.supplierNotes.text}
+                                </div>
+                              )}
                             </div>
                             <div className="text-xs text-slate-400 whitespace-nowrap">
                               {new Date(t.start).toLocaleDateString('fr-FR')}
@@ -1034,27 +1043,57 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 </div>
 
 {/* Notes fournisseur */}
-{!isViewOnly && newTask.supplierNotes && (
-  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-    <div className="text-[10px] font-bold text-amber-500 uppercase mb-1">Note du fournisseur</div>
-    {newTask.supplierNotes}
+<div className="border border-amber-200 rounded-xl overflow-hidden">
+  <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+    <span className="text-xs font-bold text-amber-700 uppercase">Note du fournisseur</span>
+    {newTask.supplierNotes?.updatedAt && (
+      <span className="text-xs text-amber-500">
+        {newTask.supplierNotes.authorName} · {new Date(newTask.supplierNotes.updatedAt).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+      </span>
+    )}
   </div>
-)}
-{isViewOnly && (
-  <div className="border border-amber-200 rounded-xl overflow-hidden">
-    <div className="px-3 py-2 bg-amber-50 border-b border-amber-200">
-      <span className="text-xs font-bold text-amber-600 uppercase">Ma note</span>
-    </div>
-    <div className="p-3 bg-white">
-      <textarea
-        value={newTask.supplierNotes || ''}
-        onChange={e => setNewTask({ ...newTask, supplierNotes: e.target.value })}
-        className="w-full min-h-[80px] p-2 bg-amber-50 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none text-sm text-amber-800"
-        placeholder="Ajouter une note…"
-      />
-    </div>
+  <div className="p-3 bg-amber-50/40">
+    {isViewOnly ? (
+      <div className="space-y-2">
+        <textarea
+          value={newTask.supplierNotes?.text || ''}
+          onChange={e => setNewTask({
+            ...newTask,
+            supplierNotes: {
+              text: e.target.value,
+              authorName: newTask.supplierNotes?.authorName || (supplierSelf?.name ?? 'Fournisseur'),
+              authorId: newTask.supplierNotes?.authorId || (supplierSelf?.id ?? ''),
+              updatedAt: new Date().toISOString(),
+            }
+          })}
+          className="w-full min-h-[80px] p-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none text-sm"
+          placeholder="Laisser une note sur cette tâche…"
+        />
+        <button
+          onClick={() => {
+            if (!newTask.supplierNotes?.text?.trim() || !editingTaskId) return;
+            onUpdateSupplierNote?.(editingTaskId, {
+              text: newTask.supplierNotes.text,
+              authorName: supplierSelf?.name ?? 'Fournisseur',
+              authorId: supplierSelf?.id ?? '',
+              updatedAt: new Date().toISOString(),
+            });
+            setIsModalOpen(false);
+          }}
+          className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          Enregistrer ma note
+        </button>
+      </div>
+    ) : (
+      newTask.supplierNotes?.text ? (
+        <p className="text-sm text-amber-900 whitespace-pre-wrap">{newTask.supplierNotes.text}</p>
+      ) : (
+        <p className="text-xs text-amber-400 italic">Aucune note laissée par le fournisseur.</p>
+      )
+    )}
   </div>
-)}
+</div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

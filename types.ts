@@ -25,7 +25,12 @@ export interface Task {
   end: string;        // ISO Date String
   createdAt?: string; // ISO Date String — set at creation, never modified
   confirmedBySupplier?: boolean;
-  supplierNotes?: string;
+  supplierNotes?: {
+    text: string;
+    authorName: string; // nom du fournisseur qui a écrit
+    authorId: string;   // supplierId
+    updatedAt: string;  // ISO date string
+  };
 }
 
 export interface Conflict {

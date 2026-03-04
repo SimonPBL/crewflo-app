@@ -9,7 +9,7 @@ interface MyTasksViewProps {
   supplierSelf: Supplier | null; // null = admin, voit toutes les tâches
   canEdit: boolean;
   onConfirmTask: (taskId: string) => void;
-  onUpdateSupplierNote: (taskId: string, note: string) => void;
+  onUpdateSupplierNote: (taskId: string, note: { text: string; authorName: string; authorId: string; updatedAt: string }) => void;
 }
 
 const formatDate = (isoStr: string) =>
@@ -62,12 +62,17 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
       : `${formatDate(task.start)} → ${formatDate(task.end)}`;
 
     const startEditNote = () => {
-      setNoteValue(task.supplierNotes || '');
+      setNoteValue(task.supplierNotes?.text || '');
       setEditingNoteId(task.id);
     };
 
     const saveNote = () => {
-      onUpdateSupplierNote(task.id, noteValue);
+      onUpdateSupplierNote(task.id, {
+        text: noteValue,
+        authorName: supplierSelf?.name ?? 'Fournisseur',
+        authorId: supplierSelf?.id ?? '',
+        updatedAt: new Date().toISOString(),
+      });
       setEditingNoteId(null);
     };
 
@@ -103,10 +108,18 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         )}
 
         {/* Supplier notes display */}
-        {task.supplierNotes && !isEditing && (
-          <div className="bg-amber-50 rounded-lg p-2 mb-2">
-            <div className="text-[10px] font-bold text-amber-500 uppercase mb-1">Ma note</div>
-            <div className="text-sm text-amber-800">{task.supplierNotes}</div>
+        {task.supplierNotes?.text && !isEditing && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Ma note</span>
+              <span className="text-xs text-amber-600">
+                {new Date(task.supplierNotes.updatedAt).toLocaleDateString('fr-CA', {
+                  day: 'numeric', month: 'short', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit'
+                })}
+              </span>
+            </div>
+            <p className="text-sm text-amber-900">{task.supplierNotes.text}</p>
           </div>
         )}
 
