@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Project } from '../types';
-import { Plus, Building2, MapPin, Pencil, Check, X, ClipboardList, Info } from 'lucide-react';
+import { Plus, Building2, MapPin, Pencil, Check, X, ClipboardList, Info, Search, SlidersHorizontal } from 'lucide-react';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
 import { FINISHING_TEMPLATE } from './finishingTemplate';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
@@ -24,6 +24,11 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
   // Modal
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<ModalTab>('infos');
+
+  // ── Filtre & tri ───────────────────────────────────────────────────────────
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'planning' | 'active' | 'completed'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'status'>('name');
 
   // ── Progression des finitions ──────────────────────────────────────────────
   const supabase = getSupabase();
@@ -117,6 +122,22 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
     return { label: 'Terminé', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
   };
 
+  // ── Projets filtrés et triés ──────────────────────────────────────────────
+  const visibleProjects = projects
+    .filter(p => {
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.address.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = filterStatus === 'all' || p.status === filterStatus;
+      return matchSearch && matchStatus;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'status') {
+        const order = { active: 0, planning: 1, completed: 2 };
+        return order[a.status] - order[b.status];
+      }
+      return a.name.localeCompare(b.name, 'fr');
+    });
+
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
       <div className="p-6 max-w-4xl mx-auto pb-20">
@@ -124,6 +145,40 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
           <Building2 className="w-6 h-6 text-blue-600" />
           Gestion des Chantiers
         </h2>
+
+        {/* Barre de filtre / recherche */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher un chantier..."
+              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value as any)}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="all">Tous les statuts</option>
+              <option value="active">En cours</option>
+              <option value="planning">Planification</option>
+              <option value="completed">Terminé</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="name">Trier : Nom</option>
+              <option value="status">Trier : Statut</option>
+            </select>
+          </div>
+        </div>
 
         {/* Formulaire nouveau chantier */}
         {canEdit && (
@@ -164,7 +219,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
 
         {/* Liste des chantiers */}
         <div className="grid grid-cols-1 gap-4">
-          {projects.map(project => {
+          {visibleProjects.map(project => {
             const isEditing = editingId === project.id;
             const st = statusLabel(project.status);
 
@@ -285,9 +340,11 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
             );
           })}
 
-          {projects.length === 0 && (
+          {visibleProjects.length === 0 && (
             <div className="text-center py-12 text-slate-400">
-              Aucun chantier actif. Créez votre premier projet.
+              {projects.length === 0
+                ? 'Aucun chantier actif. Créez votre premier projet.'
+                : 'Aucun chantier ne correspond à vos filtres.'}
             </div>
           )}
         </div>
