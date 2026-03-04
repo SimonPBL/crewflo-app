@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Project } from '../types';
 import { Plus, Building2, MapPin, Pencil, Check, X, ClipboardList, Info } from 'lucide-react';
+import { getSupabase, getSupabaseConfig } from '../services/supabase';
+import { FINISHING_TEMPLATE } from './finishingTemplate';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import { ProjectFinishingsPanel } from './ProjectFinishingsPanel';
 
@@ -22,6 +24,38 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
   // Modal
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<ModalTab>('infos');
+
+  // ── Progression des finitions ──────────────────────────────────────────────
+  const supabase = getSupabase();
+  const { companyId } = getSupabaseConfig();
+  const [progressMap, setProgressMap] = useState<Record<string, { confirmed: number; total: number }>>({});
+
+  const totalRooms = FINISHING_TEMPLATE.reduce((s, cat) => s + cat.rooms.length, 0);
+
+  const fetchAllProgress = useCallback(async () => {
+    if (!supabase || !companyId) return;
+    try {
+      const { data, error } = await supabase
+        .from('project_finishing_data')
+        .select('project_id, data')
+        .eq('company_id', companyId);
+      if (error || !data) return;
+      const map: Record<string, { confirmed: number; total: number }> = {};
+      data.forEach(row => {
+        const finData = row.data as Record<string, Record<string, { confirmed?: boolean }>>;
+        let confirmed = 0;
+        FINISHING_TEMPLATE.forEach(cat => {
+          cat.rooms.forEach(room => {
+            if (finData?.[cat.key]?.[room.key]?.confirmed) confirmed++;
+          });
+        });
+        map[row.project_id] = { confirmed, total: totalRooms };
+      });
+      setProgressMap(map);
+    } catch {}
+  }, [supabase, companyId, totalRooms]);
+
+  useEffect(() => { fetchAllProgress(); }, [fetchAllProgress]);
 
   const addProject = () => {
     if (!canEdit) return;
@@ -74,6 +108,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
 
   const closeModal = () => {
     setSelectedProject(null);
+    fetchAllProgress(); // Rafraîchir la progression après fermeture de la modale
   };
 
   const statusLabel = (status: Project['status']) => {
@@ -217,6 +252,25 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                             Finitions & Notes
                           </button>
                         </div>
+                        {/* Barre de progression des finitions */}
+                        {progressMap[project.id] !== undefined && (() => {
+                          const { confirmed, total } = progressMap[project.id];
+                          const pct = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+                          return (
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-slate-400">{confirmed}/{total} sections</span>
+                                <span className={`text-xs font-bold ${pct === 100 ? 'text-green-600' : 'text-blue-600'}`}>{pct}%</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -310,8 +364,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
               {activeTab === 'finitions' && (
                 <ProjectFinishingsPanel
                   projectId={selectedProject.id}
-                  projectName={selectedProject.name}
-                  projectAddress={selectedProject.address}
                   canEdit={canEdit}
                   allProjects={projects.filter(p => p.id !== selectedProject!.id).map(p => ({ id: p.id, name: p.name }))}
                 />
