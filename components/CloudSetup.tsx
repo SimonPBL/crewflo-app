@@ -78,9 +78,9 @@ create policy "read_company_data"
 on crewflo_sync for select
 to authenticated
 using (
-  split_part(key, '_', 1) = (
+  starts_with(key, (
     select company_id from profiles where id = auth.uid()
-  )
+  ) || '_')
 );
 
 -- Crewflo_sync: écriture autorisée seulement aux admins de la compagnie
@@ -93,7 +93,7 @@ using (
     select 1 from profiles
     where id = auth.uid()
       and role = 'admin'
-      and company_id = split_part(key, '_', 1)
+      and starts_with(key, company_id || '_')
   )
 )
 with check (
@@ -101,7 +101,7 @@ with check (
     select 1 from profiles
     where id = auth.uid()
       and role = 'admin'
-      and company_id = split_part(key, '_', 1)
+      and starts_with(key, company_id || '_')
   )
 );
 

@@ -2,9 +2,9 @@
 
 ## Vue d'ensemble
 Application PWA de gestion de chantier en temps réel pour **Habitations PBL**.
-- **URL production** : https://crewflo-app.vercel.app
-- **Repo GitHub** : https://github.com/SimonPBL/crewflo-app
-- **Hébergement** : Vercel (déploiement automatique via git push)
+- **URL production** : https://crewflo-pro.vercel.app
+- **Repo GitHub** : https://github.com/SimonPBL/crewflo-app (branche `main`)
+- **Hébergement** : Vercel (déploiement automatique via `git push` sur `main`)
 - **Base de données** : Supabase
 - **Supabase URL** : https://sfmdlovlpwelehoughgv.supabase.co
 - **Company ID** : PBL
@@ -15,9 +15,10 @@ Application PWA de gestion de chantier en temps réel pour **Habitations PBL**.
 - **React 18** + **TypeScript**
 - **Vite 5** + **vite-plugin-pwa** (PWA avec service worker)
 - **Tailwind CSS**
-- **Supabase** (@supabase/supabase-js ^2.39.0) — auth + realtime + base de données
+- **Supabase** (@supabase/supabase-js) — auth + realtime + base de données
 - **Lucide React** — icônes
-- **@google/genai** — Assistant IA
+- **jsPDF** — export PDF des finitions
+- **@google/genai** — Assistant IA (Google Gemini)
 
 ---
 
@@ -29,47 +30,45 @@ crewflo-pro/
 │   ├── icon-192.png          ← Icône PWA (navy + contour doré + toit + CF)
 │   ├── icon-512.png          ← Icône PWA grande
 │   └── manifest.json         ← Config PWA
-├── src/ (ou racine selon structure)
-│   ├── types.ts              ← Types TypeScript (Project, Supplier, Task, etc.)
-│   ├── services/
-│   │   └── supabase.ts       ← Client Supabase singleton (Navigator Lock désactivé)
-│   ├── hooks/
-│   │   └── useSyncStore.ts   ← Hook sync locale + Supabase realtime
-│   └── components/
-│       ├── App.tsx                      ← Composant principal
-│       ├── CalendarView.tsx             ← Vue calendrier
-│       ├── ProjectList.tsx              ← Liste chantiers + modale finitions
-│       ├── ProjectFinishingsPanel.tsx   ← Panel finitions OUI/NON + sous-choix
-│       ├── SupplierList.tsx             ← Liste fournisseurs
-│       ├── AIAssistant.tsx              ← Assistant IA
-│       ├── AuthScreen.tsx               ← Écran de connexion
-│       ├── CloudSetup.tsx               ← Config cloud
-│       ├── ConflictAlert.tsx            ← Alertes conflits
-│       └── SwipeToConfirmButton.tsx     ← Bouton swipe pour supprimer
-├── vite.config.ts            ← Config Vite + PWA
-└── package.json
+├── types.ts                  ← Types TypeScript (Project, Supplier, Task, COLORS, TRADES)
+├── services/
+│   └── supabase.ts           ← Client Supabase singleton
+├── hooks/
+│   └── useSyncStore.ts       ← Hook sync locale + Supabase realtime
+├── components/
+│   ├── finishingTemplate.ts             ← Template des catégories/pièces/zones de finition
+│   ├── FinishingsPDFExport.ts           ← Export PDF des finitions (jsPDF)
+│   ├── AuthScreen.tsx                   ← Écran de connexion
+│   ├── CloudSetup.tsx                   ← Modal config Supabase + script SQL à copier
+│   ├── ConflictAlert.tsx                ← Alertes conflits de calendrier
+│   ├── SwipeToConfirmButton.tsx         ← Bouton swipe pour supprimer
+│   ├── AIAssistant.tsx                  ← Assistant IA Gemini
+│   ├── SupplierList.tsx                 ← Gestion fournisseurs + color picker visuel
+│   ├── ProjectList.tsx                  ← Liste chantiers + filtre/tri + modale finitions
+│   ├── ProjectFinishingsPanel.tsx       ← Panel finitions complet
+│   └── CalendarView.tsx                 ← Vue calendrier + export PDF rapport
+└── src/
+    ├── App.tsx                          ← Composant principal
+    └── main.tsx
 ```
 
 ---
 
-## Rôles utilisateurs
-- **admin** (Simon) : accès complet, peut modifier tout
-- **supplier** (fournisseurs) : lecture seule sur finitions, voit le calendrier de ses tâches
+## Sécurité et rôles
 
-Les rôles sont stockés dans Supabase table `profiles` :
-```sql
-profiles (
-  id uuid,          -- = auth.uid()
-  company_id text,  -- ex: 'PBL'
-  role text         -- 'admin' ou 'supplier'
-)
-```
+- **admin** (Simon) : accès complet, peut modifier tout
+- **supplier** (fournisseurs) : lecture seule, voit le calendrier de ses tâches
+
+### Règles importantes
+- Le rôle est **validé côté serveur uniquement** — `App.tsx` initialise `role` à `''` et utilise un état `roleChecked` avant tout rendu
+- **Ne jamais lire le rôle depuis localStorage** comme état initial
+- `canEdit = roleChecked && role === 'admin'` — propagé en prop à tous les composants
+- `SupplierList` et tous les composants utilisent le prop `canEdit` — jamais `localStorage`
 
 ---
 
 ## Tables Supabase
 
-### Tables existantes (opérationnelles)
 ```sql
 -- Sync temps réel des données app
 crewflo_sync (
@@ -81,139 +80,107 @@ crewflo_sync (
 -- Profils utilisateurs
 profiles (
   id uuid PRIMARY KEY,    -- = auth.uid()
-  company_id text,
-  role text
-)
-```
-
-### Tables finitions (ajoutées récemment — problème à résoudre)
-```sql
--- Liste dynamique des items de finition
-finishing_items (
-  id uuid PRIMARY KEY,
-  category text,          -- ex: 'Céramique', 'Planchers'
-  label text,             -- ex: 'Plancher chauffant'
-  sort_order int,
-  is_active boolean,
-  created_at timestamptz
+  company_id text,        -- ex: 'PBL'
+  role text               -- 'admin' ou 'supplier'
 )
 
--- Sous-choix par item (ex: Salon, SDB, Cuisine)
-finishing_subitems (
-  id uuid PRIMARY KEY,
-  item_id uuid REFERENCES finishing_items(id),
-  label text,
-  sort_order int,
-  created_at timestamptz
-)
-
--- Valeurs OUI/NON par chantier pour chaque item
-project_finishings (
-  id uuid PRIMARY KEY,
-  project_id text,        -- ID du projet (string)
-  item_id uuid REFERENCES finishing_items(id),
-  checked boolean,        -- OUI ou NON
-  notes text,
-  updated_at timestamptz,
-  UNIQUE(project_id, item_id)
-)
-
--- Valeurs des sous-choix par chantier
-project_subfinishings (
-  id uuid PRIMARY KEY,
+-- Données de finitions par chantier
+project_finishing_data (
   project_id text,
-  subitem_id uuid REFERENCES finishing_subitems(id),
-  checked boolean,
-  model text,             -- Modèle / No produit
-  color text,             -- Couleur
-  format text,            -- Format / Dimension
-  notes text,
-  updated_at timestamptz,
-  UNIQUE(project_id, subitem_id)
+  company_id text,
+  data jsonb,
+  PRIMARY KEY (project_id, company_id)
 )
 ```
 
 ### RLS (Row Level Security)
-- **Lecture** : tous les utilisateurs connectés (`authenticated`)
-- **Écriture** : seulement `role = 'admin'` dans `profiles`
-- **Realtime** activé sur toutes les tables via `supabase_realtime` publication
+
+**crewflo_sync** — lecture :
+```sql
+create policy "read_company_data" on crewflo_sync for select to authenticated
+using (
+  starts_with(key, (select company_id from profiles where id = auth.uid()) || '_')
+);
+```
+
+**crewflo_sync** — écriture admin :
+```sql
+create policy "admin_write_company_data" on crewflo_sync for insert, update, delete to authenticated
+using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin'
+    and starts_with(key, company_id || '_'))
+)
+with check (
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin'
+    and starts_with(key, company_id || '_'))
+);
+```
+
+**project_finishing_data** — lecture filtrée par company_id :
+```sql
+create policy "finishing_data_read" on project_finishing_data for select to authenticated
+using (company_id = (select company_id from profiles where id = auth.uid()));
+```
+
+> ⚠️ Utiliser `starts_with(key, company_id || '_')` et NON `split_part(key, '_', 1)` — robuste si company_id contient des underscores.
 
 ---
 
 ## Fonctionnalités implémentées
 
-### ✅ Opérationnel
-- Authentification Supabase (admin + supplier)
-- Sync temps réel entre appareils (useSyncStore)
-- Calendrier global + par projet
-- Gestion fournisseurs
-- Gestion chantiers (CRUD)
-- Assistant IA (Google Gemini)
-- PWA installable (Android + iOS)
-- Bannière "Mise à jour disponible" auto
-- Export/Import backup JSON
-- Undo/Redo actions
-- Icône PWA custom (navy, contour doré, toit PBL, CF CrewFlo)
-
-### 🔧 En cours / À debugger
-- **Finitions par chantier** — tables créées, composants codés, problème Supabase à identifier
-  - `ProjectFinishingsPanel.tsx` — panel OUI/NON + sous-choix + détails
-  - `ProjectList.tsx` — modale avec onglets Infos / Finitions
-
----
-
-## Config PWA (vite.config.ts)
-```typescript
-VitePWA({
-  registerType: 'prompt',        // Affiche bannière au lieu de mise à jour silencieuse
-  manifest: {
-    name: 'CrewFlo — Habitations PBL',
-    short_name: 'CrewFlo',
-    background_color: '#0D1F3C',
-    theme_color: '#0D1F3C',
-    icons: [
-      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-    ]
-  }
-})
-```
+- ✅ Authentification Supabase (admin + supplier), rôle validé serveur
+- ✅ Sync temps réel entre appareils (useSyncStore) — offline-first
+- ✅ Calendrier global + par projet, tap sur case pour ajouter une tâche (admin)
+- ✅ Gestion fournisseurs avec color picker visuel (28 couleurs : 17 pastels + 11 saturées)
+- ✅ Gestion chantiers — filtre par statut, recherche nom/adresse, tri
+- ✅ Barre de progression finitions sur chaque carte de chantier
+- ✅ Panel finitions complet (OUI/NON, presets, options custom, modèle/couleur/notes, copie entre chantiers)
+- ✅ Export PDF des finitions par chantier (jsPDF)
+- ✅ Export PDF du rapport calendrier (html2canvas + jsPDF)
+- ✅ Assistant IA (Google Gemini)
+- ✅ PWA installable Android + iOS avec bannière de mise à jour
+- ✅ Détection iOS + instructions d'installation (modal)
+- ✅ Listeners `visibilitychange` + `focus` + `pageshow` pour mise à jour iOS Safari
+- ✅ Bannière hors ligne (orange) quand `navigator.onLine === false`
+- ✅ Export/Import backup JSON
+- ✅ Undo/Redo
 
 ---
 
-## supabase.ts — Points importants
-- **Singleton** — une seule instance partagée dans toute l'app
-- **Navigator Lock désactivé** — fix pour éviter timeouts sur mobile
-- Company ID stocké dans `localStorage` sous clé `crewflo_company_id`
+## useSyncStore — comportement
+
+- **Reconnexion/focus/visibilité** : si `pendingData` existe → envoie d'abord, puis fetch. Sinon → fetch serveur
+- **Timeout** 10s + retry jusqu'à 3 fois avec backoff exponentiel
+- **Keepalive ping** toutes les 25s
+- **Realtime channel** avec reconnexion auto sur erreur
+- **Listener `online`** inclus pour détection reconnexion réseau
 
 ---
 
 ## Workflow de déploiement
+
 ```bash
 # Dans Git Bash (PAS PowerShell)
 git add .
 git commit -m "description"
 git push
-# Puis dans Vercel : Deployments → Promote to Production
+# Vercel déploie automatiquement sur push vers main — pas besoin de "promote"
 ```
 
 ---
 
-## Ce que Claude Code peut faire
-- Lire et modifier les fichiers du projet directement
-- Utiliser ce fichier comme contexte de départ
-- Travailler en équipe avec claude.ai (chat) pour les décisions
+## Workflow de collaboration
 
-## Ce que claude.ai (chat) fait
-- Générer du code complet
-- Expliquer les concepts
-- Créer les fichiers SQL Supabase
-- Garder l'historique de conversation
+- **claude.ai (chat)** : planification, architecture, génération de code, SQL, révisions
+- **Claude Code** : éditions directes de fichiers, commits git, déploiements
+- Simon révise les plans avant que du code soit écrit
 
 ---
 
 ## Notes importantes
+
 - Utiliser **Git Bash** (pas PowerShell) pour les commandes git
 - Les fournisseurs ne peuvent PAS s'auto-enregistrer — admin crée les comptes manuellement dans Supabase Auth
-- `types.ts` est à la racine du projet (pas dans src/) — les imports utilisent `'../types'`
-- APP_VERSION dans App.tsx doit être incrémentée à chaque déploiement pour déclencher la bannière de mise à jour
+- `types.ts` est à la **racine** du projet (pas dans `src/`) — les imports utilisent `'../types'`
+- L'icône CrewFlo dans la sidebar et la page login utilise `/icon-192.png` (pas d'icône lucide)
+- Quand un fichier `App.tsx` est copié d'une autre session Claude, vérifier que l'icône Hammer n'est pas revenue
