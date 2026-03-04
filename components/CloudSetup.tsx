@@ -105,6 +105,28 @@ with check (
   )
 );
 
+-- Fournisseurs: mise à jour autorisée sur la clé tasks uniquement (confirmations, refus, notes)
+drop policy if exists "supplier_write_tasks" on crewflo_sync;
+create policy "supplier_write_tasks"
+on crewflo_sync for update
+to authenticated
+using (
+  exists (
+    select 1 from profiles p
+    where p.id = auth.uid()
+      and p.role = 'supplier'
+      and key = p.company_id || '_crewflo_tasks'
+  )
+)
+with check (
+  exists (
+    select 1 from profiles p
+    where p.id = auth.uid()
+      and p.role = 'supplier'
+      and key = p.company_id || '_crewflo_tasks'
+  )
+);
+
 -- IMPORTANT:
 -- 1) Crée tes utilisateurs dans Authentication > Users (admin et fournisseurs)
 -- 2) Ajoute une ligne dans "profiles" pour chaque user avec company_id + role

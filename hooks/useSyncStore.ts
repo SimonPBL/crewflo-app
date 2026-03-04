@@ -92,13 +92,21 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     } catch (err: any) {
       console.warn(`[SyncStore] save attempt ${attempt} failed:`, err?.message ?? err);
 
-      // Erreur d'auth (JWT expiré, RLS, permission refusée) → échec immédiat, pas de retry
       const msg = (err?.message ?? '').toLowerCase();
-      const isAuthError = msg.includes('jwt') || msg.includes('auth') || msg.includes('security policy') || err?.code === '42501' || err?.status === 401 || err?.status === 403;
-      if (isAuthError) {
-        console.error('[SyncStore] auth error — session invalide, rechargement requis.');
+      // Session réellement expirée → demander rechargement
+      const isSessionExpired = msg.includes('jwt expired') || msg.includes('token expired') || err?.status === 401;
+      if (isSessionExpired) {
+        console.error('[SyncStore] session expirée — rechargement requis.');
         isSavingRef.current = false;
         setStatus('error');
+        return;
+      }
+      // Permission refusée (RLS) → échec silencieux, données sauvées localement
+      const isPermissionDenied = msg.includes('security policy') || err?.code === '42501' || err?.status === 403;
+      if (isPermissionDenied) {
+        console.warn('[SyncStore] permission refusée (RLS) — données conservées localement.');
+        isSavingRef.current = false;
+        setStatus('idle');
         return;
       }
 
