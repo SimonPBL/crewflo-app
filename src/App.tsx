@@ -7,7 +7,7 @@ import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
-import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building } from 'lucide-react';
 import { getSupabase } from "../services/supabase";
 // @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -148,6 +148,18 @@ const App = () => {
 
   // canEdit est false tant que le rôle n'est pas confirmé par Supabase
   const canEdit = roleChecked && role === 'admin';
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline  = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online',  handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online',  handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -358,6 +370,13 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* Bannière hors ligne */}
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-[90] bg-amber-500 text-white text-center text-sm font-medium py-2 flex items-center justify-center gap-2">
+          <WifiOff className="w-4 h-4" />
+          Hors ligne — vos modifications sont sauvegardées localement
+        </div>
+      )}
       {/* Bannière mise à jour PWA */}
       <UpdateBanner />
 
@@ -499,7 +518,7 @@ const App = () => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className={`flex-1 flex flex-col min-w-0 overflow-hidden${!isOnline ? ' pt-10' : ''}`}>
         <header className="lg:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={toggleSidebar} className="text-slate-600 hover:text-slate-900"><Menu className="w-6 h-6" /></button>
