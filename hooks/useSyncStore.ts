@@ -6,6 +6,8 @@ export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 const DEBOUNCE_MS     = 600;
 const SAVE_TIMEOUT_MS = 10_000;
 const KEEPALIVE_MS    = 30_000;
+const RESUME_THROTTLE = 30_000; // min 30s entre deux syncs de reprise (focus/visible)
+const MAX_RETRIES     = 2;      // max tentatives après erreur avant abandon
 
 export function useSyncStore<T>(
   baseKey: string,
@@ -39,8 +41,9 @@ export function useSyncStore<T>(
   const safetyTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keepaliveTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef       = useRef<any>(null);
-  const lastFocusSync    = useRef<number>(0);
+  const lastResumeSync   = useRef<number>(0); // throttle commun focus + visible
   const savingInProgress = useRef(false);
+  const retryCount       = useRef(0);         // nombre de tentatives après erreur
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const clearDebounce = () => {
@@ -62,12 +65,13 @@ export function useSyncStore<T>(
 
     clearSafety();
 
-    // Safety timer — libère le verrou après 12s quoi qu'il arrive
+    // Safety timer — libère le verrou après 12s, SANS effacer pendingData
+    // (les données sont précieuses — on les garde pour le prochain retry)
     safetyTimer.current = setTimeout(() => {
-      console.warn('[SyncStore] safety timer — reset');
+      console.warn('[SyncStore] safety timer — reset verrou');
       savingInProgress.current = false;
-      pendingData.current = null;
       setStatus('idle');
+      // pendingData intentionnellement conservé pour retry éventuel
     }, SAVE_TIMEOUT_MS + 2_000);
 
     setStatus('saving');
@@ -76,14 +80,25 @@ export function useSyncStore<T>(
       console.warn('[SyncStore] save failed:', msg);
       clearSafety();
       savingInProgress.current = false;
+
+      if (retryCount.current >= MAX_RETRIES) {
+        // Abandon — trop de tentatives, on ne loop pas
+        console.warn('[SyncStore] abandon après', MAX_RETRIES, 'tentatives');
+        retryCount.current = 0;
+        pendingData.current = null;
+        setStatus('idle');
+        return;
+      }
+
+      retryCount.current += 1;
       setStatus('error');
-      // Refresh session silencieux, puis retour idle dans 4s
-      // Pas de retry automatique — évite la boucle infinie
-      // Le keepalive toutes les 30s maintiendra la session active
+
+      // Refresh session silencieux puis retente unique après délai croissant
+      const delay = retryCount.current * 4_000; // 4s puis 8s
       setTimeout(async () => {
         try { await supabase.auth.refreshSession(); } catch {}
         setStatus('idle');
-        // Si des données sont encore en attente, relancer via debounce une seule fois
+        // Retente avec les données en attente (pendingData conservé)
         if (pendingData.current && !savingInProgress.current) {
           clearDebounce();
           const data = pendingData.current;
@@ -91,9 +106,9 @@ export function useSyncStore<T>(
             if (pendingData.current && !savingInProgress.current) {
               saveToCloud(data);
             }
-          }, 2_000);
+          }, 1_000);
         }
-      }, 4_000);
+      }, delay);
     };
 
     try {
@@ -120,6 +135,7 @@ export function useSyncStore<T>(
       clearSafety();
       savingInProgress.current = false;
       pendingData.current = null;
+      retryCount.current = 0;
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 2_000);
 
@@ -130,11 +146,13 @@ export function useSyncStore<T>(
 
   // ── persistData ────────────────────────────────────────────────────────────
   const persistData = useCallback((newData: T) => {
+    // Sauvegarde locale immédiate — jamais perdu
     try { localStorage.setItem(effectiveKey, JSON.stringify(newData)); } catch {}
 
     if (!isCloud || !supabase || readOnly) return;
 
     pendingData.current = newData;
+    retryCount.current = 0; // nouveau changement = on repart de zéro
     clearDebounce();
 
     debounceTimer.current = setTimeout(() => {
@@ -162,6 +180,7 @@ export function useSyncStore<T>(
         setStatus('saved');
         setTimeout(() => setStatus('idle'), 2_000);
       } else if (error?.code === 'PGRST116' && !readOnly) {
+        // Ligne absente → admin crée la ligne initiale
         const local = getSaved();
         await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
       }
@@ -224,14 +243,20 @@ export function useSyncStore<T>(
     return () => { if (keepaliveTimer.current) clearInterval(keepaliveTimer.current); };
   }, [effectiveKey, isCloud, supabase]);
 
-  // ── Resync au retour (focus / visibilité / online) ─────────────────────────
+  // ── Resync au retour — throttle commun focus + visible ────────────────────
   useEffect(() => {
     if (!isCloud) return;
 
     const syncOnResume = async () => {
+      const now = Date.now();
+      if (now - lastResumeSync.current < RESUME_THROTTLE) return;
+      lastResumeSync.current = now;
+
       if (pendingData.current && !savingInProgress.current) {
+        // Données locales en attente → envoyer en priorité
         await saveToCloud(pendingData.current);
       } else if (!pendingData.current) {
+        // Rien en attente → fetch serveur pour rester à jour
         fetchFromCloud();
       }
       setupChannel();
@@ -241,15 +266,11 @@ export function useSyncStore<T>(
       if (document.visibilityState === 'visible') syncOnResume();
     };
 
-    const onFocus = () => {
-      const now = Date.now();
-      if (now - lastFocusSync.current < 30_000) return;
-      lastFocusSync.current = now;
-      syncOnResume();
-    };
+    const onFocus = () => syncOnResume();
 
     const onOnline = () => {
-      console.log('[SyncStore] retour en ligne → sync');
+      // Retour réseau : forcer un sync immédiat sans throttle
+      lastResumeSync.current = 0;
       syncOnResume();
     };
 
