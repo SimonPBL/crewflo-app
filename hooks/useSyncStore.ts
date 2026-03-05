@@ -4,7 +4,6 @@ import { getSupabase, getSupabaseConfig } from '../services/supabase';
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const DEBOUNCE_MS     = 600;
-const SAVE_TIMEOUT_MS = 20_000;
 const RESUME_THROTTLE = 30_000;
 
 export function useSyncStore<T>(
@@ -36,22 +35,16 @@ export function useSyncStore<T>(
   const isRemoteUpdate   = useRef(false);
   const pendingData      = useRef<T | null>(null);
   const debounceTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const safetyTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef       = useRef<any>(null);
   const isMounted        = useRef(true);
   // Initialiser à Date.now() pour que le premier focus après mount soit throttlé
   // (on fetchFromCloud déjà au mount — pas besoin d'un sync immédiat au premier focus)
   const lastResumeSync   = useRef<number>(Date.now());
-  const savingInProgress  = useRef(false);
-  const lastSaveStarted   = useRef<number>(0); // timestamp du dernier save démarré
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const clearDebounce = () => {
     if (debounceTimer.current) { clearTimeout(debounceTimer.current); debounceTimer.current = null; }
-  };
-  const clearSafety = () => {
-    if (safetyTimer.current) { clearTimeout(safetyTimer.current); safetyTimer.current = null; }
   };
   const clearRetry = () => {
     if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
@@ -61,72 +54,61 @@ export function useSyncStore<T>(
     if (isMounted.current) setStatus(s);
   };
 
-  const makeTimeout = () => new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('timeout')), SAVE_TIMEOUT_MS)
-  );
+  // ── saveToCloud — sans verrou bloquant ────────────────────────────────────
+  // On utilise AbortController au lieu d'un verrou ref.
+  // Chaque save annule le précédent si encore en cours — pas de blocage permanent.
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ── saveToCloud ────────────────────────────────────────────────────────────
   const saveToCloud = useCallback(async (dataToSave: T): Promise<void> => {
     if (!supabase || readOnly) return;
-    if (savingInProgress.current) return;
-    savingInProgress.current = true;
-    lastSaveStarted.current = Date.now();
 
-    clearSafety();
+    // Annuler le save précédent s'il traine encore
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
+
     clearRetry();
-
-    // Safety timer — libère le verrou immédiatement, conserve pendingData
-    // Doit être mis AVANT tout appel async pour garantir la libération du verrou
-    safetyTimer.current = setTimeout(() => {
-      console.warn('[SyncStore] safety timer — reset verrou');
-      savingInProgress.current = false;
-      safeSetStatus('idle');
-    }, SAVE_TIMEOUT_MS + 2_000);
-
     safeSetStatus('saving');
 
-    const onError = (msg: string) => {
-      console.warn('[SyncStore] save failed:', msg);
-      clearSafety();
-      clearRetry();
-      savingInProgress.current = false;
-      // NE PAS effacer pendingData — conservé pour forceRetry (bouton Réessayer)
-      // Aucun retry automatique — élimine toute boucle possible
-      safeSetStatus('error');
-      retryTimer.current = setTimeout(() => {
-        if (isMounted.current) safeSetStatus('idle');
-      }, 5_000);
-    };
-
     try {
-      // UPDATE d'abord (admin + fournisseur via RLS)
+      // UPDATE avec timeout 15s
       const { error: updateError } = await Promise.race([
         supabase.from('crewflo_sync').update({ data: dataToSave as any }).eq('key', effectiveKey),
-        makeTimeout(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15_000)),
       ]) as any;
 
+      if (ac.signal.aborted) return; // un save plus récent a pris le relais
+
       if (updateError) {
-        // Fallback upsert — admin seulement (création première ligne)
         const { error: upsertError } = await Promise.race([
           supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: dataToSave as any }),
-          makeTimeout(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15_000)),
         ]) as any;
 
+        if (ac.signal.aborted) return;
+
         if (upsertError) {
-          onError(upsertError.message);
+          console.warn('[SyncStore] save failed:', upsertError.message);
+          safeSetStatus('error');
+          retryTimer.current = setTimeout(() => { if (isMounted.current) safeSetStatus('idle'); }, 5_000);
           return;
         }
       }
 
       // Succès
-      clearSafety();
-      savingInProgress.current = false;
+      if (ac.signal.aborted) return;
       pendingData.current = null;
+      abortControllerRef.current = null;
       safeSetStatus('saved');
       setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
 
     } catch (err: any) {
-      onError(err?.message ?? 'exception');
+      if (ac.signal.aborted) return;
+      console.warn('[SyncStore] save failed:', err?.message);
+      safeSetStatus('error');
+      retryTimer.current = setTimeout(() => { if (isMounted.current) safeSetStatus('idle'); }, 5_000);
     }
   }, [effectiveKey, supabase, readOnly]);
 
@@ -242,23 +224,12 @@ export function useSyncStore<T>(
       if (now - lastResumeSync.current < RESUME_THROTTLE) return;
       lastResumeSync.current = now;
 
-      // Si savingInProgress bloqué depuis >25s (safety timer throttlé par le navigateur)
-      // → forcer le déverrouillage pour ne pas bloquer les saves suivants
-      if (savingInProgress.current && now - lastSaveStarted.current > 25_000) {
-        console.warn('[SyncStore] verrou bloqué — déverrouillage forcé au retour');
-        clearSafety();
-        clearRetry();
-        savingInProgress.current = false;
-      }
-
-      if (savingInProgress.current) return;
-
-      // Refresh session silencieux avant tout — app peut avoir dormi longtemps
+      // Refresh session silencieux — app peut avoir dormi longtemps
       try { await supabase!.auth.refreshSession(); } catch {}
       if (!isMounted.current) return;
 
       if (pendingData.current) {
-          await saveToCloud(pendingData.current);
+        await saveToCloud(pendingData.current);
       } else {
         fetchFromCloud();
       }
@@ -289,8 +260,8 @@ export function useSyncStore<T>(
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
       clearDebounce();
-      clearSafety();
       clearRetry();
     };
   }, []);
@@ -321,12 +292,12 @@ export function useSyncStore<T>(
   // Appelé par le bouton "Réessayer" dans le UI après timeout d'envoi
   const forceRetry = useCallback(async () => {
     if (!supabase || readOnly) return;
-    if (savingInProgress.current) {
-      // Libérer le verrou bloqué avant de retenter
-      clearSafety();
-      clearRetry();
-      savingInProgress.current = false;
+    // Annuler tout save en cours
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
+    clearRetry();
     safeSetStatus('idle');
     try { await supabase.auth.refreshSession(); } catch {}
     // Récupérer les données — pendingData en priorité, sinon localStorage
