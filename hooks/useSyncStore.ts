@@ -6,7 +6,6 @@ export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 const DEBOUNCE_MS     = 600;
 const SAVE_TIMEOUT_MS = 10_000;
 const KEEPALIVE_MS    = 30_000;
-const RECOVERY_MS     = 5_000; // délai avant auto-recovery après erreur
 
 export function useSyncStore<T>(
   baseKey: string,
@@ -56,7 +55,6 @@ export function useSyncStore<T>(
   );
 
   // ── saveToCloud ────────────────────────────────────────────────────────────
-  // Pas de référence circulaire — finishSaving est inline ici
   const saveToCloud = useCallback(async (dataToSave: T): Promise<void> => {
     if (!supabase || readOnly) return;
     if (savingInProgress.current) return;
@@ -68,10 +66,35 @@ export function useSyncStore<T>(
     safetyTimer.current = setTimeout(() => {
       console.warn('[SyncStore] safety timer — reset');
       savingInProgress.current = false;
+      pendingData.current = null;
       setStatus('idle');
     }, SAVE_TIMEOUT_MS + 2_000);
 
     setStatus('saving');
+
+    const onError = async (msg: string) => {
+      console.warn('[SyncStore] save failed:', msg);
+      clearSafety();
+      savingInProgress.current = false;
+      setStatus('error');
+      // Refresh session silencieux, puis retour idle dans 4s
+      // Pas de retry automatique — évite la boucle infinie
+      // Le keepalive toutes les 30s maintiendra la session active
+      setTimeout(async () => {
+        try { await supabase.auth.refreshSession(); } catch {}
+        setStatus('idle');
+        // Si des données sont encore en attente, relancer via debounce une seule fois
+        if (pendingData.current && !savingInProgress.current) {
+          clearDebounce();
+          const data = pendingData.current;
+          debounceTimer.current = setTimeout(() => {
+            if (pendingData.current && !savingInProgress.current) {
+              saveToCloud(data);
+            }
+          }, 2_000);
+        }
+      }, 4_000);
+    };
 
     try {
       // UPDATE d'abord (admin + fournisseur)
@@ -88,10 +111,7 @@ export function useSyncStore<T>(
         ]) as any;
 
         if (upsertError) {
-          console.warn('[SyncStore] save failed:', upsertError.message);
-          clearSafety();
-          savingInProgress.current = false;
-          setStatus('error'); // ← useEffect d'auto-recovery prend le relais
+          await onError(upsertError.message);
           return;
         }
       }
@@ -104,41 +124,9 @@ export function useSyncStore<T>(
       setTimeout(() => setStatus('idle'), 2_000);
 
     } catch (err: any) {
-      console.warn('[SyncStore] save exception:', err?.message ?? err);
-      clearSafety();
-      savingInProgress.current = false;
-      setStatus('error'); // ← useEffect d'auto-recovery prend le relais
+      await onError(err?.message ?? 'exception');
     }
   }, [effectiveKey, supabase, readOnly]);
-
-  // ── Auto-recovery — useEffect propre, pas de closure stale ───────────────
-  // Quand status passe à 'error' : attend 5s, refresh session, retente
-  useEffect(() => {
-    if (status !== 'error' || !supabase || readOnly) return;
-
-    const timer = setTimeout(async () => {
-      try { await supabase.auth.refreshSession(); } catch {}
-
-      if (savingInProgress.current) return; // un autre save a démarré entre-temps
-
-      // Récupérer les dernières données locales et retenter
-      const dataToRetry = pendingData.current ?? (() => {
-        try {
-          const raw = localStorage.getItem(effectiveKey);
-          return raw ? JSON.parse(raw) as T : null;
-        } catch { return null; }
-      })();
-
-      if (dataToRetry) {
-        pendingData.current = dataToRetry;
-        saveToCloud(dataToRetry); // saveToCloud ici est toujours la version à jour
-      } else {
-        setStatus('idle');
-      }
-    }, RECOVERY_MS);
-
-    return () => clearTimeout(timer);
-  }, [status, supabase, readOnly, effectiveKey, saveToCloud]);
 
   // ── persistData ────────────────────────────────────────────────────────────
   const persistData = useCallback((newData: T) => {
@@ -240,9 +228,9 @@ export function useSyncStore<T>(
   useEffect(() => {
     if (!isCloud) return;
 
-    const syncOnResume = () => {
+    const syncOnResume = async () => {
       if (pendingData.current && !savingInProgress.current) {
-        saveToCloud(pendingData.current);
+        await saveToCloud(pendingData.current);
       } else if (!pendingData.current) {
         fetchFromCloud();
       }
