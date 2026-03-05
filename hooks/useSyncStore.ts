@@ -4,7 +4,7 @@ import { getSupabase, getSupabaseConfig } from '../services/supabase';
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const DEBOUNCE_MS     = 600;
-const SAVE_TIMEOUT_MS = 10_000;
+const SAVE_TIMEOUT_MS = 20_000;
 const RESUME_THROTTLE = 30_000;
 
 export function useSyncStore<T>(
@@ -43,7 +43,8 @@ export function useSyncStore<T>(
   // Initialiser à Date.now() pour que le premier focus après mount soit throttlé
   // (on fetchFromCloud déjà au mount — pas besoin d'un sync immédiat au premier focus)
   const lastResumeSync   = useRef<number>(Date.now());
-  const savingInProgress = useRef(false);
+  const savingInProgress  = useRef(false);
+  const lastSaveStarted   = useRef<number>(0); // timestamp du dernier save démarré
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const clearDebounce = () => {
@@ -69,6 +70,7 @@ export function useSyncStore<T>(
     if (!supabase || readOnly) return;
     if (savingInProgress.current) return;
     savingInProgress.current = true;
+    lastSaveStarted.current = Date.now();
 
     clearSafety();
     clearRetry();
@@ -240,7 +242,15 @@ export function useSyncStore<T>(
       if (now - lastResumeSync.current < RESUME_THROTTLE) return;
       lastResumeSync.current = now;
 
-      // Ne pas interférer si un save est en cours
+      // Si savingInProgress bloqué depuis >25s (safety timer throttlé par le navigateur)
+      // → forcer le déverrouillage pour ne pas bloquer les saves suivants
+      if (savingInProgress.current && now - lastSaveStarted.current > 25_000) {
+        console.warn('[SyncStore] verrou bloqué — déverrouillage forcé au retour');
+        clearSafety();
+        clearRetry();
+        savingInProgress.current = false;
+      }
+
       if (savingInProgress.current) return;
 
       // Refresh session silencieux avant tout — app peut avoir dormi longtemps
