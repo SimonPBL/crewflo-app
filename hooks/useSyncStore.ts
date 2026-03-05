@@ -290,6 +290,22 @@ export function useSyncStore<T>(
     return () => { if (supabase && channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [effectiveKey, isCloud]);
 
+  // ── Health check canal — vérifie toutes les 20s que le canal est vivant ───
+  // Supabase peut décrocher silencieusement sans envoyer CHANNEL_ERROR
+  useEffect(() => {
+    if (!isCloud || !supabase) return;
+    const healthCheck = setInterval(() => {
+      if (!isMounted.current) return;
+      const state = channelRef.current?.state;
+      // 'joined' = OK, tout autre état = canal mort ou en erreur
+      if (state && state !== 'joined') {
+        console.warn('[SyncStore] canal mort (state:', state, ') — reconnexion');
+        setupChannel();
+      }
+    }, 20_000);
+    return () => clearInterval(healthCheck);
+  }, [isCloud, supabase, setupChannel]);
+
   // ── Resync au retour — throttle commun focus + visible ────────────────────
   useEffect(() => {
     if (!isCloud) return;
