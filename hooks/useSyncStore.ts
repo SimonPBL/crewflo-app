@@ -5,9 +5,8 @@ export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const DEBOUNCE_MS     = 600;
 const SAVE_TIMEOUT_MS = 10_000;
-const KEEPALIVE_MS    = 30_000;
-const RESUME_THROTTLE = 30_000; // min 30s entre deux syncs de reprise (focus/visible)
-const MAX_RETRIES     = 2;      // max tentatives après erreur avant abandon
+const RESUME_THROTTLE = 30_000;
+const MAX_RETRIES     = 2;
 
 export function useSyncStore<T>(
   baseKey: string,
@@ -39,11 +38,14 @@ export function useSyncStore<T>(
   const pendingData      = useRef<T | null>(null);
   const debounceTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const safetyTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keepaliveTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimer       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef       = useRef<any>(null);
-  const lastResumeSync   = useRef<number>(0); // throttle commun focus + visible
+  const isMounted        = useRef(true);
+  // Initialiser à Date.now() pour que le premier focus après mount soit throttlé
+  // (on fetchFromCloud déjà au mount — pas besoin d'un sync immédiat au premier focus)
+  const lastResumeSync   = useRef<number>(Date.now());
   const savingInProgress = useRef(false);
-  const retryCount       = useRef(0);         // nombre de tentatives après erreur
+  const retryCount       = useRef(0);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const clearDebounce = () => {
@@ -51,6 +53,13 @@ export function useSyncStore<T>(
   };
   const clearSafety = () => {
     if (safetyTimer.current) { clearTimeout(safetyTimer.current); safetyTimer.current = null; }
+  };
+  const clearRetry = () => {
+    if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
+  };
+
+  const safeSetStatus = (s: SyncStatus) => {
+    if (isMounted.current) setStatus(s);
   };
 
   const makeTimeout = () => new Promise<never>((_, reject) =>
@@ -64,46 +73,44 @@ export function useSyncStore<T>(
     savingInProgress.current = true;
 
     clearSafety();
+    clearRetry();
 
-    // Safety timer — libère le verrou après 12s, SANS effacer pendingData
-    // (les données sont précieuses — on les garde pour le prochain retry)
+    // Safety timer — libère le verrou, conserve pendingData pour retry éventuel
     safetyTimer.current = setTimeout(() => {
       console.warn('[SyncStore] safety timer — reset verrou');
       savingInProgress.current = false;
-      setStatus('idle');
-      // pendingData intentionnellement conservé pour retry éventuel
+      safeSetStatus('idle');
     }, SAVE_TIMEOUT_MS + 2_000);
 
-    setStatus('saving');
+    safeSetStatus('saving');
 
-    const onError = async (msg: string) => {
+    const onError = (msg: string) => {
       console.warn('[SyncStore] save failed:', msg);
       clearSafety();
       savingInProgress.current = false;
 
       if (retryCount.current >= MAX_RETRIES) {
-        // Abandon — trop de tentatives, on ne loop pas
         console.warn('[SyncStore] abandon après', MAX_RETRIES, 'tentatives');
         retryCount.current = 0;
         pendingData.current = null;
-        setStatus('idle');
+        safeSetStatus('idle');
         return;
       }
 
       retryCount.current += 1;
-      setStatus('error');
+      safeSetStatus('error');
 
-      // Refresh session silencieux puis retente unique après délai croissant
+      // Retry unique dans un ref — cancellable si nouveau changement arrive
       const delay = retryCount.current * 4_000; // 4s puis 8s
-      setTimeout(async () => {
+      retryTimer.current = setTimeout(async () => {
+        if (!isMounted.current) return;
         try { await supabase.auth.refreshSession(); } catch {}
-        setStatus('idle');
-        // Retente avec les données en attente (pendingData conservé)
+        safeSetStatus('idle');
         if (pendingData.current && !savingInProgress.current) {
-          clearDebounce();
           const data = pendingData.current;
+          clearDebounce();
           debounceTimer.current = setTimeout(() => {
-            if (pendingData.current && !savingInProgress.current) {
+            if (pendingData.current && !savingInProgress.current && isMounted.current) {
               saveToCloud(data);
             }
           }, 1_000);
@@ -112,21 +119,21 @@ export function useSyncStore<T>(
     };
 
     try {
-      // UPDATE d'abord (admin + fournisseur)
+      // UPDATE d'abord (admin + fournisseur via RLS)
       const { error: updateError } = await Promise.race([
         supabase.from('crewflo_sync').update({ data: dataToSave as any }).eq('key', effectiveKey),
         makeTimeout(),
       ]) as any;
 
       if (updateError) {
-        // Fallback upsert (admin — création première ligne)
+        // Fallback upsert — admin seulement (création première ligne)
         const { error: upsertError } = await Promise.race([
           supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: dataToSave as any }),
           makeTimeout(),
         ]) as any;
 
         if (upsertError) {
-          await onError(upsertError.message);
+          onError(upsertError.message);
           return;
         }
       }
@@ -136,27 +143,27 @@ export function useSyncStore<T>(
       savingInProgress.current = false;
       pendingData.current = null;
       retryCount.current = 0;
-      setStatus('saved');
-      setTimeout(() => setStatus('idle'), 2_000);
+      safeSetStatus('saved');
+      setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
 
     } catch (err: any) {
-      await onError(err?.message ?? 'exception');
+      onError(err?.message ?? 'exception');
     }
   }, [effectiveKey, supabase, readOnly]);
 
   // ── persistData ────────────────────────────────────────────────────────────
   const persistData = useCallback((newData: T) => {
-    // Sauvegarde locale immédiate — jamais perdu
     try { localStorage.setItem(effectiveKey, JSON.stringify(newData)); } catch {}
 
     if (!isCloud || !supabase || readOnly) return;
 
     pendingData.current = newData;
-    retryCount.current = 0; // nouveau changement = on repart de zéro
+    retryCount.current = 0; // nouveau changement = compteur retry remis à zéro
+    clearRetry();           // annuler tout retry en cours
     clearDebounce();
 
     debounceTimer.current = setTimeout(() => {
-      if (pendingData.current !== null) {
+      if (pendingData.current !== null && isMounted.current) {
         saveToCloud(pendingData.current);
       }
     }, DEBOUNCE_MS);
@@ -172,15 +179,16 @@ export function useSyncStore<T>(
         .eq('key', effectiveKey)
         .single();
 
+      if (!isMounted.current) return;
+
       if (data?.data) {
         isRemoteUpdate.current = true;
         setValue(data.data as T);
         localStorage.setItem(effectiveKey, JSON.stringify(data.data));
         isRemoteUpdate.current = false;
-        setStatus('saved');
-        setTimeout(() => setStatus('idle'), 2_000);
+        safeSetStatus('saved');
+        setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
       } else if (error?.code === 'PGRST116' && !readOnly) {
-        // Ligne absente → admin crée la ligne initiale
         const local = getSaved();
         await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
       }
@@ -206,18 +214,18 @@ export function useSyncStore<T>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
         (payload: any) => {
-          if (payload.new?.data) {
+          if (payload.new?.data && isMounted.current) {
             isRemoteUpdate.current = true;
             setValue(payload.new.data as T);
             localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
             isRemoteUpdate.current = false;
-            setStatus('saved');
-            setTimeout(() => setStatus('idle'), 2_000);
+            safeSetStatus('saved');
+            setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
           }
         }
       )
       .subscribe((s: string) => {
-        if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') {
+        if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') && isMounted.current) {
           setTimeout(setupChannel, 3_000);
         }
       });
@@ -231,18 +239,6 @@ export function useSyncStore<T>(
     return () => { if (supabase && channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [effectiveKey, isCloud]);
 
-  // ── Keepalive — refresh session + ping toutes les 30s ─────────────────────
-  useEffect(() => {
-    if (!isCloud || !supabase) return;
-    keepaliveTimer.current = setInterval(async () => {
-      try {
-        await supabase.auth.refreshSession();
-        await supabase.from('crewflo_sync').select('key').eq('key', effectiveKey).limit(1);
-      } catch {}
-    }, KEEPALIVE_MS);
-    return () => { if (keepaliveTimer.current) clearInterval(keepaliveTimer.current); };
-  }, [effectiveKey, isCloud, supabase]);
-
   // ── Resync au retour — throttle commun focus + visible ────────────────────
   useEffect(() => {
     if (!isCloud) return;
@@ -252,11 +248,12 @@ export function useSyncStore<T>(
       if (now - lastResumeSync.current < RESUME_THROTTLE) return;
       lastResumeSync.current = now;
 
-      if (pendingData.current && !savingInProgress.current) {
-        // Données locales en attente → envoyer en priorité
+      // Ne pas interférer si un save est en cours
+      if (savingInProgress.current) return;
+
+      if (pendingData.current) {
         await saveToCloud(pendingData.current);
-      } else if (!pendingData.current) {
-        // Rien en attente → fetch serveur pour rester à jour
+      } else {
         fetchFromCloud();
       }
       setupChannel();
@@ -265,12 +262,9 @@ export function useSyncStore<T>(
     const onVisible = () => {
       if (document.visibilityState === 'visible') syncOnResume();
     };
-
-    const onFocus = () => syncOnResume();
-
-    const onOnline = () => {
-      // Retour réseau : forcer un sync immédiat sans throttle
-      lastResumeSync.current = 0;
+    const onFocus   = () => syncOnResume();
+    const onOnline  = () => {
+      lastResumeSync.current = 0; // retour réseau = sync forcé sans throttle
       syncOnResume();
     };
 
@@ -284,11 +278,14 @@ export function useSyncStore<T>(
     };
   }, [isCloud, fetchFromCloud, saveToCloud, setupChannel]);
 
-  // ── Cleanup ────────────────────────────────────────────────────────────────
+  // ── Cleanup complet au unmount ─────────────────────────────────────────────
   useEffect(() => {
+    isMounted.current = true;
     return () => {
+      isMounted.current = false;
       clearDebounce();
       clearSafety();
+      clearRetry();
     };
   }, []);
 

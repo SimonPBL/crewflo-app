@@ -71,6 +71,8 @@ const App = () => {
 
   const [sessionChecked, setSessionChecked] = useState(false);
   const [roleChecked, setRoleChecked] = useState(false);
+  const [cloudDataLoaded, setCloudDataLoaded] = useState(false); // true après premier fetch cloud
+  const fetchingRole = useRef(false); // guard — empêche appels concurrents
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
   const [userEmail, setUserEmail] = useState<string>('');
@@ -78,6 +80,8 @@ const App = () => {
 
   const fetchUserRole = async () => {
     if (!supabase) return;
+    if (fetchingRole.current) return; // guard — un seul appel à la fois
+    fetchingRole.current = true;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -103,6 +107,8 @@ const App = () => {
       }
     } catch (e) {
       // ignore
+    } finally {
+      fetchingRole.current = false;
     }
   };
 
@@ -131,7 +137,11 @@ const App = () => {
 
     init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, sess) => {
+      // TOKEN_REFRESHED : session toujours valide, rôle inchangé — ignorer
+      // Évite re-render + double fetchUserRole déjà géré par init()
+      if (event === 'TOKEN_REFRESHED') return;
+
       setIsLoggedIn(!!sess);
 
       if (sess) {
@@ -165,6 +175,15 @@ const App = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // ── Keepalive unique — UN SEUL interval pour toute l'app ─────────────────
+  useEffect(() => {
+    if (!supabase) return;
+    const interval = setInterval(async () => {
+      try { await supabase.auth.refreshSession(); } catch {}
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [supabase]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -253,7 +272,15 @@ const App = () => {
     ? (suppliers.find(s => s.email?.toLowerCase() === userEmail) ?? null)
     : null;
 
+  // cloudDataLoaded — vrai après que les données cloud soient arrivées
+  useEffect(() => {
+    if (!cloudDataLoaded && (statusS === 'saved' || statusP === 'saved' || statusT === 'saved')) {
+      setCloudDataLoaded(true);
+    }
+  }, [statusS, statusP, statusT, cloudDataLoaded]);
+
   const supplierNotRecognized = roleChecked
+    && cloudDataLoaded           // attendre que le cloud soit chargé avant de juger
     && role === 'supplier'
     && !!userEmail
     && suppliers.length > 0
@@ -474,12 +501,13 @@ const App = () => {
     if (globalStatus === 'saving') return <div className="flex items-center gap-2 text-yellow-500 text-[10px] font-bold animate-pulse"><Loader2 className="w-3 h-3 animate-spin" /> Envoi...</div>;
     if (globalStatus === 'saved') return <div className="flex items-center gap-2 text-green-500 text-[10px] font-bold"><CheckCircle2 className="w-3 h-3" /> Synchronisé</div>;
     if (globalStatus === 'error') return (
-      <div
-        className="flex items-center gap-1.5 text-amber-500 text-[10px] font-bold animate-pulse"
-        title="Reconnexion automatique en cours..."
+      <button
+        onClick={() => window.location.reload()}
+        className="flex items-center gap-1.5 text-red-500 text-[10px] font-bold hover:text-red-400 transition-colors"
+        title="Session expirée ou erreur réseau — cliquez pour rechargement"
       >
-        <Loader2 className="w-3 h-3 animate-spin" /> Reconnexion...
-      </div>
+        <AlertTriangle className="w-3 h-3" /> Session expirée · Recharger
+      </button>
     );
     return <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold"><Wifi className="w-3 h-3" /> Connecté</div>;
   };
