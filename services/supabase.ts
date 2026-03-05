@@ -7,9 +7,6 @@ const STORE_KEY_COMPANY_ID = 'crewflo_company_id';
 
 // Singleton — une seule instance, Navigator Lock désactivé pour éviter les conflits
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => fn(),
-  },
   realtime: { params: { eventsPerSecond: 10 } },
 });
 
