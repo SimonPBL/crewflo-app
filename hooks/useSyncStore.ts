@@ -224,8 +224,8 @@ export function useSyncStore<T>(
       if (now - lastResumeSync.current < RESUME_THROTTLE) return;
       lastResumeSync.current = now;
 
-      // Refresh session silencieux — app peut avoir dormi longtemps
-      try { await supabase!.auth.refreshSession(); } catch {}
+      // Pas de refreshSession ici — App.tsx gère le keepalive de session
+      // Appels multiples simultanés causent token_revoked + délais 30-47s
       if (!isMounted.current) return;
 
       if (pendingData.current) {
