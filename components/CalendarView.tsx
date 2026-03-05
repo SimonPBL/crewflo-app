@@ -443,12 +443,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     </span>
                                     )}
                                     {task.taskStatus === 'declined' && !isPdf && (
-                                    <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center z-20" title="Refusé par le fournisseur">
-                                        <svg viewBox="0 0 10 10" className="w-2 h-2 stroke-white stroke-2 fill-none">
-                                        <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
-                                        <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
-                                        </svg>
-                                    </span>
+                                    <div className="absolute -top-1.5 -right-1 bg-red-500 text-white text-[8px] font-bold px-1 py-0.5 rounded z-20 leading-none shadow-sm">
+                                        Refusé
+                                    </div>
                                     )}
                                     <div className="flex flex-col gap-0.5">
                                         {currentProjectId ? (
@@ -983,6 +980,12 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                               <div className="font-bold text-slate-800 text-sm truncate">{supplier?.name || 'Fournisseur'}</div>
                               <div className="text-xs text-slate-500 truncate">{project?.name || 'Chantier'}</div>
                               {t.title && <div className="text-xs text-slate-700 mt-1">{t.title}</div>}
+                              {t.taskStatus === 'declined' && (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1">
+                                  <X className="w-3 h-3" /> Refusé
+                                  {t.supplierNotes?.text && <span className="font-normal">— {t.supplierNotes.text}</span>}
+                                </span>
+                              )}
                               {t.notes && <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.notes}</div>}
                               {t.supplierNotes?.text && (
                                 <div className="mt-1 text-xs bg-amber-50 border border-amber-100 rounded px-2 py-1 text-amber-800">
