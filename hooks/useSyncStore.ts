@@ -75,27 +75,8 @@ export function useSyncStore<T>(
     clearSafety();
     clearRetry();
 
-    // Vérification proactive de la session avant d'envoyer
-    // Évite le cycle erreur → retry → erreur si le token est déjà expiré
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        // Pas de session — tenter un refresh avant tout
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          // Refresh impossible — garder pendingData, libérer le verrou, attendre
-          console.warn('[SyncStore] session introuvable — retry plus tard');
-          savingInProgress.current = false;
-          safeSetStatus('error');
-          retryTimer.current = setTimeout(() => {
-            if (isMounted.current) safeSetStatus('idle');
-          }, 5_000);
-          return;
-        }
-      }
-    } catch {}
-
-    // Safety timer — libère le verrou, conserve pendingData pour retry éventuel
+    // Safety timer — libère le verrou immédiatement, conserve pendingData
+    // Doit être mis AVANT tout appel async pour garantir la libération du verrou
     safetyTimer.current = setTimeout(() => {
       console.warn('[SyncStore] safety timer — reset verrou');
       savingInProgress.current = false;
