@@ -54,6 +54,21 @@ export function useSyncStore<T>(
     if (isMounted.current) setStatus(s);
   };
 
+  // ── Garde session — vérifie qu'on a une vraie session user avant d'envoyer ─
+  // Si le client a perdu sa session (role=anon), on attend le refresh jusqu'à 5s
+  const waitForSession = async (): Promise<boolean> => {
+    if (!supabase) return false;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) return true;
+    // Pas de session — tenter un refresh
+    try {
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+      return !!refreshed?.user;
+    } catch {
+      return false;
+    }
+  };
+
   // ── saveToCloud — sans verrou bloquant ────────────────────────────────────
   // On utilise AbortController au lieu d'un verrou ref.
   // Chaque save annule le précédent si encore en cours — pas de blocage permanent.
@@ -61,6 +76,14 @@ export function useSyncStore<T>(
 
   const saveToCloud = useCallback(async (dataToSave: T): Promise<void> => {
     if (!supabase || readOnly) return;
+
+    // Vérifier la session AVANT d'envoyer — évite les 401 avec role=anon
+    const hasSession = await waitForSession();
+    if (!hasSession) {
+      console.warn('[SyncStore] pas de session — save annulé, pendingData conservé');
+      pendingData.current = dataToSave;
+      return;
+    }
 
     // Annuler le save précédent s'il traine encore
     if (abortControllerRef.current) {
@@ -132,6 +155,12 @@ export function useSyncStore<T>(
   // ── fetchFromCloud ─────────────────────────────────────────────────────────
   const fetchFromCloud = useCallback(async () => {
     if (!supabase) return;
+    // Vérifier la session avant fetch — évite 406 avec clé sans préfixe (role=anon)
+    const hasSession = await waitForSession();
+    if (!hasSession) {
+      console.warn('[SyncStore] pas de session — fetch annulé');
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('crewflo_sync')
