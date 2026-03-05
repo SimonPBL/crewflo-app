@@ -176,13 +176,38 @@ const App = () => {
     };
   }, []);
 
-  // ── Keepalive unique — UN SEUL interval pour toute l'app ─────────────────
+  // ── Keepalive + refresh immédiat au retour d'inactivité ──────────────────
+  // Le navigateur throttle les setInterval quand l'onglet est en arrière-plan.
+  // Solution : visibilitychange refresh la session immédiatement au retour,
+  // sans attendre le prochain tick du interval (qui peut avoir été retardé).
   useEffect(() => {
     if (!supabase) return;
-    const interval = setInterval(async () => {
+
+    const refreshSession = async () => {
       try { await supabase.auth.refreshSession(); } catch {}
-    }, 30_000);
-    return () => clearInterval(interval);
+    };
+
+    // Interval régulier — actif quand l'onglet est au premier plan
+    const interval = setInterval(refreshSession, 30_000);
+
+    // Refresh immédiat dès que l'app redevient visible
+    // Couvre : retour d'un autre onglet, déverrouillage écran, retour d'une autre app
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshSession();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    // pageshow couvre le retour depuis le cache bfcache sur iOS Safari
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) refreshSession();
+    };
+    window.addEventListener('pageshow', onPageShow);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
+    };
   }, [supabase]);
 
   useEffect(() => {
