@@ -121,12 +121,12 @@ const TaskCard: React.FC<TaskCardProps> = ({
       {/* Note admin — visible par le fournisseur, lecture seule */}
       {task.adminNote?.text && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Message de l'administrateur</span>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-xs font-bold text-blue-700">Admin</span>
             {task.adminNote.updatedAt && (
               <span className="text-xs text-blue-400">
                 {new Date(task.adminNote.updatedAt).toLocaleDateString('fr-CA', {
-                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                 })}
               </span>
             )}
@@ -138,12 +138,11 @@ const TaskCard: React.FC<TaskCardProps> = ({
       {/* Supplier notes display */}
       {task.supplierNotes?.text && !isEditingNote && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Ma note</span>
-            <span className="text-xs text-amber-600">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-xs font-bold text-amber-700">{task.supplierNotes.authorName}</span>
+            <span className="text-xs text-amber-500">
               {new Date(task.supplierNotes.updatedAt).toLocaleDateString('fr-CA', {
-                day: 'numeric', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
+                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
               })}
             </span>
           </div>
