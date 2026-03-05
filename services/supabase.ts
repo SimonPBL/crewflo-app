@@ -6,7 +6,21 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const STORE_KEY_COMPANY_ID = 'crewflo_company_id';
 
 // Singleton — une seule instance, Navigator Lock désactivé pour éviter les conflits
+// Serialise les refreshes de token — empêche les appels simultanés qui révoquent
+// mutuellement leurs tokens. Utilise Navigator Lock si disponible, sinon une
+// queue maison (PWA installée sur iOS/Android n'a pas toujours Navigator Lock).
+let refreshQueue: Promise<any> = Promise.resolve();
+const serializedLock = async (_name: string, _timeout: number, fn: () => Promise<any>) => {
+  refreshQueue = refreshQueue.then(() => fn()).catch(() => fn());
+  return refreshQueue;
+};
+
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    lock: typeof navigator !== 'undefined' && 'locks' in navigator
+      ? undefined  // laisser Supabase utiliser Navigator Lock natif
+      : serializedLock,  // fallback PWA sans Navigator Lock
+  },
   realtime: { params: { eventsPerSecond: 10 } },
 });
 
