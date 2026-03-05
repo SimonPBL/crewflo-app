@@ -84,27 +84,37 @@ export function useSyncStore<T>(
 
     safeSetStatus('saving');
 
-    const onError = (msg: string) => {
+    const onError = async (msg: string) => {
       console.warn('[SyncStore] save failed:', msg);
       clearSafety();
       savingInProgress.current = false;
 
+      // Détecter si c'est une erreur d'authentification
+      const isAuthError = msg.toLowerCase().includes('jwt') ||
+        msg.toLowerCase().includes('token') ||
+        msg.toLowerCase().includes('401') ||
+        msg.toLowerCase().includes('403') ||
+        msg.toLowerCase().includes('auth');
+
       if (retryCount.current >= MAX_RETRIES) {
         console.warn('[SyncStore] abandon après', MAX_RETRIES, 'tentatives');
         retryCount.current = 0;
-        pendingData.current = null;
-        safeSetStatus('idle');
+        // NE PAS effacer pendingData — conserver pour retry au prochain focus/action
+        safeSetStatus('error');
+        // Afficher erreur 5s puis retour idle silencieux
+        retryTimer.current = setTimeout(() => {
+          if (isMounted.current) safeSetStatus('idle');
+        }, 5_000);
         return;
       }
 
       retryCount.current += 1;
       safeSetStatus('error');
 
-      // Retry unique dans un ref — cancellable si nouveau changement arrive
-      const delay = retryCount.current * 4_000; // 4s puis 8s
-      retryTimer.current = setTimeout(async () => {
-        if (!isMounted.current) return;
+      if (isAuthError) {
+        // Auth error : refresh session immédiat puis retry rapide
         try { await supabase.auth.refreshSession(); } catch {}
+        if (!isMounted.current) return;
         safeSetStatus('idle');
         if (pendingData.current && !savingInProgress.current) {
           const data = pendingData.current;
@@ -113,9 +123,26 @@ export function useSyncStore<T>(
             if (pendingData.current && !savingInProgress.current && isMounted.current) {
               saveToCloud(data);
             }
-          }, 1_000);
+          }, 500);
         }
-      }, delay);
+      } else {
+        // Erreur réseau : délai croissant avant retry
+        const delay = retryCount.current * 4_000; // 4s puis 8s
+        retryTimer.current = setTimeout(async () => {
+          if (!isMounted.current) return;
+          try { await supabase.auth.refreshSession(); } catch {}
+          safeSetStatus('idle');
+          if (pendingData.current && !savingInProgress.current) {
+            const data = pendingData.current;
+            clearDebounce();
+            debounceTimer.current = setTimeout(() => {
+              if (pendingData.current && !savingInProgress.current && isMounted.current) {
+                saveToCloud(data);
+              }
+            }, 1_000);
+          }
+        }, delay);
+      }
     };
 
     try {
@@ -251,7 +278,12 @@ export function useSyncStore<T>(
       // Ne pas interférer si un save est en cours
       if (savingInProgress.current) return;
 
+      // Refresh session silencieux avant tout — app peut avoir dormi longtemps
+      try { await supabase!.auth.refreshSession(); } catch {}
+      if (!isMounted.current) return;
+
       if (pendingData.current) {
+        retryCount.current = 0; // nouveau contexte — repartir de zéro
         await saveToCloud(pendingData.current);
       } else {
         fetchFromCloud();
