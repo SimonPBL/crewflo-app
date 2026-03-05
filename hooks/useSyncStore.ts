@@ -55,18 +55,12 @@ export function useSyncStore<T>(
   };
 
   // ── Garde session — vérifie qu'on a une vraie session user avant d'envoyer ─
-  // Si le client a perdu sa session (role=anon), on attend le refresh jusqu'à 5s
+  // NE PAS appeler refreshSession ici — App.tsx le fait déjà (keepalive + visibilitychange)
+  // Appels concurrents depuis 3 stores = token_revoked + délais 30-47s
   const waitForSession = async (): Promise<boolean> => {
     if (!supabase) return false;
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) return true;
-    // Pas de session — tenter un refresh
-    try {
-      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
-      return !!refreshed?.user;
-    } catch {
-      return false;
-    }
+    return !!session?.user;
   };
 
   // ── saveToCloud — sans verrou bloquant ────────────────────────────────────

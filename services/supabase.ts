@@ -9,20 +9,26 @@ const STORE_KEY_COMPANY_ID = 'crewflo_company_id';
 // Serialise les refreshes de token — empêche les appels simultanés qui révoquent
 // mutuellement leurs tokens. Utilise Navigator Lock si disponible, sinon une
 // queue maison (PWA installée sur iOS/Android n'a pas toujours Navigator Lock).
+// Queue de sérialisation pour les environnements sans Navigator Lock
+// (certaines PWA installées, iOS Safari, contextes isolés)
 let refreshQueue: Promise<any> = Promise.resolve();
 const serializedLock = async (_name: string, _timeout: number, fn: () => Promise<any>) => {
   refreshQueue = refreshQueue.then(() => fn()).catch(() => fn());
   return refreshQueue;
 };
 
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    lock: typeof navigator !== 'undefined' && 'locks' in navigator
-      ? undefined  // laisser Supabase utiliser Navigator Lock natif
-      : serializedLock,  // fallback PWA sans Navigator Lock
-  },
-  realtime: { params: { eventsPerSecond: 10 } },
-});
+const hasNativeLock = typeof navigator !== 'undefined' && 'locks' in navigator;
+
+// Si Navigator Lock natif disponible : ne pas passer lock du tout (Supabase l'utilise automatiquement)
+// Sinon : queue maison pour sérialiser les refreshes et éviter token_revoked
+export const supabase: SupabaseClient = hasNativeLock
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+      realtime: { params: { eventsPerSecond: 10 } },
+    })
+  : createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { lock: serializedLock },
+      realtime: { params: { eventsPerSecond: 10 } },
+    });
 
 export const getSupabase = (): SupabaseClient => supabase;
 
