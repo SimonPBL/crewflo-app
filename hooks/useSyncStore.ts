@@ -75,6 +75,26 @@ export function useSyncStore<T>(
     clearSafety();
     clearRetry();
 
+    // Vérification proactive de la session avant d'envoyer
+    // Évite le cycle erreur → retry → erreur si le token est déjà expiré
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Pas de session — tenter un refresh avant tout
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          // Refresh impossible — garder pendingData, libérer le verrou, attendre
+          console.warn('[SyncStore] session introuvable — retry plus tard');
+          savingInProgress.current = false;
+          safeSetStatus('error');
+          retryTimer.current = setTimeout(() => {
+            if (isMounted.current) safeSetStatus('idle');
+          }, 5_000);
+          return;
+        }
+      }
+    } catch {}
+
     // Safety timer — libère le verrou, conserve pendingData pour retry éventuel
     safetyTimer.current = setTimeout(() => {
       console.warn('[SyncStore] safety timer — reset verrou');
@@ -111,26 +131,22 @@ export function useSyncStore<T>(
       retryCount.current += 1;
       safeSetStatus('error');
 
-      if (isAuthError) {
-        // Auth error : refresh session immédiat puis retry rapide
-        try { await supabase.auth.refreshSession(); } catch {}
-        if (!isMounted.current) return;
-        safeSetStatus('idle');
-        if (pendingData.current && !savingInProgress.current) {
-          const data = pendingData.current;
-          clearDebounce();
-          debounceTimer.current = setTimeout(() => {
-            if (pendingData.current && !savingInProgress.current && isMounted.current) {
-              saveToCloud(data);
-            }
-          }, 500);
-        }
-      } else {
-        // Erreur réseau : délai croissant avant retry
-        const delay = retryCount.current * 4_000; // 4s puis 8s
+      // Tenter le refresh — s'il échoue, ne pas retenter le save (évite la boucle)
+      const attemptRefreshAndRetry = async (delayMs: number) => {
         retryTimer.current = setTimeout(async () => {
           if (!isMounted.current) return;
-          try { await supabase.auth.refreshSession(); } catch {}
+          try {
+            const { error: refreshErr } = await supabase.auth.refreshSession();
+            if (refreshErr) {
+              // Refresh impossible — garder pendingData, attendre focus/online
+              console.warn('[SyncStore] refresh échoué — attente réseau/session');
+              safeSetStatus('idle');
+              return;
+            }
+          } catch {
+            safeSetStatus('idle');
+            return;
+          }
           safeSetStatus('idle');
           if (pendingData.current && !savingInProgress.current) {
             const data = pendingData.current;
@@ -139,9 +155,17 @@ export function useSyncStore<T>(
               if (pendingData.current && !savingInProgress.current && isMounted.current) {
                 saveToCloud(data);
               }
-            }, 1_000);
+            }, 500);
           }
-        }, delay);
+        }, delayMs);
+      };
+
+      if (isAuthError) {
+        // Auth error : retry rapide après refresh
+        await attemptRefreshAndRetry(500);
+      } else {
+        // Erreur réseau : délai croissant
+        await attemptRefreshAndRetry(retryCount.current * 4_000);
       }
     };
 
