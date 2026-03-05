@@ -406,50 +406,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => { e.stopPropagation(); if (isPdf) return; handleEditTask(e, task); }}
                                     className={`
-                                    rounded border shadow-sm transition-all relative
+                                    rounded border shadow-sm transition-all relative flex gap-0.5
                                     ${isPdf ? 'p-1 mb-1 border-l-2' : 'p-1 text-[10px]'}
                                     ${interactive ? 'cursor-pointer hover:brightness-95 hover:scale-[1.02] z-10' : ''}
                                     ${colorClass}
-                                    ${hasConflict ? 'ring-2 ring-red-500 ring-offset-0 z-20' : task.taskStatus === 'declined' ? 'ring-2 ring-red-400 ring-offset-0' : ''}
+                                    ${hasConflict ? 'ring-2 ring-red-500 ring-offset-0 z-20' : ''}
+                                    ${!isPdf && isNew ? 'border-l-[3px] border-l-blue-500' : ''}
                                     `}
                                 >
+                                    {/* Badge conflit — seul absolu restant */}
                                     {hasConflict && (
                                     <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 z-20 shadow-sm border border-white">
                                         <AlertTriangle className="w-2 h-2" />
                                     </div>
                                     )}
-                                    {isNew && (
-                                    <div className="absolute -top-1.5 -left-1 bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded z-20 leading-none shadow-sm">
-                                        Nouveau
-                                    </div>
-                                    )}
-                                    {task.confirmedBySupplier && !isPdf && (
-                                    <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center z-20">
-                                        <svg viewBox="0 0 10 10" className="w-2 h-2 text-white fill-none stroke-current stroke-2">
-                                        <polyline points="1.5,5 4,7.5 8.5,2.5" />
-                                        </svg>
-                                    </span>
-                                    )}
-                                    {task.supplierNotes?.text && !isPdf && (
-                                    <span
-                                        className="absolute bottom-0.5 left-0.5 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center z-20"
-                                        title={task.supplierNotes.text}
-                                    >
-                                        <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-white">
-                                        <rect x="2" y="1.5" width="6" height="1" rx="0.5"/>
-                                        <rect x="2" y="3.5" width="6" height="1" rx="0.5"/>
-                                        <rect x="2" y="5.5" width="4" height="1" rx="0.5"/>
-                                        </svg>
-                                    </span>
-                                    )}
-                                    {task.taskStatus === 'declined' && !isPdf && (
-                                    <div className="absolute -top-1.5 -right-1 bg-red-500 text-white text-[8px] font-bold px-1 py-0.5 rounded z-20 leading-none shadow-sm">
-                                        Refusé
-                                    </div>
-                                    )}
-                                    <div className="flex flex-col gap-0.5">
+
+                                    {/* Texte — prend tout l'espace disponible */}
+                                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                         {currentProjectId ? (
-                                          // Vue par chantier : titre de la tâche + fournisseur
                                           <>
                                             <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
                                               {formatLabel(task.title)}
@@ -459,7 +433,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                             </div>
                                           </>
                                         ) : (
-                                          // Vue globale : fournisseur + nom chantier + adresse
                                           <>
                                             <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
                                               {formatLabel(supplier?.name)}
@@ -475,6 +448,42 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                           </>
                                         )}
                                     </div>
+
+                                    {/* Colonne icônes statuts — droite, jamais par-dessus le texte */}
+                                    {!isPdf && (task.taskStatus === 'confirmed' || task.confirmedBySupplier || task.taskStatus === 'declined' || task.supplierNotes?.text) && (
+                                      <div className="flex flex-col items-center gap-0.5 justify-start pl-0.5 border-l border-black/10 flex-shrink-0">
+                                        {(task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined' && (
+                                          <span
+                                            className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0"
+                                            title="Confirmé par le fournisseur"
+                                          >
+                                            <svg viewBox="0 0 10 10" className="w-2 h-2 text-white fill-none stroke-current stroke-2">
+                                              <polyline points="1.5,5 4,7.5 8.5,2.5" />
+                                            </svg>
+                                          </span>
+                                        )}
+                                        {task.taskStatus === 'declined' && (
+                                          <span
+                                            className="w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0"
+                                            title="Refusé par le fournisseur"
+                                          >
+                                            <svg viewBox="0 0 10 10" className="w-2 h-2 stroke-white fill-none stroke-2">
+                                              <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
+                                              <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
+                                            </svg>
+                                          </span>
+                                        )}
+                                        {task.supplierNotes?.text && (
+                                          <span
+                                            className="w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold leading-none"
+                                            style={{ fontSize: '8px' }}
+                                            title={task.supplierNotes.text}
+                                          >
+                                            !
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                 </div>
                                 );
                             })}
