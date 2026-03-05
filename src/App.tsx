@@ -266,9 +266,9 @@ const App = () => {
 
   const isSupplier = roleChecked && role === 'supplier';
 
-  const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects, roleChecked, isSupplier);
-  const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers, roleChecked, isSupplier);
-  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked, false); // tasks: fournisseur peut écrire (confirm/refus/notes)
+  const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP, forceRetryP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects, roleChecked, isSupplier);
+  const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS, forceRetryS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers, roleChecked, isSupplier);
+  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT, forceRetryT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked, false); // tasks: fournisseur peut écrire
 
   const isCloudConnected = isCloudP || isCloudS || isCloudT;
 
@@ -278,6 +278,22 @@ const App = () => {
     if (statusP === 'saved' || statusS === 'saved' || statusT === 'saved') return 'saved';
     return 'idle';
   }, [statusP, statusS, statusT]);
+
+  // Retry forcé — refresh session + relance les 3 stores en parallèle
+  const forceRetryAll = async () => {
+    await Promise.all([forceRetryP(), forceRetryS(), forceRetryT()]);
+  };
+
+  // Timeout "Envoi..." — après 8s on propose le bouton Réessayer
+  const [savingTooLong, setSavingTooLong] = useState(false);
+  useEffect(() => {
+    if (globalStatus === 'saving') {
+      const t = setTimeout(() => setSavingTooLong(true), 8_000);
+      return () => clearTimeout(t);
+    } else {
+      setSavingTooLong(false);
+    }
+  }, [globalStatus]);
 
   const handleGlobalUndo = () => {
     const maxMod = Math.max(
@@ -523,7 +539,21 @@ const App = () => {
 
   const StatusIndicator = () => {
     if (!isCloudConnected) return null;
-    if (globalStatus === 'saving') return <div className="flex items-center gap-2 text-yellow-500 text-[10px] font-bold animate-pulse"><Loader2 className="w-3 h-3 animate-spin" /> Envoi...</div>;
+    if (globalStatus === 'saving') return (
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-1.5 text-yellow-500 text-[10px] font-bold animate-pulse">
+          <Loader2 className="w-3 h-3 animate-spin" /> Envoi...
+        </div>
+        {savingTooLong && (
+          <button
+            onClick={forceRetryAll}
+            className="text-[10px] font-bold text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+          >
+            ↻ Réessayer
+          </button>
+        )}
+      </div>
+    );
     if (globalStatus === 'saved') return <div className="flex items-center gap-2 text-green-500 text-[10px] font-bold"><CheckCircle2 className="w-3 h-3" /> Synchronisé</div>;
     if (globalStatus === 'error') return (
       <div

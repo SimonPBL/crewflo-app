@@ -364,5 +364,31 @@ export function useSyncStore<T>(
     setLastModified(Date.now());
   }, [history, persistData]);
 
-  return [value, setAndSyncValue, isCloud, status, undo, history.length > 0, lastModified] as const;
+  // ── forceRetry — refresh session + retry depuis données locales ────────────
+  // Appelé par le bouton "Réessayer" dans le UI après timeout d'envoi
+  const forceRetry = useCallback(async () => {
+    if (!supabase || readOnly) return;
+    if (savingInProgress.current) {
+      // Libérer le verrou bloqué avant de retenter
+      clearSafety();
+      clearRetry();
+      savingInProgress.current = false;
+    }
+    retryCount.current = 0;
+    safeSetStatus('idle');
+    try { await supabase.auth.refreshSession(); } catch {}
+    // Récupérer les données — pendingData en priorité, sinon localStorage
+    const data = pendingData.current ?? (() => {
+      try {
+        const raw = localStorage.getItem(effectiveKey);
+        return raw ? JSON.parse(raw) as T : null;
+      } catch { return null; }
+    })();
+    if (data) {
+      pendingData.current = data;
+      await saveToCloud(data);
+    }
+  }, [supabase, readOnly, effectiveKey, saveToCloud]);
+
+  return [value, setAndSyncValue, isCloud, status, undo, history.length > 0, lastModified, forceRetry] as const;
 }
