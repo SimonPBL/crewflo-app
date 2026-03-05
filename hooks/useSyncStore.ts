@@ -3,41 +3,128 @@ import { getSupabase, getSupabaseConfig } from '../services/supabase';
 
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-const SAVE_TIMEOUT_MS  = 10_000; // 10s — si pas de réponse, on retry
-const MAX_RETRIES      = 3;
-const KEEPALIVE_MS     = 25_000; // ping toutes les 25s pour garder la connexion vivante
+const DEBOUNCE_MS    = 600;   // attendre 600ms d'inactivité avant d'envoyer
+const SAVE_TIMEOUT_MS = 12_000; // abandon après 12s
+const KEEPALIVE_MS   = 30_000; // refresh session + ping toutes les 30s
 
-export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean = true, readOnly: boolean = false) {
-  const supabase        = getSupabase();
-  const { companyId }   = getSupabaseConfig();
-  const isCloud         = !!supabase;
+export function useSyncStore<T>(
+  baseKey: string,
+  initialValue: T,
+  ready: boolean = true,
+  readOnly: boolean = false,
+) {
+  const supabase      = getSupabase();
+  const { companyId } = getSupabaseConfig();
+  const isCloud       = !!supabase;
 
-  const sanitize = (str: string) => str.trim().replace(/\s+/g, '_');
-  const effectiveKey    = companyId ? `${sanitize(companyId)}_${baseKey}` : baseKey;
+  const sanitize = (s: string) => s.trim().replace(/\s+/g, '_');
+  const effectiveKey  = companyId ? `${sanitize(companyId)}_${baseKey}` : baseKey;
 
-  const getSavedValue = () => {
+  const getSaved = (): T => {
     try {
-      const saved = localStorage.getItem(effectiveKey);
-      if (saved) return JSON.parse(saved) as T;
+      const raw = localStorage.getItem(effectiveKey);
+      if (raw) return JSON.parse(raw) as T;
     } catch {}
     return initialValue;
   };
 
-  const [value,        setValue]        = useState<T>(getSavedValue);
+  const [value,        setValue]        = useState<T>(getSaved);
   const [status,       setStatus]       = useState<SyncStatus>('idle');
   const [history,      setHistory]      = useState<T[]>([]);
   const [lastModified, setLastModified] = useState<number>(0);
 
-  const isRemoteUpdate  = useRef(false);
-  const pendingData     = useRef<T | null>(null);
-  const saveTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keepaliveRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef      = useRef<any>(null);
-  const isSavingRef     = useRef(false);
-  const lastSyncRef     = useRef<number>(0);
+  const isRemoteUpdate = useRef(false);
+  const pendingData    = useRef<T | null>(null);
+  const debounceTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keepaliveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef     = useRef<any>(null);
+  const lastFocusSync  = useRef<number>(0);
 
-  // ── Fetch depuis Supabase ─────────────────────────────────────────────────
-  const fetchFromCloud = useCallback(async (isReadOnly = false) => {
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const clearDebounce = () => {
+    if (debounceTimer.current) { clearTimeout(debounceTimer.current); debounceTimer.current = null; }
+  };
+  const clearSafety = () => {
+    if (safetyTimer.current) { clearTimeout(safetyTimer.current); safetyTimer.current = null; }
+  };
+  const finishSaving = (nextStatus: SyncStatus) => {
+    clearSafety();
+    pendingData.current = null;
+    setStatus(nextStatus);
+    if (nextStatus === 'saved') {
+      setTimeout(() => setStatus('idle'), 2000);
+    }
+  };
+
+  // ── saveToCloud — simple, sans verrou ─────────────────────────────────────
+  const saveToCloud = useCallback(async (dataToSave: T): Promise<void> => {
+    if (!supabase || readOnly) return;
+
+    clearSafety();
+
+    // Safety timer — libère le statut après 12s quoi qu'il arrive
+    safetyTimer.current = setTimeout(() => {
+      console.warn('[SyncStore] safety timer déclenché — reset statut');
+      setStatus('idle');
+      pendingData.current = null;
+    }, SAVE_TIMEOUT_MS);
+
+    setStatus('saving');
+
+    try {
+      // UPDATE d'abord (fonctionne admin + fournisseur)
+      const { error: updateError } = await supabase
+        .from('crewflo_sync')
+        .update({ data: dataToSave as any })
+        .eq('key', effectiveKey);
+
+      if (updateError) {
+        // Fallback upsert (admin seulement — création première ligne)
+        const { error: upsertError } = await supabase
+          .from('crewflo_sync')
+          .upsert({ key: effectiveKey, data: dataToSave as any });
+
+        if (upsertError) {
+          const msg = (upsertError.message ?? '').toLowerCase();
+          const isAuth = msg.includes('jwt') || msg.includes('token') ||
+            upsertError.code === '42501' || (upsertError as any).status === 401;
+          if (isAuth) {
+            // Tenter refresh silencieux
+            try { await supabase.auth.refreshSession(); } catch {}
+          }
+          console.warn('[SyncStore] save failed:', upsertError.message);
+          finishSaving('error');
+          return;
+        }
+      }
+
+      finishSaving('saved');
+
+    } catch (err: any) {
+      console.warn('[SyncStore] save exception:', err?.message ?? err);
+      finishSaving('error');
+    }
+  }, [effectiveKey, supabase, readOnly]);
+
+  // ── persistData — sauvegarde locale immédiate + cloud debouncé ─────────────
+  const persistData = useCallback((newData: T) => {
+    try { localStorage.setItem(effectiveKey, JSON.stringify(newData)); } catch {}
+
+    if (!isCloud || !supabase || readOnly) return;
+
+    pendingData.current = newData;
+    clearDebounce();
+
+    debounceTimer.current = setTimeout(() => {
+      if (pendingData.current !== null) {
+        saveToCloud(pendingData.current);
+      }
+    }, DEBOUNCE_MS);
+  }, [effectiveKey, isCloud, supabase, readOnly, saveToCloud]);
+
+  // ── fetchFromCloud ─────────────────────────────────────────────────────────
+  const fetchFromCloud = useCallback(async () => {
     if (!supabase) return;
     try {
       const { data, error } = await supabase
@@ -52,230 +139,140 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
         localStorage.setItem(effectiveKey, JSON.stringify(data.data));
         isRemoteUpdate.current = false;
         setStatus('saved');
-      } else if (error?.code === 'PGRST116') {
-        if (!isReadOnly) {
-          // Seulement l'admin peut créer la ligne initiale
-          const local = getSavedValue();
-          await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
-        }
-        // Supplier : pas de données trouvées → normal, on attend que l'admin sync
+        setTimeout(() => setStatus('idle'), 2000);
+      } else if (error?.code === 'PGRST116' && !readOnly) {
+        // Ligne absente → admin crée la ligne initiale
+        const local = getSaved();
+        await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
       }
     } catch (e) {
       console.warn('[SyncStore] fetchFromCloud error:', e);
     }
-  }, [effectiveKey, supabase]);
-
-  // ── Save avec timeout + retry ─────────────────────────────────────────────
-  const saveToCloud = useCallback(async (dataToSave: T, attempt = 1): Promise<void> => {
-    if (!supabase || readOnly) return;
-    if (isSavingRef.current) return; // appel concurrent — ignorer
-    isSavingRef.current = true;
-    setStatus('saving');
-
-    // Rafraîchir le token si nécessaire avant de sauvegarder
-    try {
-      await supabase.auth.refreshSession();
-    } catch (e) {
-      // ignore — si ça échoue on essaie quand même
-    }
-
-    const makeTimeout = () => new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), SAVE_TIMEOUT_MS)
-    );
-
-    try {
-      // Essayer UPDATE d'abord (fonctionne pour admin et fournisseur)
-      const { error: updateError } = await Promise.race([
-        supabase.from('crewflo_sync').update({ data: dataToSave as any }).eq('key', effectiveKey),
-        makeTimeout()
-      ]) as any;
-
-      if (updateError) {
-        // Si UPDATE échoue, essayer upsert (admin seulement — création de nouvelle ligne)
-        const { error: upsertError } = await Promise.race([
-          supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: dataToSave as any }),
-          makeTimeout()
-        ]) as any;
-        if (upsertError) throw upsertError;
-      }
-
-      pendingData.current = null;
-      isSavingRef.current = false;
-      setStatus('saved');
-      setTimeout(() => setStatus('idle'), 2000);
-
-    } catch (err: any) {
-      console.warn(`[SyncStore] save attempt ${attempt} failed:`, err?.message ?? err);
-
-      const msg = (err?.message ?? '').toLowerCase();
-      // Session réellement expirée → demander rechargement
-      const isSessionExpired = msg.includes('jwt expired') || msg.includes('token expired') || err?.status === 401;
-      if (isSessionExpired) {
-        console.error('[SyncStore] session expirée — tentative de refresh...');
-        isSavingRef.current = false;
-        setStatus('error');
-        // Tenter un refresh automatique et retry une fois
-        try {
-          const { error } = await supabase.auth.refreshSession();
-          if (!error) {
-            setTimeout(() => saveToCloud(dataToSave, 1), 1000);
-          }
-        } catch {}
-        return;
-      }
-      // Permission refusée (RLS) → échec silencieux, données sauvées localement
-      const isPermissionDenied = msg.includes('security policy') || err?.code === '42501' || err?.status === 403;
-      if (isPermissionDenied) {
-        console.warn('[SyncStore] permission refusée (RLS) — données conservées localement.');
-        isSavingRef.current = false;
-        setStatus('idle');
-        return;
-      }
-
-      if (attempt < MAX_RETRIES) {
-        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-        isSavingRef.current = false; // libérer le verrou pour que le retry puisse s'exécuter
-        saveTimeoutRef.current = setTimeout(() => saveToCloud(dataToSave, attempt + 1), delay);
-      } else {
-        console.error('[SyncStore] save failed after', MAX_RETRIES, 'attempts.');
-        isSavingRef.current = false;
-        setStatus('error');
-      }
-    }
   }, [effectiveKey, supabase, readOnly]);
 
-  // ── persistData ───────────────────────────────────────────────────────────
-  const persistData = useCallback((newData: T) => {
-    // Sauvegarde locale TOUJOURS en premier (jamais perdu)
-    try {
-      localStorage.setItem(effectiveKey, JSON.stringify(newData));
-    } catch (e) { console.error(e); }
-
-    if (isCloud && supabase && !readOnly) {
-      pendingData.current = newData;
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveToCloud(newData);
-    }
-  }, [effectiveKey, isCloud, supabase, readOnly, saveToCloud]);
-
-  // ── Chargement initial — attend que la session soit confirmée (ready=true) ──
+  // ── Chargement initial ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!isCloud || !ready) return;
-    fetchFromCloud(readOnly);
+    fetchFromCloud();
   }, [effectiveKey, isCloud, ready]);
 
-  // ── Canal Realtime avec reconnexion auto ──────────────────────────────────
+  // ── Canal Realtime ─────────────────────────────────────────────────────────
   const setupChannel = useCallback(() => {
     if (!supabase) return;
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
-    const channel = supabase
-      .channel(`room_${effectiveKey}_${Date.now()}`)
+    const ch = supabase
+      .channel(`crewflo_${effectiveKey}_${Date.now()}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
         (payload: any) => {
           if (payload.new?.data) {
             isRemoteUpdate.current = true;
-            const newData = payload.new.data as T;
-            setValue(newData);
-            localStorage.setItem(effectiveKey, JSON.stringify(newData));
+            setValue(payload.new.data as T);
+            localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
             isRemoteUpdate.current = false;
             setStatus('saved');
+            setTimeout(() => setStatus('idle'), 2000);
           }
         }
       )
-      .subscribe((channelStatus: string) => {
-        if (channelStatus === 'CHANNEL_ERROR' || channelStatus === 'TIMED_OUT') {
-          console.warn('[SyncStore] canal perdu, reconnexion dans 3s...');
-          setTimeout(() => setupChannel(), 3000);
+      .subscribe((s: string) => {
+        if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') {
+          setTimeout(setupChannel, 3000);
         }
       });
 
-    channelRef.current = channel;
+    channelRef.current = ch;
   }, [effectiveKey, supabase]);
 
   useEffect(() => {
     if (!isCloud) return;
     setupChannel();
-    return () => {
-      if (supabase && channelRef.current) supabase.removeChannel(channelRef.current);
-    };
+    return () => { if (supabase && channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [effectiveKey, isCloud]);
 
-  // ── Keepalive toutes les 25s ──────────────────────────────────────────────
+  // ── Keepalive — refresh session + ping toutes les 30s ─────────────────────
   useEffect(() => {
     if (!isCloud || !supabase) return;
-    keepaliveRef.current = setInterval(async () => {
+    keepaliveTimer.current = setInterval(async () => {
       try {
         await supabase.auth.refreshSession();
         await supabase.from('crewflo_sync').select('key').eq('key', effectiveKey).limit(1);
       } catch {}
     }, KEEPALIVE_MS);
-    return () => { if (keepaliveRef.current) clearInterval(keepaliveRef.current); };
+    return () => { if (keepaliveTimer.current) clearInterval(keepaliveTimer.current); };
   }, [effectiveKey, isCloud, supabase]);
 
-  // ── Resync au retour de veille / focus / retour en ligne ────────────────
+  // ── Resync au retour (focus / visibilité / online) ────────────────────────
   useEffect(() => {
     if (!isCloud) return;
 
     const syncOnResume = async () => {
       if (pendingData.current) {
+        // Données locales en attente → envoyer en premier
         await saveToCloud(pendingData.current);
       } else {
-        fetchFromCloud(readOnly);
+        fetchFromCloud();
       }
       setupChannel();
     };
 
-    const handleVisible = () => {
+    const onVisible = () => {
       if (document.visibilityState === 'visible') syncOnResume();
     };
-    const handleFocus = () => {
+
+    const onFocus = () => {
       const now = Date.now();
-      if (now - lastSyncRef.current < 30_000) return; // max 1 resync par 30s via focus
-      lastSyncRef.current = now;
+      if (now - lastFocusSync.current < 30_000) return;
+      lastFocusSync.current = now;
       syncOnResume();
     };
 
-    const handleOnline = () => {
-      console.log('[SyncStore] retour en ligne → envoi des données en attente');
+    const onOnline = () => {
+      console.log('[SyncStore] retour en ligne → sync');
       syncOnResume();
     };
 
-    document.addEventListener('visibilitychange', handleVisible);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisible);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
     };
-  }, [isCloud, fetchFromCloud, saveToCloud, setupChannel, readOnly]);
+  }, [isCloud, fetchFromCloud, saveToCloud, setupChannel]);
 
-  // ── API publique ──────────────────────────────────────────────────────────
+  // ── Cleanup ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      clearDebounce();
+      clearSafety();
+    };
+  }, []);
+
+  // ── API publique ───────────────────────────────────────────────────────────
   const setAndSyncValue = useCallback((newValue: T | ((val: T) => T)) => {
-    setValue((currentValue) => {
-      const valueToStore = newValue instanceof Function ? newValue(currentValue) : newValue;
+    setValue(current => {
+      const next = newValue instanceof Function ? newValue(current) : newValue;
       if (!isRemoteUpdate.current) {
-        setHistory(prev => [...prev.slice(-19), currentValue]);
+        setHistory(prev => [...prev.slice(-19), current]);
         setLastModified(Date.now());
       }
-      persistData(valueToStore);
-      return valueToStore;
+      persistData(next);
+      return next;
     });
   }, [persistData]);
 
   const undo = useCallback(() => {
     if (history.length === 0) return;
-    const previousValue = history[history.length - 1];
-    setHistory(prev => prev.slice(0, -1));
-    setValue(previousValue);
-    persistData(previousValue);
+    const prev = history[history.length - 1];
+    setHistory(h => h.slice(0, -1));
+    setValue(prev);
+    persistData(prev);
     setLastModified(Date.now());
   }, [history, persistData]);
 
-  const canUndo = history.length > 0;
-
-  return [value, setAndSyncValue, isCloud, status, undo, canUndo, lastModified] as const;
+  return [value, setAndSyncValue, isCloud, status, undo, history.length > 0, lastModified] as const;
 }
