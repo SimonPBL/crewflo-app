@@ -5,6 +5,7 @@ export interface Supplier {
   trade: string; // e.g., Electricien, Plombier
   color: string;
   email?: string;
+  supabaseUserId?: string; // UUID du compte Supabase Auth
 }
 
 export interface Project {

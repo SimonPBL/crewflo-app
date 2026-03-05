@@ -253,6 +253,12 @@ const App = () => {
     ? (suppliers.find(s => s.email?.toLowerCase() === userEmail) ?? null)
     : null;
 
+  const supplierNotRecognized = roleChecked
+    && role === 'supplier'
+    && !!userEmail
+    && suppliers.length > 0
+    && !suppliers.some(s => s.email?.toLowerCase() === userEmail);
+
   const handleConfirmTask = (taskId: string) => {
     setTasks((prev: Task[]) => prev.map(t =>
       t.id === taskId ? { ...t, confirmedBySupplier: true, taskStatus: 'confirmed' as const } : t
@@ -374,6 +380,28 @@ const App = () => {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-slate-400 text-sm">Chargement du profil...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Fournisseur connecté mais absent de la liste → compte non reconnu
+  if (supplierNotRecognized) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-sm text-center space-y-3 shadow-2xl">
+          <div className="text-4xl">🔒</div>
+          <h2 className="font-bold text-slate-800 text-lg">Compte non reconnu</h2>
+          <p className="text-sm text-slate-500">
+            Votre compte ({userEmail}) n'est pas dans la liste des fournisseurs.
+            Contactez votre administrateur pour qu'il vous ajoute dans l'application.
+          </p>
+          <button
+            onClick={() => supabase?.auth.signOut().then(() => window.location.reload())}
+            className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-700"
+          >
+            Se déconnecter
+          </button>
         </div>
       </div>
     );

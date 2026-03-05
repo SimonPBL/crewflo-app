@@ -3,7 +3,7 @@ import { Supplier, TRADES, COLORS } from '../types';
 import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2, Eye, EyeOff } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseConfig } from '../services/supabase';
+import { getSupabase, getSupabaseConfig } from '../services/supabase';
 
 interface SupplierListProps {
   suppliers: Supplier[];
@@ -17,6 +17,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
   // Supabase config (url/key seulement — on NE lit PAS le singleton pour ne pas affecter la session admin)
   const { url: supabaseUrl, key: supabaseKey, companyId } = getSupabaseConfig();
+  const supabase = getSupabase();
 
   // State pour l'ajout
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -47,6 +48,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     }
 
     // Si un email + mot de passe sont fournis, créer un compte Supabase Auth
+    let newUserId: string | undefined;
     if (newSupplierEmail.trim() && newSupplierPassword.trim()) {
       if (!supabaseUrl || !supabaseKey) {
         setCreateError('Supabase non configuré.');
@@ -72,7 +74,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
         if (signUpError) throw signUpError;
 
-        const newUserId = signUpData.user?.id;
+        newUserId = signUpData.user?.id;
 
         // 2. Insérer la ligne profiles via le client temporaire (session du nouveau compte)
         if (newUserId && companyId) {
@@ -100,8 +102,9 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
       id: crypto.randomUUID(),
       name: newSupplierName,
       trade: newSupplierTrade,
-      email: newSupplierEmail,
+      email: newSupplierEmail.trim() || undefined,
       color: newSupplierColor,
+      supabaseUserId: newUserId,
     };
     setSuppliers([...suppliers, newSupplier]);
 
@@ -114,9 +117,22 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     setNewSupplierColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
   };
 
-  const deleteSupplier = (id: string) => {
+  const deleteSupplier = async (id: string) => {
     if (!canEdit) return;
+    const supplierToDelete = suppliers.find(s => s.id === id);
     setSuppliers(suppliers.filter(s => s.id !== id));
+
+    // Retirer le company_id du profil → fournisseur verra "Profil incomplet" au prochain login
+    if (supabase && supplierToDelete?.supabaseUserId) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({ company_id: null })
+          .eq('id', supplierToDelete.supabaseUserId);
+      } catch (e) {
+        console.warn('Erreur mise à jour profil:', e);
+      }
+    }
   };
 
   const startEditing = (supplier: Supplier) => {
