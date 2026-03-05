@@ -6,7 +6,6 @@ export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 const DEBOUNCE_MS     = 600;
 const SAVE_TIMEOUT_MS = 10_000;
 const RESUME_THROTTLE = 30_000;
-const MAX_RETRIES     = 2;
 
 export function useSyncStore<T>(
   baseKey: string,
@@ -45,7 +44,6 @@ export function useSyncStore<T>(
   // (on fetchFromCloud déjà au mount — pas besoin d'un sync immédiat au premier focus)
   const lastResumeSync   = useRef<number>(Date.now());
   const savingInProgress = useRef(false);
-  const retryCount       = useRef(0);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const clearDebounce = () => {
@@ -85,69 +83,17 @@ export function useSyncStore<T>(
 
     safeSetStatus('saving');
 
-    const onError = async (msg: string) => {
+    const onError = (msg: string) => {
       console.warn('[SyncStore] save failed:', msg);
       clearSafety();
+      clearRetry();
       savingInProgress.current = false;
-
-      // Détecter si c'est une erreur d'authentification
-      const isAuthError = msg.toLowerCase().includes('jwt') ||
-        msg.toLowerCase().includes('token') ||
-        msg.toLowerCase().includes('401') ||
-        msg.toLowerCase().includes('403') ||
-        msg.toLowerCase().includes('auth');
-
-      if (retryCount.current >= MAX_RETRIES) {
-        console.warn('[SyncStore] abandon après', MAX_RETRIES, 'tentatives');
-        retryCount.current = 0;
-        // NE PAS effacer pendingData — conserver pour retry au prochain focus/action
-        safeSetStatus('error');
-        // Afficher erreur 5s puis retour idle silencieux
-        retryTimer.current = setTimeout(() => {
-          if (isMounted.current) safeSetStatus('idle');
-        }, 5_000);
-        return;
-      }
-
-      retryCount.current += 1;
+      // NE PAS effacer pendingData — conservé pour forceRetry (bouton Réessayer)
+      // Aucun retry automatique — élimine toute boucle possible
       safeSetStatus('error');
-
-      // Tenter le refresh — s'il échoue, ne pas retenter le save (évite la boucle)
-      const attemptRefreshAndRetry = async (delayMs: number) => {
-        retryTimer.current = setTimeout(async () => {
-          if (!isMounted.current) return;
-          try {
-            const { error: refreshErr } = await supabase.auth.refreshSession();
-            if (refreshErr) {
-              // Refresh impossible — garder pendingData, attendre focus/online
-              console.warn('[SyncStore] refresh échoué — attente réseau/session');
-              safeSetStatus('idle');
-              return;
-            }
-          } catch {
-            safeSetStatus('idle');
-            return;
-          }
-          safeSetStatus('idle');
-          if (pendingData.current && !savingInProgress.current) {
-            const data = pendingData.current;
-            clearDebounce();
-            debounceTimer.current = setTimeout(() => {
-              if (pendingData.current && !savingInProgress.current && isMounted.current) {
-                saveToCloud(data);
-              }
-            }, 500);
-          }
-        }, delayMs);
-      };
-
-      if (isAuthError) {
-        // Auth error : retry rapide après refresh
-        await attemptRefreshAndRetry(500);
-      } else {
-        // Erreur réseau : délai croissant
-        await attemptRefreshAndRetry(retryCount.current * 4_000);
-      }
+      retryTimer.current = setTimeout(() => {
+        if (isMounted.current) safeSetStatus('idle');
+      }, 5_000);
     };
 
     try {
@@ -174,7 +120,6 @@ export function useSyncStore<T>(
       clearSafety();
       savingInProgress.current = false;
       pendingData.current = null;
-      retryCount.current = 0;
       safeSetStatus('saved');
       setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
 
@@ -190,7 +135,6 @@ export function useSyncStore<T>(
     if (!isCloud || !supabase || readOnly) return;
 
     pendingData.current = newData;
-    retryCount.current = 0; // nouveau changement = compteur retry remis à zéro
     clearRetry();           // annuler tout retry en cours
     clearDebounce();
 
@@ -304,8 +248,7 @@ export function useSyncStore<T>(
       if (!isMounted.current) return;
 
       if (pendingData.current) {
-        retryCount.current = 0; // nouveau contexte — repartir de zéro
-        await saveToCloud(pendingData.current);
+          await saveToCloud(pendingData.current);
       } else {
         fetchFromCloud();
       }
@@ -374,7 +317,6 @@ export function useSyncStore<T>(
       clearRetry();
       savingInProgress.current = false;
     }
-    retryCount.current = 0;
     safeSetStatus('idle');
     try { await supabase.auth.refreshSession(); } catch {}
     // Récupérer les données — pendingData en priorité, sinon localStorage
