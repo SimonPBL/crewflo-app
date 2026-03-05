@@ -72,25 +72,30 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     isSavingRef.current = true;
     setStatus('saving');
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
+    // Rafraîchir le token si nécessaire avant de sauvegarder
+    try {
+      await supabase.auth.refreshSession();
+    } catch (e) {
+      // ignore — si ça échoue on essaie quand même
+    }
+
+    const makeTimeout = () => new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), SAVE_TIMEOUT_MS)
     );
 
     try {
       // Essayer UPDATE d'abord (fonctionne pour admin et fournisseur)
-      const updatePromise = supabase
-        .from('crewflo_sync')
-        .update({ data: dataToSave as any })
-        .eq('key', effectiveKey);
-
-      const { error: updateError } = await Promise.race([updatePromise, timeoutPromise]) as any;
+      const { error: updateError } = await Promise.race([
+        supabase.from('crewflo_sync').update({ data: dataToSave as any }).eq('key', effectiveKey),
+        makeTimeout()
+      ]) as any;
 
       if (updateError) {
         // Si UPDATE échoue, essayer upsert (admin seulement — création de nouvelle ligne)
-        const upsertPromise = supabase
-          .from('crewflo_sync')
-          .upsert({ key: effectiveKey, data: dataToSave as any });
-        const { error: upsertError } = await Promise.race([upsertPromise, timeoutPromise]) as any;
+        const { error: upsertError } = await Promise.race([
+          supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: dataToSave as any }),
+          makeTimeout()
+        ]) as any;
         if (upsertError) throw upsertError;
       }
 
@@ -106,9 +111,16 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
       // Session réellement expirée → demander rechargement
       const isSessionExpired = msg.includes('jwt expired') || msg.includes('token expired') || err?.status === 401;
       if (isSessionExpired) {
-        console.error('[SyncStore] session expirée — rechargement requis.');
+        console.error('[SyncStore] session expirée — tentative de refresh...');
         isSavingRef.current = false;
         setStatus('error');
+        // Tenter un refresh automatique et retry une fois
+        try {
+          const { error } = await supabase.auth.refreshSession();
+          if (!error) {
+            setTimeout(() => saveToCloud(dataToSave, 1), 1000);
+          }
+        } catch {}
         return;
       }
       // Permission refusée (RLS) → échec silencieux, données sauvées localement
@@ -196,6 +208,7 @@ export function useSyncStore<T>(baseKey: string, initialValue: T, ready: boolean
     if (!isCloud || !supabase) return;
     keepaliveRef.current = setInterval(async () => {
       try {
+        await supabase.auth.refreshSession();
         await supabase.from('crewflo_sync').select('key').eq('key', effectiveKey).limit(1);
       } catch {}
     }, KEEPALIVE_MS);
