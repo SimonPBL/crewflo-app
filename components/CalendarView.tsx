@@ -414,14 +414,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     ${!isPdf && isNew ? 'border-l-[3px] border-l-blue-500' : ''}
                                     `}
                                 >
-                                    {/* Badge conflit — seul absolu restant */}
+                                    {/* Seul badge absolu : conflit */}
                                     {hasConflict && (
                                     <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 z-20 shadow-sm border border-white">
                                         <AlertTriangle className="w-2 h-2" />
                                     </div>
                                     )}
 
-                                    {/* Texte — prend tout l'espace disponible */}
+                                    {/* Texte — prend tout l'espace */}
                                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                         {currentProjectId ? (
                                           <>
@@ -449,37 +449,38 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         )}
                                     </div>
 
-                                    {/* Colonne icônes statuts — droite, jamais par-dessus le texte */}
-                                    {!isPdf && (task.taskStatus === 'confirmed' || task.confirmedBySupplier || task.taskStatus === 'declined' || task.supplierNotes?.text) && (
+                                    {/* Colonne icônes droite — statuts + notes */}
+                                    {!isPdf && (task.taskStatus === 'confirmed' || task.confirmedBySupplier || task.taskStatus === 'declined' || task.supplierNotes?.text || task.adminNote?.text) && (
                                       <div className="flex flex-col items-center gap-0.5 justify-start pl-0.5 border-l border-black/10 flex-shrink-0">
                                         {(task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined' && (
-                                          <span
-                                            className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0"
-                                            title="Confirmé par le fournisseur"
-                                          >
+                                          <span className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center" title="Confirmé">
                                             <svg viewBox="0 0 10 10" className="w-2 h-2 text-white fill-none stroke-current stroke-2">
                                               <polyline points="1.5,5 4,7.5 8.5,2.5" />
                                             </svg>
                                           </span>
                                         )}
                                         {task.taskStatus === 'declined' && (
-                                          <span
-                                            className="w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0"
-                                            title="Refusé par le fournisseur"
-                                          >
+                                          <span className="w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center" title="Refusé">
                                             <svg viewBox="0 0 10 10" className="w-2 h-2 stroke-white fill-none stroke-2">
                                               <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
                                               <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
                                             </svg>
                                           </span>
                                         )}
+                                        {task.adminNote?.text && (
+                                          <span
+                                            className="w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold leading-none"
+                                            style={{ fontSize: '8px' }}
+                                            title={task.adminNote.text}
+                                          >!
+                                          </span>
+                                        )}
                                         {task.supplierNotes?.text && (
                                           <span
-                                            className="w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold leading-none"
+                                            className="w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold leading-none"
                                             style={{ fontSize: '8px' }}
                                             title={task.supplierNotes.text}
-                                          >
-                                            !
+                                          >!
                                           </span>
                                         )}
                                       </div>
@@ -996,6 +997,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                                 </span>
                               )}
                               {t.notes && <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.notes}</div>}
+                              {t.adminNote?.text && (
+                                <div className="mt-1 text-xs bg-blue-50 border border-blue-100 rounded px-2 py-1 text-blue-800">
+                                  <span className="font-bold">Admin</span>: {t.adminNote.text}
+                                </div>
+                              )}
                               {t.supplierNotes?.text && (
                                 <div className="mt-1 text-xs bg-amber-50 border border-amber-100 rounded px-2 py-1 text-amber-800">
                                   <span className="font-bold">{t.supplierNotes.authorName}</span>: {t.supplierNotes.text}
@@ -1082,7 +1088,45 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
   </div>
 </div>
 
-{/* Notes fournisseur */}
+{/* Note admin — bleue, éditable par admin, lecture seule pour fournisseur */}
+<div className="border border-blue-200 rounded-xl overflow-hidden">
+  <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+    <span className="text-xs font-bold text-blue-700 uppercase">Note de l'administrateur</span>
+    {newTask.adminNote?.updatedAt && (
+      <span className="text-xs text-blue-400">
+        {new Date(newTask.adminNote.updatedAt).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+      </span>
+    )}
+  </div>
+  <div className="p-3 bg-blue-50/40">
+    {!isViewOnly ? (
+      // Admin — peut écrire sa note
+      <textarea
+        value={newTask.adminNote?.text || ''}
+        onChange={e => setNewTask({
+          ...newTask,
+          adminNote: {
+            text: e.target.value,
+            authorName: 'Admin',
+            authorId: 'admin',
+            updatedAt: new Date().toISOString(),
+          }
+        })}
+        className="w-full min-h-[70px] p-2 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none text-sm"
+        placeholder="Note interne visible par le fournisseur…"
+      />
+    ) : (
+      // Fournisseur — lecture seule
+      newTask.adminNote?.text ? (
+        <p className="text-sm text-blue-900 whitespace-pre-wrap">{newTask.adminNote.text}</p>
+      ) : (
+        <p className="text-xs text-blue-300 italic">Aucune note de l'administrateur.</p>
+      )
+    )}
+  </div>
+</div>
+
+{/* Note du fournisseur — ambre, éditable par fournisseur, lecture seule pour admin */}
 <div className="border border-amber-200 rounded-xl overflow-hidden">
   <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
     <span className="text-xs font-bold text-amber-700 uppercase">Note du fournisseur</span>
@@ -1094,6 +1138,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
   </div>
   <div className="p-3 bg-amber-50/40">
     {isViewOnly ? (
+      // Fournisseur — peut écrire sa note
       <div className="space-y-2">
         <textarea
           value={newTask.supplierNotes?.text || ''}
@@ -1106,7 +1151,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               updatedAt: new Date().toISOString(),
             }
           })}
-          className="w-full min-h-[80px] p-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none text-sm"
+          className="w-full min-h-[70px] p-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none text-sm"
           placeholder="Laisser une note sur cette tâche…"
         />
         <button
@@ -1126,6 +1171,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </button>
       </div>
     ) : (
+      // Admin — lecture seule
       newTask.supplierNotes?.text ? (
         <p className="text-sm text-amber-900 whitespace-pre-wrap">{newTask.supplierNotes.text}</p>
       ) : (

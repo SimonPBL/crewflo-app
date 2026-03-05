@@ -110,11 +110,28 @@ const TaskCard: React.FC<TaskCardProps> = ({
       {/* Date range */}
       <div className="text-xs text-slate-500 mb-3">{dateDisplay}</div>
 
-      {/* Admin notes */}
+      {/* Notes internes admin (champ notes) */}
       {task.notes && (
         <div className="bg-slate-50 rounded-lg p-2 mb-2">
-          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Note admin</div>
+          <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Note interne</div>
           <div className="text-sm text-slate-600">{task.notes}</div>
+        </div>
+      )}
+
+      {/* Note admin — visible par le fournisseur, lecture seule */}
+      {task.adminNote?.text && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Message de l'administrateur</span>
+            {task.adminNote.updatedAt && (
+              <span className="text-xs text-blue-400">
+                {new Date(task.adminNote.updatedAt).toLocaleDateString('fr-CA', {
+                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                })}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-blue-900">{task.adminNote.text}</p>
         </div>
       )}
 

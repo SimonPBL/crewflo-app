@@ -5,7 +5,6 @@ export interface Supplier {
   trade: string; // e.g., Electricien, Plombier
   color: string;
   email?: string;
-  supabaseUserId?: string; // UUID du compte Supabase Auth
 }
 
 export interface Project {
@@ -13,6 +12,13 @@ export interface Project {
   name: string;
   address: string;
   status: 'planning' | 'active' | 'completed';
+}
+
+export interface TaskNote {
+  text: string;
+  authorName: string;
+  authorId: string;
+  updatedAt: string;
 }
 
 export interface Task {
@@ -25,14 +31,10 @@ export interface Task {
   start: string;      // ISO Date String
   end: string;        // ISO Date String
   createdAt?: string; // ISO Date String — set at creation, never modified
-  confirmedBySupplier?: boolean; // legacy — kept for backward compat
-  taskStatus?: 'pending' | 'confirmed' | 'declined'; // réponse du fournisseur
-  supplierNotes?: {
-    text: string;
-    authorName: string; // nom du fournisseur qui a écrit
-    authorId: string;   // supplierId
-    updatedAt: string;  // ISO date string
-  };
+  taskStatus?: 'pending' | 'confirmed' | 'declined';
+  confirmedBySupplier?: boolean;
+  supplierNotes?: TaskNote;
+  adminNote?: TaskNote;   // note de l'admin — visible par tous, éditable admin seulement
 }
 
 export interface Conflict {
