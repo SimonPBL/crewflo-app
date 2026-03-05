@@ -203,10 +203,29 @@ const App = () => {
     };
     window.addEventListener('pageshow', onPageShow);
 
+    // Vérification silencieuse au clic — throttlée à 1x par 5 minutes
+    // Si la session est perdue (role=anon après 1h+ inactif), on la récupère
+    // avant que l'utilisateur tente d'envoyer. Invisible pour l'utilisateur.
+    let lastClickCheck = 0;
+    const onUserClick = async () => {
+      const now = Date.now();
+      if (now - lastClickCheck < 5 * 60_000) return; // max 1x par 5min
+      lastClickCheck = now;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          // Session perdue — refresh silencieux
+          await supabase.auth.refreshSession();
+        }
+      } catch {}
+    };
+    document.addEventListener('click', onUserClick, { capture: true, passive: true });
+
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('click', onUserClick, { capture: true } as any);
     };
   }, [supabase]);
 
