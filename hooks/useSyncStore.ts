@@ -52,10 +52,30 @@ export function useSyncStore<T>(
   const finishSaving = (nextStatus: SyncStatus) => {
     clearSafety();
     savingInProgress.current = false;
-    pendingData.current = null;
     setStatus(nextStatus);
     if (nextStatus === 'saved') {
+      pendingData.current = null;
       setTimeout(() => setStatus('idle'), 2000);
+    }
+    if (nextStatus === 'error' && supabase) {
+      // Auto-recovery : refresh session silencieux + retente dans 5s
+      setTimeout(async () => {
+        try { await supabase.auth.refreshSession(); } catch {}
+        if (!savingInProgress.current) {
+          try {
+            const raw = localStorage.getItem(effectiveKey);
+            if (raw) {
+              const parsed = JSON.parse(raw) as T;
+              pendingData.current = parsed;
+              saveToCloud(parsed);
+            } else {
+              setStatus('idle');
+            }
+          } catch {
+            setStatus('idle');
+          }
+        }
+      }, 5_000);
     }
   };
 
