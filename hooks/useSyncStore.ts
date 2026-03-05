@@ -3,9 +3,9 @@ import { getSupabase, getSupabaseConfig } from '../services/supabase';
 
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-const DEBOUNCE_MS    = 600;   // attendre 600ms d'inactivité avant d'envoyer
-const SAVE_TIMEOUT_MS = 12_000; // abandon après 12s
-const KEEPALIVE_MS   = 30_000; // refresh session + ping toutes les 30s
+const DEBOUNCE_MS     = 600;
+const SAVE_TIMEOUT_MS = 10_000;
+const KEEPALIVE_MS    = 30_000;
 
 export function useSyncStore<T>(
   baseKey: string,
@@ -33,13 +33,14 @@ export function useSyncStore<T>(
   const [history,      setHistory]      = useState<T[]>([]);
   const [lastModified, setLastModified] = useState<number>(0);
 
-  const isRemoteUpdate = useRef(false);
-  const pendingData    = useRef<T | null>(null);
-  const debounceTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const safetyTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keepaliveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef     = useRef<any>(null);
-  const lastFocusSync  = useRef<number>(0);
+  const isRemoteUpdate   = useRef(false);
+  const pendingData      = useRef<T | null>(null);
+  const debounceTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keepaliveTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef       = useRef<any>(null);
+  const lastFocusSync    = useRef<number>(0);
+  const savingInProgress = useRef(false);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const clearDebounce = () => {
@@ -50,6 +51,7 @@ export function useSyncStore<T>(
   };
   const finishSaving = (nextStatus: SyncStatus) => {
     clearSafety();
+    savingInProgress.current = false;
     pendingData.current = null;
     setStatus(nextStatus);
     if (nextStatus === 'saved') {
@@ -57,40 +59,47 @@ export function useSyncStore<T>(
     }
   };
 
-  // ── saveToCloud — simple, sans verrou ─────────────────────────────────────
+  const makeTimeout = () => new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), SAVE_TIMEOUT_MS)
+  );
+
+  // ── saveToCloud ────────────────────────────────────────────────────────────
   const saveToCloud = useCallback(async (dataToSave: T): Promise<void> => {
     if (!supabase || readOnly) return;
+    if (savingInProgress.current) return;
+    savingInProgress.current = true;
 
     clearSafety();
 
-    // Safety timer — libère le statut après 12s quoi qu'il arrive
+    // Safety timer — libère le verrou après 12s quoi qu'il arrive
     safetyTimer.current = setTimeout(() => {
-      console.warn('[SyncStore] safety timer déclenché — reset statut');
-      setStatus('idle');
+      console.warn('[SyncStore] safety timer — reset');
+      savingInProgress.current = false;
       pendingData.current = null;
-    }, SAVE_TIMEOUT_MS);
+      setStatus('idle');
+    }, SAVE_TIMEOUT_MS + 2000);
 
     setStatus('saving');
 
     try {
       // UPDATE d'abord (fonctionne admin + fournisseur)
-      const { error: updateError } = await supabase
-        .from('crewflo_sync')
-        .update({ data: dataToSave as any })
-        .eq('key', effectiveKey);
+      const { error: updateError } = await Promise.race([
+        supabase.from('crewflo_sync').update({ data: dataToSave as any }).eq('key', effectiveKey),
+        makeTimeout()
+      ]) as any;
 
       if (updateError) {
-        // Fallback upsert (admin seulement — création première ligne)
-        const { error: upsertError } = await supabase
-          .from('crewflo_sync')
-          .upsert({ key: effectiveKey, data: dataToSave as any });
+        // Fallback upsert (admin — création première ligne)
+        const { error: upsertError } = await Promise.race([
+          supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: dataToSave as any }),
+          makeTimeout()
+        ]) as any;
 
         if (upsertError) {
           const msg = (upsertError.message ?? '').toLowerCase();
           const isAuth = msg.includes('jwt') || msg.includes('token') ||
             upsertError.code === '42501' || (upsertError as any).status === 401;
           if (isAuth) {
-            // Tenter refresh silencieux
             try { await supabase.auth.refreshSession(); } catch {}
           }
           console.warn('[SyncStore] save failed:', upsertError.message);
@@ -107,7 +116,7 @@ export function useSyncStore<T>(
     }
   }, [effectiveKey, supabase, readOnly]);
 
-  // ── persistData — sauvegarde locale immédiate + cloud debouncé ─────────────
+  // ── persistData ────────────────────────────────────────────────────────────
   const persistData = useCallback((newData: T) => {
     try { localStorage.setItem(effectiveKey, JSON.stringify(newData)); } catch {}
 
@@ -141,7 +150,6 @@ export function useSyncStore<T>(
         setStatus('saved');
         setTimeout(() => setStatus('idle'), 2000);
       } else if (error?.code === 'PGRST116' && !readOnly) {
-        // Ligne absente → admin crée la ligne initiale
         const local = getSaved();
         await supabase.from('crewflo_sync').upsert({ key: effectiveKey, data: local as any });
       }
@@ -204,15 +212,14 @@ export function useSyncStore<T>(
     return () => { if (keepaliveTimer.current) clearInterval(keepaliveTimer.current); };
   }, [effectiveKey, isCloud, supabase]);
 
-  // ── Resync au retour (focus / visibilité / online) ────────────────────────
+  // ── Resync au retour (focus / visibilité / online) ─────────────────────────
   useEffect(() => {
     if (!isCloud) return;
 
     const syncOnResume = async () => {
-      if (pendingData.current) {
-        // Données locales en attente → envoyer en premier
+      if (pendingData.current && !savingInProgress.current) {
         await saveToCloud(pendingData.current);
-      } else {
+      } else if (!pendingData.current) {
         fetchFromCloud();
       }
       setupChannel();
