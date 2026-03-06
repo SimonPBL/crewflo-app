@@ -313,15 +313,33 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, projectName
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMounted = useRef(true);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [copySourceId, setCopySourceId] = useState<string>('');
   const [copying, setCopying] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
 
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
   // ── Charger ────────────────────────────────────────────────────────────────
 
   const load = useCallback(async (attempt = 1) => {
     if (!supabase) { setLoading(false); return; }
+
+    // Vérifier la session avant la requête — évite les erreurs d'autorisation
+    // si le token est en cours de refresh au moment de l'ouverture de l'onglet.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      if (attempt < 3) {
+        setTimeout(() => { if (isMounted.current) load(attempt + 1); }, 2000);
+        return;
+      }
+      if (isMounted.current) setLoading(false);
+      return;
+    }
 
     // Timeout de 8s — évite le spinner infini si Supabase est lent
     const timeout = new Promise<never>((_, reject) =>
@@ -338,10 +356,12 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, projectName
 
       const { data: row, error: err } = await Promise.race([queryPromise, timeout]) as any;
 
+      if (!isMounted.current) return;
+
       if (err && err.code !== 'PGRST116') {
         // Retry automatique jusqu'à 3 fois si erreur réseau
         if (attempt < 3 && (err.message?.includes('fetch') || err.message?.includes('network'))) {
-          setTimeout(() => load(attempt + 1), attempt * 1500);
+          setTimeout(() => { if (isMounted.current) load(attempt + 1); }, attempt * 1500);
           return;
         }
         setError('Erreur de chargement. Vérifiez votre connexion.');
@@ -350,14 +370,15 @@ export const ProjectFinishingsPanel: React.FC<Props> = ({ projectId, projectName
         setError(null);
       }
     } catch (e: any) {
+      if (!isMounted.current) return;
       if (attempt < 3) {
         // Retry sur timeout
-        setTimeout(() => load(attempt + 1), attempt * 2000);
+        setTimeout(() => { if (isMounted.current) load(attempt + 1); }, attempt * 2000);
         return;
       }
       setError('Délai dépassé. Appuyez sur Actualiser.');
     }
-    setLoading(false);
+    if (isMounted.current) setLoading(false);
   }, [projectId, companyId, supabase]);
 
   useEffect(() => { load(); }, [load]);
