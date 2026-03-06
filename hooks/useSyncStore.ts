@@ -57,10 +57,21 @@ export function useSyncStore<T>(
   // ── Garde session — vérifie qu'on a une vraie session user avant d'envoyer ─
   // NE PAS appeler refreshSession ici — App.tsx le fait déjà (keepalive + visibilitychange)
   // Appels concurrents depuis 3 stores = token_revoked + délais 30-47s
+  //
+  // RACE CONDITION FIX: après 5+ min d'inactivité, le premier clic déclenche
+  // simultanément onUserClick→refreshSession() ET le save→waitForSession().
+  // Pendant le refresh, getSession() peut retourner null brièvement.
+  // Solution: si null, attendre 2s et réessayer une fois.
   const waitForSession = async (): Promise<boolean> => {
     if (!supabase) return false;
     const { data: { session } } = await supabase.auth.getSession();
-    return !!session?.user;
+    if (session?.user) return true;
+    // Session absente — probablement un refresh en cours (App.tsx keepalive).
+    // Attendre 2s et réessayer une seule fois.
+    await new Promise(r => setTimeout(r, 2_000));
+    if (!isMounted.current) return false;
+    const { data: { session: s2 } } = await supabase.auth.getSession();
+    return !!s2?.user;
   };
 
   // ── saveToCloud — sans verrou bloquant ────────────────────────────────────
@@ -74,8 +85,14 @@ export function useSyncStore<T>(
     // Vérifier la session AVANT d'envoyer — évite les 401 avec role=anon
     const hasSession = await waitForSession();
     if (!hasSession) {
-      console.warn('[SyncStore] pas de session — save annulé, pendingData conservé');
+      console.warn('[SyncStore] pas de session — save annulé, retry dans 5s');
       pendingData.current = dataToSave;
+      // Programmer un retry dans 5s — évite que pendingData reste bloqué indéfiniment
+      retryTimer.current = setTimeout(() => {
+        if (pendingData.current !== null && isMounted.current) {
+          saveToCloud(pendingData.current);
+        }
+      }, 5_000);
       return;
     }
 
