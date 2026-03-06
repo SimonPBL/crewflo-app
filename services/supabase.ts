@@ -9,10 +9,10 @@ const STORE_KEY_COMPANY_ID = 'crewflo_company_id';
 // Les refreshes concurrents sont contrôlés autrement :
 // — seul App.tsx appelle refreshSession (keepalive 30s + visibilitychange)
 // — useSyncStore ne fait plus aucun refreshSession
+// auth.lock custom retiré — il court-circuitait le mécanisme de lock natif de
+// Supabase et pouvait créer des refreshs concurrents mal coordonnés en PWA.
+// La gestion des refreshs concurrents est maintenant assurée par guardedRefreshSession().
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn(),
-  },
   realtime: { params: { eventsPerSecond: 10 } },
 });
 

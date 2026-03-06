@@ -54,19 +54,32 @@ export function useSyncStore<T>(
     if (isMounted.current) setStatus(s);
   };
 
-  // ── Garde session — vérifie et renouvelle si nécessaire ──────────────────
-  // Utilise guardedRefreshSession() (singleton dans supabase.ts) pour éviter
-  // les token_revoked en cascade quand les 3 stores appellent refresh en même temps.
+  // ── Garde session — vérifie expires_at ET renouvelle si nécessaire ─────────
+  // session.user présent ≠ token valide : le JWT peut être expiré ou sur le point
+  // d'expirer, ce qui cause des writes/realtime instables sans que l'UI s'en aperçoive.
   const waitForSession = async (): Promise<boolean> => {
     if (!supabase) return false;
+
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) return true;
-    // Session absente — déclencher un refresh via le singleton partagé.
-    // Si App.tsx a déjà un refresh en cours, on attend le même Promise.
-    await guardedRefreshSession();
-    if (!isMounted.current) return false;
-    const { data: { session: s2 } } = await supabase.auth.getSession();
-    return !!s2?.user;
+
+    if (!session?.user) {
+      // Pas de session — tenter un refresh via le singleton partagé
+      await guardedRefreshSession();
+      if (!isMounted.current) return false;
+      const { data: { session: s2 } } = await supabase.auth.getSession();
+      return !!s2?.user;
+    }
+
+    // Vérifier si le token expire dans moins de 60s
+    const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+    if (!expiresAt || expiresAt - Date.now() < 60_000) {
+      await guardedRefreshSession();
+      if (!isMounted.current) return false;
+      const { data: { session: s2 } } = await supabase.auth.getSession();
+      return !!s2?.user;
+    }
+
+    return true;
   };
 
   // ── saveToCloud — sans verrou bloquant ────────────────────────────────────
@@ -134,6 +147,27 @@ export function useSyncStore<T>(
 
         if (upsertError) {
           console.warn('[SyncStore] save failed:', upsertError.message);
+
+          // Retry sur erreur JWT/auth — refresh session puis une seule tentative
+          const isAuthError = upsertError.message?.toLowerCase().includes('jwt')
+            || upsertError.message?.toLowerCase().includes('token')
+            || upsertError.message?.toLowerCase().includes('auth')
+            || String(upsertError.code) === '401';
+
+          if (isAuthError) {
+            await guardedRefreshSession();
+            if (!isMounted.current) return;
+            const retry = await supabase.from('crewflo_sync')
+              .upsert({ key: effectiveKey, data: dataToSave as any });
+            if (!retry.error) {
+              pendingData.current = null;
+              abortControllerRef.current = null;
+              safeSetStatus('saved');
+              setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
+              return;
+            }
+          }
+
           safeSetStatus('error');
           retryTimer.current = setTimeout(() => { if (isMounted.current) safeSetStatus('idle'); }, 5_000);
           return;
@@ -218,33 +252,70 @@ export function useSyncStore<T>(
   }, [effectiveKey, isCloud, ready]);
 
   // ── Canal Realtime ─────────────────────────────────────────────────────────
-  const setupChannel = useCallback(() => {
-    if (!supabase) return;
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
+  // reconnectingRef évite les reconnexions concurrentes (plusieurs setupChannel
+  // simultanés empirent le problème de channel bloqué en 'joining').
+  const reconnectingRef = useRef(false);
 
-    const ch = supabase
-      .channel(`crewflo_${effectiveKey}_${Date.now()}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
-        (payload: any) => {
-          if (payload.new?.data && isMounted.current) {
-            isRemoteUpdate.current = true;
-            setValue(payload.new.data as T);
-            localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
-            isRemoteUpdate.current = false;
-            safeSetStatus('saved');
-            setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
+  const setupChannel = useCallback(async () => {
+    if (!supabase) return;
+    if (reconnectingRef.current) return; // déjà une reconnexion en cours
+    reconnectingRef.current = true;
+
+    try {
+      // Nettoyer proprement le channel existant avant d'en créer un nouveau
+      if (channelRef.current) {
+        try { await supabase.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
+      }
+
+      const ch = supabase
+        .channel(`crewflo_${effectiveKey}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
+          (payload: any) => {
+            if (payload.new?.data && isMounted.current) {
+              isRemoteUpdate.current = true;
+              setValue(payload.new.data as T);
+              localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
+              isRemoteUpdate.current = false;
+              safeSetStatus('saved');
+              setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
+            }
           }
+        );
+
+      channelRef.current = ch;
+
+      ch.subscribe((s: string) => {
+        console.log('[SyncStore] channel status:', effectiveKey.split('_').pop(), s);
+
+        if (s === 'SUBSCRIBED') {
+          reconnectingRef.current = false;
+          return;
         }
-      )
-      .subscribe((s: string) => {
-        if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') && isMounted.current) {
-          setTimeout(setupChannel, 3_000);
+        if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') && isMounted.current) {
+          channelRef.current = null;
+          reconnectingRef.current = false;
+          setTimeout(() => { if (isMounted.current) setupChannel(); }, 3_000);
         }
       });
 
-    channelRef.current = ch;
+      // Watchdog : si le channel est encore en 'joining' après 8s, forcer une recréation
+      setTimeout(() => {
+        if (!isMounted.current) return;
+        const state = channelRef.current?.state;
+        if (state && state !== 'joined') {
+          console.warn('[SyncStore] channel bloqué (state:', state, ') — recréation forcée');
+          reconnectingRef.current = false;
+          setupChannel();
+        }
+      }, 8_000);
+
+    } catch (e) {
+      reconnectingRef.current = false;
+      console.warn('[SyncStore] setupChannel error:', e);
+    }
   }, [effectiveKey, supabase]);
 
   useEffect(() => {
