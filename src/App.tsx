@@ -193,10 +193,9 @@ const App = () => {
   useEffect(() => {
     if (!supabase) return;
 
-    // Keepalive — utilise guardedRefreshSession (singleton dans supabase.ts).
-    // Toutes les sources (keepalive, visibilitychange, clic, useSyncStore) partagent
-    // le même guard → plus de token_revoked en cascade.
-    const interval = setInterval(guardedRefreshSession, 30_000);
+    // PAS de setInterval keepalive — Supabase rafraîchit le token automatiquement
+    // via onAuthStateChange(TOKEN_REFRESHED). Un interval manuel génère des cascades
+    // de TOKEN_REFRESHED qui révoquent les tokens des autres sessions.
 
     // Retour de visibilité
     const onVisible = () => {
@@ -221,7 +220,6 @@ const App = () => {
     document.addEventListener('click', onUserClick, { capture: true, passive: true });
 
     return () => {
-      clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('pageshow', onPageShow);
       document.removeEventListener('click', onUserClick, { capture: true } as any);
