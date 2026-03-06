@@ -206,18 +206,14 @@ const App = () => {
     // Vérification silencieuse au clic — throttlée à 1x par 5 minutes
     // Si la session est perdue (role=anon après 1h+ inactif), on la récupère
     // avant que l'utilisateur tente d'envoyer. Invisible pour l'utilisateur.
-    let lastClickCheck = 0;
+    // Au premier clic après 5min d'inactivité : refresh systématique
+    // Garantit que la session est valide avant toute modif, sans modale visible
+    let lastClickRefresh = Date.now();
     const onUserClick = async () => {
       const now = Date.now();
-      if (now - lastClickCheck < 5 * 60_000) return; // max 1x par 5min
-      lastClickCheck = now;
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-          // Session perdue — refresh silencieux
-          await supabase.auth.refreshSession();
-        }
-      } catch {}
+      if (now - lastClickRefresh < 5 * 60_000) return;
+      lastClickRefresh = now;
+      try { await supabase.auth.refreshSession(); } catch {}
     };
     document.addEventListener('click', onUserClick, { capture: true, passive: true });
 
