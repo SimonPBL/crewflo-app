@@ -26,11 +26,13 @@ export const getSupabase = (): SupabaseClient => supabase;
 // useSyncStore. Si un refresh est déjà en cours, les appels suivants attendent
 // le même Promise au lieu d'en lancer un nouveau (évite token_revoked en cascade).
 let _refreshPromise: Promise<void> | null = null;
-let _lastRefresh = 0;
+// Initialiser à Date.now() pour bloquer les appels simultanés au démarrage
+// (3 stores montent en même temps et appellent tous guardedRefreshSession)
+let _lastRefresh = Date.now();
 
 export const guardedRefreshSession = async (): Promise<void> => {
   if (_refreshPromise) return _refreshPromise;             // déjà en cours — attendre
-  if (Date.now() - _lastRefresh < 10_000) return;         // trop récent — ignorer
+  if (Date.now() - _lastRefresh < 30_000) return;         // 30s minimum entre refreshes
   _refreshPromise = supabase.auth.refreshSession()
     .then(() => { _lastRefresh = Date.now(); })
     .catch(() => {})
