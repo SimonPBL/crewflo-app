@@ -140,9 +140,14 @@ const App = () => {
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, sess) => {
       // Log tous les événements auth pour diagnostic
       console.log('[Auth] onAuthStateChange event:', event, '| user:', sess?.user?.email ?? 'null', '| expires_at:', sess?.expires_at ?? 'null');
-      // TOKEN_REFRESHED : session toujours valide, rôle inchangé — ignorer
-      // Évite re-render + double fetchUserRole déjà géré par init()
+
+      // TOKEN_REFRESHED : ignorer — session toujours valide, rôle inchangé
       if (event === 'TOKEN_REFRESHED') return;
+
+      // SIGNED_IN alors qu'on est déjà connecté = re-auth silencieux déclenché par
+      // token_revoked (trop de refreshes simultanés admin/supplier sur le même IP).
+      // Traiter comme TOKEN_REFRESHED pour éviter le re-render qui détruit les stores.
+      if (event === 'SIGNED_IN' && isLoggedIn && sess?.user) return;
 
       setIsLoggedIn(!!sess);
 
