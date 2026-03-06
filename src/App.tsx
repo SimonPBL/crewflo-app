@@ -74,6 +74,7 @@ const App = () => {
   const [cloudDataLoaded, setCloudDataLoaded] = useState(false); // true après premier fetch cloud
   const fetchingRole = useRef(false); // guard — empêche appels concurrents
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const isLoggedInRef = useRef(false); // ref pour éviter stale closure dans onAuthStateChange
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
   const [userEmail, setUserEmail] = useState<string>('');
   const [profileIncomplete, setProfileIncomplete] = useState(false);
@@ -122,6 +123,7 @@ const App = () => {
 
     const init = async () => {
       const { data } = await supabase.auth.getSession();
+      isLoggedInRef.current = !!data.session;
       setIsLoggedIn(!!data.session);
 
       if (data.session) {
@@ -146,9 +148,10 @@ const App = () => {
 
       // SIGNED_IN alors qu'on est déjà connecté = re-auth silencieux déclenché par
       // token_revoked (trop de refreshes simultanés admin/supplier sur le même IP).
-      // Traiter comme TOKEN_REFRESHED pour éviter le re-render qui détruit les stores.
-      if (event === 'SIGNED_IN' && isLoggedIn && sess?.user) return;
+      // Utilise isLoggedInRef (pas isLoggedIn) pour éviter le stale closure.
+      if (event === 'SIGNED_IN' && isLoggedInRef.current && sess?.user) return;
 
+      isLoggedInRef.current = !!sess;
       setIsLoggedIn(!!sess);
 
       if (sess) {

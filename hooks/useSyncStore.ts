@@ -274,14 +274,26 @@ export function useSyncStore<T>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
         (payload: any) => {
-          console.log('[SyncStore] postgres_changes reçu:', effectiveKey.split('_').pop(), payload.eventType);
+          const storeName = effectiveKey.split('_').pop();
+          console.log('[SyncStore] postgres_changes reçu:', storeName, payload.eventType,
+            '| isMounted:', isMounted.current,
+            '| readOnly:', readOnly,
+            '| has data:', !!payload.new?.data
+          );
           if (payload.new?.data && isMounted.current) {
+            console.log('[SyncStore] setValue appelé:', storeName, '| data length:', JSON.stringify(payload.new.data).length);
             isRemoteUpdate.current = true;
             setValue(payload.new.data as T);
-            localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
+            const stored = localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
+            console.log('[SyncStore] localStorage mis à jour:', storeName);
             isRemoteUpdate.current = false;
             safeSetStatus('saved');
             setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
+          } else {
+            console.warn('[SyncStore] event ignoré:', storeName,
+              '| isMounted:', isMounted.current,
+              '| data présent:', !!payload.new?.data
+            );
           }
         }
       )
