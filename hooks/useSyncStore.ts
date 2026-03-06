@@ -274,6 +274,7 @@ export function useSyncStore<T>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
         (payload: any) => {
+          console.log('[SyncStore] postgres_changes reçu:', effectiveKey.split('_').pop(), payload.eventType);
           if (payload.new?.data && isMounted.current) {
             isRemoteUpdate.current = true;
             setValue(payload.new.data as T);
@@ -296,7 +297,25 @@ export function useSyncStore<T>(
         if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') && isMounted.current) {
           channelRef.current = null;
           reconnectingRef.current = false;
-          setTimeout(() => { if (isMounted.current) setupChannel(); }, 3_000);
+          // Diagnostic : logguer l'état exact de la session au moment de l'erreur
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            const exp = session?.expires_at;
+            const msLeft = exp ? (exp * 1000 - Date.now()) : null;
+            console.warn(
+              '[SyncStore] CHANNEL_ERROR — session:',
+              session?.user?.email ?? 'null',
+              '| expires_at:', exp ?? 'null',
+              '| ms restants:', msLeft !== null ? Math.round(msLeft / 1000) + 's' : 'N/A'
+            );
+          });
+          setTimeout(async () => {
+            if (!isMounted.current) return;
+            await guardedRefreshSession();
+            // Log session après refresh
+            const { data: { session: s2 } } = await supabase.auth.getSession();
+            console.log('[SyncStore] après refresh — session:', s2?.user?.email ?? 'null', '| expires_at:', s2?.expires_at ?? 'null');
+            if (isMounted.current) setupChannel();
+          }, 2_000);
         }
         if (s === 'CLOSED') {
           reconnectingRef.current = false;
@@ -333,8 +352,10 @@ export function useSyncStore<T>(
       const state = channelRef.current?.state;
       // 'joined' = OK, tout autre état = canal mort ou en erreur
       if (state && state !== 'joined') {
-        console.warn('[SyncStore] canal mort (state:', state, ') — reconnexion');
-        setupChannel();
+        console.warn('[SyncStore] canal mort (state:', state, ') — refresh + reconnexion');
+        guardedRefreshSession().then(() => {
+          if (isMounted.current) setupChannel();
+        });
       }
     }, 20_000);
     return () => clearInterval(healthCheck);

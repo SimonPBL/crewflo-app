@@ -138,6 +138,8 @@ const App = () => {
     init();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, sess) => {
+      // Log tous les événements auth pour diagnostic
+      console.log('[Auth] onAuthStateChange event:', event, '| user:', sess?.user?.email ?? 'null', '| expires_at:', sess?.expires_at ?? 'null');
       // TOKEN_REFRESHED : session toujours valide, rôle inchangé — ignorer
       // Évite re-render + double fetchUserRole déjà géré par init()
       if (event === 'TOKEN_REFRESHED') return;
