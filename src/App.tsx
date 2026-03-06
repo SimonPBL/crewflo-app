@@ -183,37 +183,43 @@ const App = () => {
   useEffect(() => {
     if (!supabase) return;
 
+    // GUARD CRITIQUE — un seul refreshSession actif à la fois, toutes sources confondues.
+    // Sans ça : keepalive 30s + visibilitychange + clic + restart Realtime déclenchent
+    // des refreshes simultanés → token_revoked en cascade (369s de délai dans les logs).
+    let refreshing = false;
+    let lastRefreshTime = 0;
     const refreshSession = async () => {
+      if (refreshing) return; // déjà en cours — ignorer
+      const now = Date.now();
+      if (now - lastRefreshTime < 10_000) return; // min 10s entre chaque refresh
+      refreshing = true;
+      lastRefreshTime = now;
       try { await supabase.auth.refreshSession(); } catch {}
+      finally { refreshing = false; }
     };
 
-    // Interval régulier — actif quand l'onglet est au premier plan
+    // Keepalive toutes les 30s
     const interval = setInterval(refreshSession, 30_000);
 
-    // Refresh immédiat dès que l'app redevient visible
-    // Couvre : retour d'un autre onglet, déverrouillage écran, retour d'une autre app
+    // Retour de visibilité
     const onVisible = () => {
       if (document.visibilityState === 'visible') refreshSession();
     };
     document.addEventListener('visibilitychange', onVisible);
 
-    // pageshow couvre le retour depuis le cache bfcache sur iOS Safari
+    // bfcache iOS Safari
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) refreshSession();
     };
     window.addEventListener('pageshow', onPageShow);
 
-    // Vérification silencieuse au clic — throttlée à 1x par 5 minutes
-    // Si la session est perdue (role=anon après 1h+ inactif), on la récupère
-    // avant que l'utilisateur tente d'envoyer. Invisible pour l'utilisateur.
-    // Au premier clic après 5min d'inactivité : refresh systématique
-    // Garantit que la session est valide avant toute modif, sans modale visible
+    // Premier clic après 5min d'inactivité
     let lastClickRefresh = Date.now();
-    const onUserClick = async () => {
+    const onUserClick = () => {
       const now = Date.now();
       if (now - lastClickRefresh < 5 * 60_000) return;
       lastClickRefresh = now;
-      try { await supabase.auth.refreshSession(); } catch {}
+      refreshSession(); // sera ignoré si un refresh est déjà en cours
     };
     document.addEventListener('click', onUserClick, { capture: true, passive: true });
 
