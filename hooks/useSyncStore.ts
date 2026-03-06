@@ -291,10 +291,15 @@ export function useSyncStore<T>(
           reconnectingRef.current = false;
           return;
         }
-        if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') && isMounted.current) {
+        // CLOSED est géré par le healthCheck existant — ne pas reconnect ici
+        // pour éviter la boucle infinie (deux mécanismes qui se battent)
+        if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') && isMounted.current) {
           channelRef.current = null;
           reconnectingRef.current = false;
           setTimeout(() => { if (isMounted.current) setupChannel(); }, 3_000);
+        }
+        if (s === 'CLOSED') {
+          reconnectingRef.current = false;
         }
       });
 
