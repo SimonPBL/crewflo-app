@@ -79,9 +79,15 @@ export function useSyncStore<T>(
 
     // Guard companyId — si vide, la clé n'a pas de préfixe PBL_ et la requête
     // cible une ligne inexistante → PGRST116 → données perdues silencieusement.
+    // Retry dans 3s au cas où companyId arrive après un re-render.
     if (!companyId) {
-      console.warn('[SyncStore] companyId vide — save annulé');
+      console.warn('[SyncStore] companyId vide — retry dans 3s');
       pendingData.current = dataToSave;
+      retryTimer.current = setTimeout(() => {
+        if (pendingData.current !== null && isMounted.current) {
+          saveToCloud(pendingData.current);
+        }
+      }, 3_000);
       return;
     }
 
