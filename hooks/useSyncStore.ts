@@ -252,42 +252,39 @@ export function useSyncStore<T>(
   }, [effectiveKey, isCloud, ready]);
 
   // ── Canal Realtime ─────────────────────────────────────────────────────────
-  // reconnectingRef évite les reconnexions concurrentes (plusieurs setupChannel
-  // simultanés empirent le problème de channel bloqué en 'joining').
+  // reconnectingRef évite les reconnexions concurrentes.
+  // setupChannel reste synchrone comme l'original — le rendre async causait
+  // des problèmes de timing avec subscribe().
   const reconnectingRef = useRef(false);
 
-  const setupChannel = useCallback(async () => {
+  const setupChannel = useCallback(() => {
     if (!supabase) return;
-    if (reconnectingRef.current) return; // déjà une reconnexion en cours
+    if (reconnectingRef.current) return;
     reconnectingRef.current = true;
 
-    try {
-      // Nettoyer proprement le channel existant avant d'en créer un nouveau
-      if (channelRef.current) {
-        try { await supabase.removeChannel(channelRef.current); } catch {}
-        channelRef.current = null;
-      }
+    // Nettoyer le channel existant de façon synchrone
+    if (channelRef.current) {
+      try { supabase.removeChannel(channelRef.current); } catch {}
+      channelRef.current = null;
+    }
 
-      const ch = supabase
-        .channel(`crewflo_${effectiveKey}_${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
-          (payload: any) => {
-            if (payload.new?.data && isMounted.current) {
-              isRemoteUpdate.current = true;
-              setValue(payload.new.data as T);
-              localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
-              isRemoteUpdate.current = false;
-              safeSetStatus('saved');
-              setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
-            }
+    const ch = supabase
+      .channel(`crewflo_${effectiveKey}_${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'crewflo_sync', filter: `key=eq.${effectiveKey}` },
+        (payload: any) => {
+          if (payload.new?.data && isMounted.current) {
+            isRemoteUpdate.current = true;
+            setValue(payload.new.data as T);
+            localStorage.setItem(effectiveKey, JSON.stringify(payload.new.data));
+            isRemoteUpdate.current = false;
+            safeSetStatus('saved');
+            setTimeout(() => { if (isMounted.current) setStatus('idle'); }, 2_000);
           }
-        );
-
-      channelRef.current = ch;
-
-      ch.subscribe((s: string) => {
+        }
+      )
+      .subscribe((s: string) => {
         console.log('[SyncStore] channel status:', effectiveKey.split('_').pop(), s);
 
         if (s === 'SUBSCRIBED') {
@@ -301,21 +298,19 @@ export function useSyncStore<T>(
         }
       });
 
-      // Watchdog : si le channel est encore en 'joining' après 8s, forcer une recréation
-      setTimeout(() => {
-        if (!isMounted.current) return;
-        const state = channelRef.current?.state;
-        if (state && state !== 'joined') {
-          console.warn('[SyncStore] channel bloqué (state:', state, ') — recréation forcée');
-          reconnectingRef.current = false;
-          setupChannel();
-        }
-      }, 8_000);
+    channelRef.current = ch;
 
-    } catch (e) {
-      reconnectingRef.current = false;
-      console.warn('[SyncStore] setupChannel error:', e);
-    }
+    // Watchdog : si bloqué en 'joining' après 8s, forcer une recréation
+    setTimeout(() => {
+      if (!isMounted.current) return;
+      const state = channelRef.current?.state;
+      if (state && state !== 'joined') {
+        console.warn('[SyncStore] channel bloqué (state:', state, ') — recréation forcée');
+        reconnectingRef.current = false;
+        setupChannel();
+      }
+    }, 8_000);
+
   }, [effectiveKey, supabase]);
 
   useEffect(() => {
