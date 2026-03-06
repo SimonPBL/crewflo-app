@@ -18,6 +18,23 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY,
 
 export const getSupabase = (): SupabaseClient => supabase;
 
+// ── Refresh session centralisé ────────────────────────────────────────────────
+// Un seul refreshSession actif à la fois, partagé entre App.tsx et tous les
+// useSyncStore. Si un refresh est déjà en cours, les appels suivants attendent
+// le même Promise au lieu d'en lancer un nouveau (évite token_revoked en cascade).
+let _refreshPromise: Promise<void> | null = null;
+let _lastRefresh = 0;
+
+export const guardedRefreshSession = async (): Promise<void> => {
+  if (_refreshPromise) return _refreshPromise;             // déjà en cours — attendre
+  if (Date.now() - _lastRefresh < 10_000) return;         // trop récent — ignorer
+  _refreshPromise = supabase.auth.refreshSession()
+    .then(() => { _lastRefresh = Date.now(); })
+    .catch(() => {})
+    .finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+};
+
 export const getSupabaseConfig = () => ({
   url: SUPABASE_URL,
   key: SUPABASE_KEY,

@@ -8,7 +8,7 @@ import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
 import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building, ClipboardList } from 'lucide-react';
-import { getSupabase } from "../services/supabase";
+import { getSupabase, guardedRefreshSession } from "../services/supabase";
 import { MyTasksView } from '../components/MyTasksView';
 // @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -183,33 +183,20 @@ const App = () => {
   useEffect(() => {
     if (!supabase) return;
 
-    // GUARD CRITIQUE — un seul refreshSession actif à la fois, toutes sources confondues.
-    // Sans ça : keepalive 30s + visibilitychange + clic + restart Realtime déclenchent
-    // des refreshes simultanés → token_revoked en cascade (369s de délai dans les logs).
-    let refreshing = false;
-    let lastRefreshTime = 0;
-    const refreshSession = async () => {
-      if (refreshing) return; // déjà en cours — ignorer
-      const now = Date.now();
-      if (now - lastRefreshTime < 10_000) return; // min 10s entre chaque refresh
-      refreshing = true;
-      lastRefreshTime = now;
-      try { await supabase.auth.refreshSession(); } catch {}
-      finally { refreshing = false; }
-    };
-
-    // Keepalive toutes les 30s
-    const interval = setInterval(refreshSession, 30_000);
+    // Keepalive — utilise guardedRefreshSession (singleton dans supabase.ts).
+    // Toutes les sources (keepalive, visibilitychange, clic, useSyncStore) partagent
+    // le même guard → plus de token_revoked en cascade.
+    const interval = setInterval(guardedRefreshSession, 30_000);
 
     // Retour de visibilité
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refreshSession();
+      if (document.visibilityState === 'visible') guardedRefreshSession();
     };
     document.addEventListener('visibilitychange', onVisible);
 
     // bfcache iOS Safari
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) refreshSession();
+      if (e.persisted) guardedRefreshSession();
     };
     window.addEventListener('pageshow', onPageShow);
 
@@ -219,7 +206,7 @@ const App = () => {
       const now = Date.now();
       if (now - lastClickRefresh < 5 * 60_000) return;
       lastClickRefresh = now;
-      refreshSession(); // sera ignoré si un refresh est déjà en cours
+      guardedRefreshSession();
     };
     document.addEventListener('click', onUserClick, { capture: true, passive: true });
 

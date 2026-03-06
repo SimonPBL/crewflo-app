@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSupabase, getSupabaseConfig } from '../services/supabase';
+import { getSupabase, getSupabaseConfig, guardedRefreshSession } from '../services/supabase';
 
 export type SyncStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -54,21 +54,16 @@ export function useSyncStore<T>(
     if (isMounted.current) setStatus(s);
   };
 
-  // ── Garde session — vérifie qu'on a une vraie session user avant d'envoyer ─
-  // NE PAS appeler refreshSession ici — App.tsx le fait déjà (keepalive + visibilitychange)
-  // Appels concurrents depuis 3 stores = token_revoked + délais 30-47s
-  //
-  // RACE CONDITION FIX: après 5+ min d'inactivité, le premier clic déclenche
-  // simultanément onUserClick→refreshSession() ET le save→waitForSession().
-  // Pendant le refresh, getSession() peut retourner null brièvement.
-  // Solution: si null, attendre 2s et réessayer une fois.
+  // ── Garde session — vérifie et renouvelle si nécessaire ──────────────────
+  // Utilise guardedRefreshSession() (singleton dans supabase.ts) pour éviter
+  // les token_revoked en cascade quand les 3 stores appellent refresh en même temps.
   const waitForSession = async (): Promise<boolean> => {
     if (!supabase) return false;
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) return true;
-    // Session absente — probablement un refresh en cours (App.tsx keepalive).
-    // Attendre 2s et réessayer une seule fois.
-    await new Promise(r => setTimeout(r, 2_000));
+    // Session absente — déclencher un refresh via le singleton partagé.
+    // Si App.tsx a déjà un refresh en cours, on attend le même Promise.
+    await guardedRefreshSession();
     if (!isMounted.current) return false;
     const { data: { session: s2 } } = await supabase.auth.getSession();
     return !!s2?.user;
@@ -82,10 +77,18 @@ export function useSyncStore<T>(
   const saveToCloud = useCallback(async (dataToSave: T): Promise<void> => {
     if (!supabase || readOnly) return;
 
-    // Vérifier la session AVANT d'envoyer — évite les 401 avec role=anon
+    // Guard companyId — si vide, la clé n'a pas de préfixe PBL_ et la requête
+    // cible une ligne inexistante → PGRST116 → données perdues silencieusement.
+    if (!companyId) {
+      console.warn('[SyncStore] companyId vide — save annulé');
+      pendingData.current = dataToSave;
+      return;
+    }
+
+    // Vérifier/renouveler la session AVANT d'envoyer — évite les 401 avec role=anon
     const hasSession = await waitForSession();
     if (!hasSession) {
-      console.warn('[SyncStore] pas de session — save annulé, retry dans 5s');
+      console.warn('[SyncStore] pas de session après refresh — retry dans 5s');
       pendingData.current = dataToSave;
       // Programmer un retry dans 5s — évite que pendingData reste bloqué indéfiniment
       retryTimer.current = setTimeout(() => {
@@ -166,10 +169,15 @@ export function useSyncStore<T>(
   // ── fetchFromCloud ─────────────────────────────────────────────────────────
   const fetchFromCloud = useCallback(async () => {
     if (!supabase) return;
-    // Vérifier la session avant fetch — évite 406 avec clé sans préfixe (role=anon)
+    // Guard companyId — si vide, effectiveKey n'a pas de préfixe PBL_ → PGRST116
+    if (!companyId) {
+      console.warn('[SyncStore] companyId vide — fetch annulé');
+      return;
+    }
+    // Vérifier/renouveler la session avant fetch — évite 406 avec role=anon
     const hasSession = await waitForSession();
     if (!hasSession) {
-      console.warn('[SyncStore] pas de session — fetch annulé');
+      console.warn('[SyncStore] pas de session après refresh — fetch annulé');
       return;
     }
     try {
