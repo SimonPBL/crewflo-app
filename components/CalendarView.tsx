@@ -48,14 +48,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // ── Détection mobile ────────────────────────────────────────────────────────
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  const [selectedAgendaDate, setSelectedAgendaDate] = useState<Date>(new Date());
-  const agendaRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [mobileTab, setMobileTab] = useState<'calendar' | 'tasks'>('calendar');
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  // Helper : initiales fournisseur (max 3 lettres)
+  const getInitials = (name: string) => {
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) return name.slice(0, 3).toUpperCase();
+    return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
+  };
 
   // États pour le Drag & Drop de sélection de date (Main View)
   const [isDragging, setIsDragging] = useState(false);
@@ -298,63 +304,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
 
-  // ── Vue Agenda Mobile ─────────────────────────────────────────────────────
-  const AgendaView = ({ tasksToRender }: { tasksToRender: Task[] }) => {
+  // ── Vue Calendrier Mobile (plein écran avec écussons) ────────────────────
+  const MobileCalendarView = ({ tasksToRender }: { tasksToRender: Task[] }) => {
     const today = new Date(); today.setHours(0,0,0,0);
     const grid = allMonthsData[0];
     const weekDays = ['L','M','M','J','V','S','D'];
 
-    // Jours qui ont des tâches ce mois-ci
-    const daysWithTasks = useMemo(() => {
-      const set = new Set<string>();
-      tasksToRender.forEach(t => {
-        const start = new Date(t.start); start.setHours(0,0,0,0);
-        const end = new Date(t.end); end.setHours(0,0,0,0);
-        let cur = new Date(start);
-        while (cur <= end) {
-          if (cur.getMonth() === grid.monthIndex && cur.getFullYear() === grid.year)
-            set.add(cur.toDateString());
-          cur.setDate(cur.getDate() + 1);
-        }
+    const getTasksForDay = (date: Date) => {
+      const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
+      const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
+      return tasksToRender.filter(t => {
+        const tStart = new Date(t.start);
+        const tEnd = new Date(t.end);
+        return tStart <= dayEnd && tEnd >= dayStart;
       });
-      return set;
-    }, [tasksToRender, grid]);
-
-    // Grouper les tâches par jour pour le mois affiché
-    const tasksByDay = useMemo(() => {
-      const map: Record<string, Task[]> = {};
-      const monthStart = new Date(grid.year, grid.monthIndex, 1);
-      const monthEnd = new Date(grid.year, grid.monthIndex + 1, 0);
-      monthEnd.setHours(23,59,59,999);
-      
-      // Itérer sur chaque jour du mois
-      const cur = new Date(monthStart);
-      while (cur <= monthEnd) {
-        const key = cur.toDateString();
-        const dayStart = new Date(cur); dayStart.setHours(0,0,0,0);
-        const dayEnd = new Date(cur); dayEnd.setHours(23,59,59,999);
-        const dayTasks = tasksToRender.filter(t => {
-          const tStart = new Date(t.start);
-          const tEnd = new Date(t.end);
-          return tStart <= dayEnd && tEnd >= dayStart;
-        });
-        if (dayTasks.length > 0) map[key] = dayTasks;
-        cur.setDate(cur.getDate() + 1);
-      }
-      return map;
-    }, [tasksToRender, grid]);
-
-    const sortedDays = Object.keys(tasksByDay).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
-
-    const scrollToDay = (date: Date) => {
-      setSelectedAgendaDate(date);
-      const key = date.toDateString();
-      if (agendaRefs.current[key]) {
-        agendaRefs.current[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
     };
 
-    const openDay = (day: Date) => {
+    const openDay = (day: Date, isCurrentMonth: boolean) => {
+      if (!isCurrentMonth) return;
       if (!canEdit) {
         openDayDetails(day);
       } else {
@@ -375,165 +342,184 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     };
 
     return (
-      <div className="flex flex-col h-full">
-        {/* Mini calendrier compact */}
-        <div className="bg-white border-b border-slate-200 px-3 pt-3 pb-2 flex-none">
-          <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
-            {weekDays.map((d,i) => (
-              <div key={i} className="text-[10px] font-bold text-slate-400 uppercase py-0.5">{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-0.5">
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* En-tête jours de semaine */}
+        <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200 flex-none">
+          {weekDays.map((d,i) => (
+            <div key={i} className="text-center text-[10px] font-bold text-slate-400 uppercase py-1.5">{d}</div>
+          ))}
+        </div>
+        {/* Grille des jours */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-7 bg-slate-200 gap-px">
             {grid.days.map((day, i) => {
-              const isCurrentMonth = day.getMonth() === grid.monthIndex;
               const isToday = day.toDateString() === today.toDateString();
-              const isSelected = day.toDateString() === selectedAgendaDate.toDateString();
-              const hasTasks = daysWithTasks.has(day.toDateString());
+              const isCurrentMonth = day.getMonth() === grid.monthIndex;
+              const dayTasks = isCurrentMonth ? getTasksForDay(day) : [];
+              const uniqueSuppliers = Array.from(new Map(dayTasks.map(t => [t.supplierId, t])).values());
+
               return (
-                <button
+                <div
                   key={i}
-                  onClick={() => isCurrentMonth && scrollToDay(day)}
-                  className={`relative flex flex-col items-center py-1 rounded-lg transition-all
-                    ${!isCurrentMonth ? 'opacity-25' : ''}
-                    ${isSelected && isCurrentMonth ? 'bg-blue-600' : isToday ? 'bg-blue-50' : 'hover:bg-slate-100'}
+                  onClick={() => openDay(day, isCurrentMonth)}
+                  className={`bg-white flex flex-col min-h-[64px] p-1 transition-colors
+                    ${isCurrentMonth ? 'cursor-pointer active:bg-slate-50' : 'bg-slate-50/60'}
                   `}
                 >
-                  <span className={`text-xs font-medium leading-tight
-                    ${isSelected && isCurrentMonth ? 'text-white' : isToday ? 'text-blue-600 font-bold' : 'text-slate-700'}
-                  `}>
-                    {day.getDate()}
-                  </span>
-                  {hasTasks && isCurrentMonth && (
-                    <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : 'bg-blue-500'}`} />
-                  )}
-                </button>
+                  {/* Numéro du jour */}
+                  <div className="text-right mb-1">
+                    <span className={`text-xs font-medium inline-flex items-center justify-center w-5 h-5 rounded-full
+                      ${isToday ? 'bg-blue-600 text-white font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-300'}
+                    `}>
+                      {day.getDate()}
+                    </span>
+                  </div>
+                  {/* Écussons fournisseurs */}
+                  <div className="flex flex-wrap gap-0.5 justify-start">
+                    {uniqueSuppliers.slice(0, 4).map(task => {
+                      const supplier = suppliers.find(s => s.id === task.supplierId);
+                      const colorClass = supplier?.color || 'bg-gray-200 text-gray-800';
+                      const initials = supplier ? getInitials(supplier.name) : '?';
+                      const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
+                      return (
+                        <span
+                          key={task.supplierId}
+                          className={`inline-flex items-center justify-center rounded text-[8px] font-bold leading-none w-6 h-5 relative flex-shrink-0 border border-black/10
+                            ${colorClass.split(' ').slice(0,2).join(' ')}
+                            ${hasConflict ? 'ring-1 ring-red-500' : ''}
+                          `}
+                          title={supplier?.name}
+                        >
+                          {initials}
+                        </span>
+                      );
+                    })}
+                    {uniqueSuppliers.length > 4 && (
+                      <span className="inline-flex items-center justify-center w-6 h-5 rounded bg-slate-200 text-slate-500 text-[8px] font-bold border border-slate-300">
+                        +{uniqueSuppliers.length - 4}
+                      </span>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>
-        </div>
-
-        {/* Liste des tâches groupées par jour */}
-        <div className="flex-1 overflow-y-auto bg-slate-50">
-          {sortedDays.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2">
-              <CalendarIcon className="w-8 h-8 opacity-30" />
-              <span>Aucune tâche ce mois-ci</span>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-200">
-              {sortedDays.map(key => {
-                const day = new Date(key);
-                const isToday = day.toDateString() === today.toDateString();
-                const dayTasks = tasksByDay[key];
-                return (
-                  <div
-                    key={key}
-                    ref={el => { agendaRefs.current[key] = el; }}
-                    className="bg-white"
-                  >
-                    {/* En-tête du jour */}
-                    <div
-                      className={`flex items-center gap-3 px-4 py-2 border-b border-slate-100 sticky top-0 z-10 cursor-pointer
-                        ${isToday ? 'bg-blue-50' : 'bg-white'}
-                      `}
-                      onClick={() => openDay(day)}
-                    >
-                      <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-full flex-shrink-0
-                        ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}
-                      `}>
-                        <span className="text-xs uppercase leading-none font-medium">
-                          {day.toLocaleDateString('fr-FR', { weekday: 'short' })}
-                        </span>
-                        <span className="text-lg font-bold leading-tight">{day.getDate()}</span>
-                      </div>
-                      <span className="text-xs text-slate-400 capitalize">
-                        {day.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                      </span>
-                      {canEdit && (
-                        <Plus className="w-4 h-4 text-slate-400 ml-auto" />
-                      )}
-                    </div>
-
-                    {/* Tâches du jour */}
-                    <div className="divide-y divide-slate-50">
-                      {dayTasks.map(task => {
-                        const supplier = suppliers.find(s => s.id === task.supplierId);
-                        const project = projects.find(p => p.id === task.projectId);
-                        const colorClass = supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
-                        const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
-                        const isConfirmed = task.taskStatus === 'confirmed' || task.confirmedBySupplier;
-                        const isDeclined = task.taskStatus === 'declined';
-                        const hasNote = task.adminNote?.text || task.supplierNotes?.text;
-
-                        return (
-                          <div
-                            key={task.id}
-                            onClick={(e) => { e.stopPropagation(); handleEditTask(e, task); }}
-                            className="flex items-stretch gap-0 mx-3 my-2 rounded-lg overflow-hidden shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
-                          >
-                            {/* Bande couleur gauche */}
-                            <div className={`w-2 flex-shrink-0 ${colorClass.split(' ')[0]}`} />
-                            {/* Contenu */}
-                            <div className="flex-1 bg-white px-3 py-2.5 border border-l-0 border-slate-200 rounded-r-lg">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-sm text-slate-800 truncate">
-                                    {currentProjectId ? task.title : supplier?.name}
-                                  </div>
-                                  <div className="text-xs text-slate-500 truncate mt-0.5">
-                                    {currentProjectId ? supplier?.name : project?.name}
-                                  </div>
-                                  {!currentProjectId && project?.address && (
-                                    <div className="text-xs text-slate-400 truncate">📍 {project.address}</div>
-                                  )}
-                                  <div className="text-xs text-slate-400 mt-1">
-                                    {new Date(task.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                                    {task.end !== task.start && ` → ${new Date(task.end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}
-                                  </div>
-                                </div>
-                                {/* Badges statut */}
-                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                  {hasConflict && (
-                                    <span className="bg-red-500 text-white rounded-full p-0.5">
-                                      <AlertTriangle className="w-3 h-3" />
-                                    </span>
-                                  )}
-                                  {isConfirmed && !isDeclined && (
-                                    <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                                      <svg viewBox="0 0 10 10" className="w-3 h-3 text-white fill-none stroke-current stroke-2">
-                                        <polyline points="1.5,5 4,7.5 8.5,2.5" />
-                                      </svg>
-                                    </span>
-                                  )}
-                                  {isDeclined && (
-                                    <span className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                                      <svg viewBox="0 0 10 10" className="w-3 h-3 stroke-white fill-none stroke-2">
-                                        <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
-                                        <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
-                                      </svg>
-                                    </span>
-                                  )}
-                                  {hasNote && (
-                                    <span className="w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center text-white text-[9px] font-bold">!</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     );
   };
 
-  const CalendarGrid = ({ tasksToRender, interactive = true, isPdf = false }: { tasksToRender: Task[], interactive?: boolean, isPdf?: boolean }) => {
+  // ── Vue Agenda Mobile (liste des tâches) ──────────────────────────────────
+  const AgendaView = ({ tasksToRender }: { tasksToRender: Task[] }) => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const grid = allMonthsData[0];
+
+    const tasksByDay = useMemo(() => {
+      const map: Record<string, Task[]> = {};
+      const monthStart = new Date(grid.year, grid.monthIndex, 1);
+      const monthEnd = new Date(grid.year, grid.monthIndex + 1, 0);
+      monthEnd.setHours(23,59,59,999);
+      const cur = new Date(monthStart);
+      while (cur <= monthEnd) {
+        const key = cur.toDateString();
+        const dayStart = new Date(cur); dayStart.setHours(0,0,0,0);
+        const dayEnd = new Date(cur); dayEnd.setHours(23,59,59,999);
+        const dayTasks = tasksToRender.filter(t => {
+          const tStart = new Date(t.start);
+          const tEnd = new Date(t.end);
+          return tStart <= dayEnd && tEnd >= dayStart;
+        });
+        if (dayTasks.length > 0) map[key] = dayTasks;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return map;
+    }, [tasksToRender, grid]);
+
+    const sortedDays = Object.keys(tasksByDay).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+
+    const openDay = (day: Date) => {
+      if (!canEdit) { openDayDetails(day); return; }
+      const start = new Date(day); start.setHours(7,0,0,0);
+      const end = new Date(day); end.setHours(17,0,0,0);
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+      setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
+      setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
+      setEditingTaskId(null); setIsViewOnly(false); setIsModalOpen(true);
+    };
+
+    return (
+      <div className="flex-1 overflow-y-auto bg-slate-50">
+        {sortedDays.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2">
+            <CalendarIcon className="w-8 h-8 opacity-30" />
+            <span>Aucune tâche ce mois-ci</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-200">
+            {sortedDays.map(key => {
+              const day = new Date(key);
+              const isToday = day.toDateString() === today.toDateString();
+              const dayTasks = tasksByDay[key];
+              return (
+                <div key={key} className="bg-white">
+                  <div
+                    className={`flex items-center gap-3 px-4 py-2 border-b border-slate-100 cursor-pointer ${isToday ? 'bg-blue-50' : ''}`}
+                    onClick={() => openDay(day)}
+                  >
+                    <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                      <span className="text-[10px] uppercase leading-none font-medium">{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+                      <span className="text-lg font-bold leading-tight">{day.getDate()}</span>
+                    </div>
+                    <span className="text-xs text-slate-400 capitalize flex-1">{day.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                    {canEdit && <Plus className="w-4 h-4 text-slate-400" />}
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {dayTasks.map(task => {
+                      const supplier = suppliers.find(s => s.id === task.supplierId);
+                      const project = projects.find(p => p.id === task.projectId);
+                      const colorClass = supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
+                      const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
+                      const isConfirmed = (task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined';
+                      const isDeclined = task.taskStatus === 'declined';
+                      const hasNote = task.adminNote?.text || task.supplierNotes?.text;
+                      return (
+                        <div key={task.id} onClick={(e) => { e.stopPropagation(); handleEditTask(e, task); }}
+                          className="flex items-stretch gap-0 mx-3 my-2 rounded-lg overflow-hidden shadow-sm cursor-pointer active:scale-[0.98] transition-transform">
+                          <div className={`w-2 flex-shrink-0 ${colorClass.split(' ')[0]}`} />
+                          <div className="flex-1 bg-white px-3 py-2.5 border border-l-0 border-slate-200 rounded-r-lg">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm text-slate-800 truncate">{currentProjectId ? task.title : supplier?.name}</div>
+                                <div className="text-xs text-slate-500 truncate mt-0.5">{currentProjectId ? supplier?.name : project?.name}</div>
+                                {!currentProjectId && project?.address && <div className="text-xs text-slate-400 truncate">📍 {project.address}</div>}
+                                <div className="text-xs text-slate-400 mt-1">
+                                  {new Date(task.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                  {task.end !== task.start && ` → ${new Date(task.end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                {hasConflict && <span className="bg-red-500 text-white rounded-full p-0.5"><AlertTriangle className="w-3 h-3" /></span>}
+                                {isConfirmed && <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-3 h-3 text-white fill-none stroke-current stroke-2"><polyline points="1.5,5 4,7.5 8.5,2.5" /></svg></span>}
+                                {isDeclined && <span className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-3 h-3 stroke-white fill-none stroke-2"><line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/><line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/></svg></span>}
+                                {hasNote && <span className="w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center text-white text-[9px] font-bold">!</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+    const CalendarGrid = ({ tasksToRender, interactive = true, isPdf = false }: { tasksToRender: Task[], interactive?: boolean, isPdf?: boolean }) => {
     const getTasksForDay = (date: Date) => {
         const dayStart = new Date(date);
         dayStart.setHours(0,0,0,0);
@@ -1076,9 +1062,9 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 ))}
             </div>
             <div className="flex items-center gap-2">
-                <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm block"><Mail className="w-4 h-4" /></button>
-                <button onClick={downloadAllPDF} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm block">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
-                                {canEdit && (
+                <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm hidden sm:block"><Mail className="w-4 h-4" /></button>
+                <button onClick={downloadAllPDF} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm hidden sm:block">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
+                                {canEdit && !isMobile && (
 <button 
                     onClick={() => {
                     if (!canEdit) return;
@@ -1108,13 +1094,54 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       <div className={`flex-1 ${isMobile ? "overflow-hidden" : "overflow-y-auto"} bg-slate-100 relative`}>
         <div className={isMobile ? "h-full flex flex-col select-none" : "p-4 min-h-full select-none"}>
           <ConflictAlert conflicts={conflicts} />
-          {isMobile ? (
-            <AgendaView tasksToRender={visibleTasks} />
-          ) : (
-            <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} />
-          )}
+          {!isMobile && <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} />}
+          {isMobile && mobileTab === 'calendar' && <MobileCalendarView tasksToRender={visibleTasks} />}
+          {isMobile && mobileTab === 'tasks' && <AgendaView tasksToRender={visibleTasks} />}
         </div>
       </div>
+
+      {/* Barre d'onglets mobile */}
+      {isMobile && (
+        <div className="flex-none flex border-t border-slate-200 bg-white safe-area-bottom">
+          <button
+            onClick={() => setMobileTab('calendar')}
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
+              ${mobileTab === 'calendar' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}
+            `}
+          >
+            <CalendarIcon className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Calendrier</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('tasks')}
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
+              ${mobileTab === 'tasks' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}
+            `}
+          >
+            <Clock className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Tâches</span>
+          </button>
+        </div>
+      )}
+
+      {/* FAB mobile — bouton + flottant */}
+      {isMobile && canEdit && (
+        <button
+          onClick={() => {
+            const now = new Date();
+            const start = new Date(now); start.setHours(7,0,0,0);
+            const end = new Date(now); end.setHours(17,0,0,0);
+            const startIso = start.toISOString();
+            const endIso = end.toISOString();
+            setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
+            setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
+            setEditingTaskId(null); setIsViewOnly(false); setIsModalOpen(true);
+          }}
+          className="fixed bottom-20 right-4 z-30 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-transform"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
       {isExporting && (
   <div className="fixed top-0 left-0 z-[-50] w-[1300px] pointer-events-none opacity-0 overflow-hidden">
