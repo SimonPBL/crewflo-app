@@ -17,6 +17,8 @@ interface CalendarViewProps {
   canEdit: boolean;
   onUpdateSupplierNote?: (taskId: string, note: { text: string; authorName: string; authorId: string; updatedAt: string }) => void;
   supplierSelf?: { id: string; name: string } | null;
+  userEmail?: string;
+  userRole?: string;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -27,7 +29,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   currentProjectId,
   canEdit,
   onUpdateSupplierNote,
-  supplierSelf
+  supplierSelf,
+  userEmail,
+  userRole
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthsToShow, setMonthsToShow] = useState<number>(1); // 1, 3, 6, 12
@@ -1052,7 +1056,31 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-4 md:gap-0 z-20 shadow-sm">
+      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-2 md:gap-0 z-20 shadow-sm">
+        {/* Ligne info mobile : nom calendrier + compte */}
+        {isMobile && (
+          <div className="flex items-center justify-between w-full">
+            <span className="text-sm font-bold text-slate-800 truncate max-w-[60%]">
+              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
+            </span>
+            {(() => {
+              const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
+              const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
+              return (
+                <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium
+                  ${canEdit ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}
+                `}>
+                  {canEdit ? (
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  ) : (
+                    <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
+                  )}
+                  {canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · {userEmail ?? ''}
+                </span>
+              );
+            })()}
+          </div>
+        )}
         <div className="flex items-center gap-4 flex-wrap">
           <h2 className="text-xl font-bold text-slate-800 hidden lg:block">
             {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}

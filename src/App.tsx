@@ -526,6 +526,8 @@ const App = () => {
             currentProjectId={selectedProjectId}
             onUpdateSupplierNote={handleUpdateSupplierNote}
             supplierSelf={supplierSelf}
+            userEmail={userEmail}
+            userRole={role}
           />
         );
       case 'suppliers':
