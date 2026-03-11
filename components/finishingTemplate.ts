@@ -75,6 +75,7 @@ const escalierAreas = (): AreaDef[] => [
 const sdbAreas = (): AreaDef[] => [
   { key: 'plancher', label: 'Plancher', presets: ceramiquePresets },
   { key: 'mur',      label: 'Mur',      presets: ceramiquePresets },
+  { key: 'coulis',   label: 'Coulis',   presets: ['Blanc', 'Gris pâle', 'Gris foncé', 'Beige', 'Noir', 'Même que céramique'] },
   {
     key: 'douche', label: 'Douche / Bain-douche',
     materialChoices: [
@@ -82,10 +83,16 @@ const sdbAreas = (): AreaDef[] => [
       { key: 'acrylique',  label: 'Acrylique', presets: ['36x36', '36x48', '36x60', '48x36', '48x60', '60x30'] },
     ],
   },
-  { key: 'backsplash',   label: 'Niche / Backsplash déco',    presets: backsplashPresets },
-  { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
-  { key: 'toilette',     label: 'Toilette',                    presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
-  { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
+  { key: 'backsplash', label: 'Niche / Backsplash déco', presets: backsplashPresets },
+  {
+    key: 'porte_douche', label: 'Porte / Paroi de douche',
+    materialChoices: [
+      { key: 'vitre',     label: 'Vitre',     presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Ouverture walk-in'] },
+      { key: 'ceramique', label: 'Céramique', presets: ceramiquePresets },
+    ],
+  },
+  { key: 'toilette', label: 'Toilette', presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
+  { key: 'miroir',   label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Miroir LED intégré'] },
 ];
 
 // ── Template complet ─────────────────────────────────────────
@@ -101,6 +108,7 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
       { key: 'sdb_principale', label: 'SDB Principale', areas: sdbAreas() },
       { key: 'sdb_secondaire', label: 'SDB Secondaire', areas: sdbAreas() },
       { key: 'sdb_soussol',    label: 'SDB Sous-sol',   areas: sdbAreas() },
+      { key: 'salle_eau',      label: "Salle d'eau",    areas: sdbAreas() },
       {
         key: 'entree', label: 'Entrée',
         areas: [{ key: 'plancher', label: 'Plancher', presets: ceramiquePresets }],
@@ -131,6 +139,10 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
       },
       {
         key: 'soussol', label: 'Sous-sol',
+        areas: [{ key: 'type', label: 'Type de plancher', materialChoices: plancherChoices() }],
+      },
+      {
+        key: 'salle_eau', label: "Salle d'eau",
         areas: [{ key: 'type', label: 'Type de plancher', materialChoices: plancherChoices() }],
       },
     ],
@@ -207,9 +219,15 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
               { key: 'combo_bain',       label: 'Combo bain-douche', presets: ['Acrylique 5\'', 'Acrylique 6\'', 'Céramique'] },
             ],
           },
-          { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
-          { key: 'toilette',     label: 'Toilette',                    presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
-          { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
+          {
+            key: 'porte_douche', label: 'Porte / Paroi de douche',
+            materialChoices: [
+              { key: 'vitre',     label: 'Vitre',     presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Ouverture walk-in'] },
+              { key: 'ceramique', label: 'Céramique', presets: ceramiquePresets },
+            ],
+          },
+          { key: 'toilette', label: 'Toilette', presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
+          { key: 'miroir',   label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Miroir LED intégré'] },
         ],
       },
       {
@@ -218,15 +236,21 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
           {
             key: 'bain_douche', label: 'Bain / Douche',
             materialChoices: [
-              { key: 'bain_acrylique',   label: 'Bain acrylique',    presets: ['Alcôve 5\'', 'Alcôve 6\''] },
+              { key: 'bain_acrylique',   label: 'Bain acrylique',    presets: ["Alcôve 5'", "Alcôve 6'"] },
               { key: 'douche_ceramique', label: 'Douche céramique',  presets: ['32x32', '36x36', '36x48', '36x60'] },
               { key: 'douche_acrylique', label: 'Douche acrylique',  presets: ['32x32', '36x36', '36x48', '36x60'] },
-              { key: 'combo_bain',       label: 'Combo bain-douche', presets: ['Acrylique 5\'', 'Céramique'] },
+              { key: 'combo_bain',       label: 'Combo bain-douche', presets: ["Acrylique 5'", 'Céramique'] },
             ],
           },
-          { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
-          { key: 'toilette',     label: 'Toilette',                    presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
-          { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
+          {
+            key: 'porte_douche', label: 'Porte / Paroi de douche',
+            materialChoices: [
+              { key: 'vitre',     label: 'Vitre',     presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Ouverture walk-in'] },
+              { key: 'ceramique', label: 'Céramique', presets: ceramiquePresets },
+            ],
+          },
+          { key: 'toilette', label: 'Toilette', presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
+          { key: 'miroir',   label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Miroir LED intégré'] },
         ],
       },
       {
@@ -239,9 +263,29 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
               { key: 'douche_acrylique', label: 'Douche acrylique', presets: ['32x32', '36x36', '36x48'] },
             ],
           },
-          { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
-          { key: 'toilette',     label: 'Toilette',                    presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
-          { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
+          {
+            key: 'porte_douche', label: 'Porte / Paroi de douche',
+            materialChoices: [
+              { key: 'vitre',     label: 'Vitre',     presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Ouverture walk-in'] },
+              { key: 'ceramique', label: 'Céramique', presets: ceramiquePresets },
+            ],
+          },
+          { key: 'toilette', label: 'Toilette', presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
+          { key: 'miroir',   label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Miroir LED intégré'] },
+        ],
+      },
+      {
+        key: 'salle_eau', label: "Salle d'eau",
+        areas: [
+          { key: 'toilette', label: 'Toilette', presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
+          { key: 'miroir',   label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Miroir LED intégré'] },
+          {
+            key: 'vanite', label: 'Vanité / Lavabo',
+            materialChoices: [
+              { key: 'meuble',   label: 'Meuble',   presets: ['Suspendu', 'Sur pied', 'Encastré'] },
+              { key: 'comptoir', label: 'Comptoir', presets: ['Quartz', 'Céramique intégrée', 'Stratifié'] },
+            ],
+          },
         ],
       },
     ],
@@ -299,11 +343,14 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
       {
         key: 'luminaires', label: 'Luminaires intérieurs',
         areas: [
-          { key: 'salon',    label: 'Salon / Salle à manger', presets: ['Encastré LED', 'Suspendu/Pendant', 'Chandelier', 'Rail'] },
-          { key: 'cuisine',  label: 'Cuisine / Îlot',         presets: ['Encastré LED', 'Pendant îlot', 'Rail', 'Sous-armoire LED'] },
-          { key: 'chambres', label: 'Chambres',               presets: ['Encastré LED', 'Plafonnier', 'Semi-encastré', 'Ventilateur-lumière'] },
-          { key: 'sdb',      label: 'Salles de bain',         presets: ['Barre LED miroir', 'Encastré LED', 'Suspendu', 'Miroir LED intégré'] },
-          { key: 'soussol',  label: 'Sous-sol',               presets: ['Encastré LED', 'Suspendu industriel', 'Rail'] },
+          { key: 'salon',          label: 'Salon / Salle à manger', presets: ['Encastré LED', 'Suspendu/Pendant', 'Chandelier', 'Rail'] },
+          { key: 'cuisine',        label: 'Cuisine / Îlot',         presets: ['Encastré LED', 'Pendant îlot', 'Rail', 'Sous-armoire LED'] },
+          { key: 'chambres',       label: 'Chambres',               presets: ['Encastré LED', 'Plafonnier', 'Semi-encastré', 'Ventilateur-lumière'] },
+          { key: 'sdb_principale', label: 'SDB Principale',         presets: ['Barre LED miroir', 'Encastré LED', 'Suspendu', 'Miroir LED intégré'] },
+          { key: 'sdb_secondaire', label: 'SDB Secondaire',         presets: ['Barre LED miroir', 'Encastré LED', 'Suspendu', 'Miroir LED intégré'] },
+          { key: 'salle_eau',      label: "Salle d'eau",            presets: ['Barre LED miroir', 'Encastré LED', 'Suspendu', 'Miroir LED intégré'] },
+          { key: 'sdb_soussol',    label: 'SDB Sous-sol',           presets: ['Barre LED miroir', 'Encastré LED', 'Suspendu', 'Miroir LED intégré'] },
+          { key: 'soussol',        label: 'Sous-sol',               presets: ['Encastré LED', 'Suspendu industriel', 'Rail'] },
         ],
       },
       {
