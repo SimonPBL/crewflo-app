@@ -320,11 +320,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       });
     };
 
-    const openDay = (day: Date, isCurrentMonth: boolean) => {
+    const openDay = (day: Date, isCurrentMonth: boolean, dayTasksForDay: Task[] = []) => {
       if (!isCurrentMonth) return;
       if (!canEdit) {
         openDayDetails(day);
+      } else if (dayTasksForDay.length > 0) {
+        // Admin + tâches existantes → voir détails du jour
+        openDayDetails(day);
       } else {
+        // Admin + jour vide → ouvrir modale d'ajout
         const start = new Date(day); start.setHours(7,0,0,0);
         const end = new Date(day); end.setHours(17,0,0,0);
         const startIso = start.toISOString();
@@ -361,7 +365,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               return (
                 <div
                   key={i}
-                  onClick={() => openDay(day, isCurrentMonth)}
+                  onClick={() => openDay(day, isCurrentMonth, dayTasks)}
                   className={`bg-white flex flex-col min-h-[64px] p-1 transition-colors
                     ${isCurrentMonth ? 'cursor-pointer active:bg-slate-50' : 'bg-slate-50/60'}
                   `}
@@ -375,27 +379,45 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     </span>
                   </div>
                   {/* Écussons fournisseurs */}
-                  <div className="flex flex-wrap gap-0.5 justify-start">
+                  <div className="flex flex-col gap-px w-full">
                     {uniqueSuppliers.slice(0, 4).map(task => {
                       const supplier = suppliers.find(s => s.id === task.supplierId);
+                      const project = projects.find(p => p.id === task.projectId);
                       const colorClass = supplier?.color || 'bg-gray-200 text-gray-800';
                       const initials = supplier ? getInitials(supplier.name) : '?';
                       const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
+                      const isConfirmed = (task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined';
+                      const isDeclined = task.taskStatus === 'declined';
+                      const hasNote = task.adminNote?.text || task.supplierNotes?.text;
+                      const addressLine = !currentProjectId
+                        ? (project?.address ? project.address.split(',')[0].trim() : project?.name ?? '')
+                        : (task.title ?? '');
                       return (
                         <span
                           key={task.supplierId}
-                          className={`inline-flex items-center justify-center rounded text-[8px] font-bold leading-none w-6 h-5 relative flex-shrink-0 border border-black/10
+                          className={`flex items-center rounded w-full px-0.5 py-px border border-black/10 gap-px
                             ${colorClass.split(' ').slice(0,2).join(' ')}
                             ${hasConflict ? 'ring-1 ring-red-500' : ''}
                           `}
                           title={supplier?.name}
                         >
-                          {initials}
+                          {/* Initiales + adresse */}
+                          <span className="flex flex-col flex-1 min-w-0 leading-tight">
+                            <span className="font-bold truncate" style={{fontSize:'7px'}}>{initials}</span>
+                            {addressLine && <span className="truncate opacity-75" style={{fontSize:'6px'}}>{addressLine}</span>}
+                          </span>
+                          {/* Icônes statut */}
+                          <span className="flex flex-col gap-px items-center flex-shrink-0">
+                            {hasConflict && <span className="w-2 h-2 bg-red-500 rounded-full flex items-center justify-center"><AlertTriangle className="w-1.5 h-1.5 text-white" /></span>}
+                            {isConfirmed && <span className="w-2 h-2 bg-green-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-1.5 h-1.5 fill-none stroke-white stroke-2"><polyline points="1.5,5 4,7.5 8.5,2.5" /></svg></span>}
+                            {isDeclined && <span className="w-2 h-2 bg-red-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-1.5 h-1.5 stroke-white fill-none stroke-2"><line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/><line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/></svg></span>}
+                            {hasNote && <span className="w-2 h-2 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold" style={{fontSize:'5px'}}>!</span>}
+                          </span>
                         </span>
                       );
                     })}
                     {uniqueSuppliers.length > 4 && (
-                      <span className="inline-flex items-center justify-center w-6 h-5 rounded bg-slate-200 text-slate-500 text-[8px] font-bold border border-slate-300">
+                      <span className="flex items-center justify-center w-full rounded bg-slate-200 text-slate-500 font-bold border border-slate-300" style={{fontSize:'7px',padding:'1px 0'}}>
                         +{uniqueSuppliers.length - 4}
                       </span>
                     )}
@@ -1055,12 +1077,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            {/* Navigation Multi-Mois - Visible sur mobile aussi maintenant */}
-            <div className="flex bg-slate-100 rounded-lg p-1 overflow-x-auto">
-                {[1, 3, 6, 12].map(num => (
-                    <button key={num} onClick={() => setMonthsToShow(num)} className={`px-2 sm:px-3 py-1.5 text-xs font-medium rounded transition-all whitespace-nowrap ${monthsToShow === num ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>{num} Mois</button>
-                ))}
-            </div>
+
             <div className="flex items-center gap-2">
                 <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm hidden sm:block"><Mail className="w-4 h-4" /></button>
                 <button onClick={downloadAllPDF} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm hidden sm:block">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
@@ -1124,24 +1141,6 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </div>
       )}
 
-      {/* FAB mobile — bouton + flottant */}
-      {isMobile && canEdit && (
-        <button
-          onClick={() => {
-            const now = new Date();
-            const start = new Date(now); start.setHours(7,0,0,0);
-            const end = new Date(now); end.setHours(17,0,0,0);
-            const startIso = start.toISOString();
-            const endIso = end.toISOString();
-            setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
-            setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
-            setEditingTaskId(null); setIsViewOnly(false); setIsModalOpen(true);
-          }}
-          className="fixed bottom-20 right-4 z-30 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-transform"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      )}
 
       {isExporting && (
   <div className="fixed top-0 left-0 z-[-50] w-[1300px] pointer-events-none opacity-0 overflow-hidden">
