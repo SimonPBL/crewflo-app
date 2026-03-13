@@ -9,9 +9,10 @@ interface SupplierListProps {
   suppliers: Supplier[];
   setSuppliers: React.Dispatch<React.SetStateAction<Supplier[]>>;
   canEdit: boolean;
+  getToken?: () => Promise<string>;
 }
 
-export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppliers, canEdit: canEditProp }) => {
+export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppliers, canEdit: canEditProp, getToken }) => {
   // canEdit vient de App.tsx qui valide le rôle côté serveur — pas besoin de relire localStorage
   const canEdit = !!canEditProp;
 
@@ -128,15 +129,15 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     // Supprimer le compte Supabase Auth si existant
     if (supplierToDelete?.supabaseUserId) {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        const token = getToken ? await getToken() : '';
+        if (token) {
           const res = await fetch(
             `${supabaseUrl}/functions/v1/delete-supplier-auth`,
             {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`,
+                'Authorization': `Bearer ${token}`,
               },
               body: JSON.stringify({ userId: supplierToDelete.supabaseUserId }),
             }
@@ -181,8 +182,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     if (emailChanged && hasSupabaseAccount) {
       setEditSaving(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Session admin introuvable');
+        const token = getToken ? await getToken() : '';
+        if (!token) throw new Error('Session admin introuvable');
 
         const res = await fetch(
           `${supabaseUrl}/functions/v1/update-supplier-email`,
@@ -190,7 +191,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
+              'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({ userId: original.supabaseUserId, newEmail: editForm.email!.trim() }),
           }
