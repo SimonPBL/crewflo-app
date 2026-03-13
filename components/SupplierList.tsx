@@ -34,6 +34,9 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   // State pour l'édition
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Supplier>>({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const addSupplier = async () => {
     if (!canEdit) return;
@@ -120,19 +123,38 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   const deleteSupplier = async (id: string) => {
     if (!canEdit) return;
     const supplierToDelete = suppliers.find(s => s.id === id);
-    setSuppliers(suppliers.filter(s => s.id !== id));
+    setDeleteError(null);
 
-    // Retirer le company_id du profil → fournisseur verra "Profil incomplet" au prochain login
-    if (supabase && supplierToDelete?.supabaseUserId) {
+    // Supprimer le compte Supabase Auth si existant
+    if (supplierToDelete?.supabaseUserId) {
       try {
-        await supabase
-          .from('profiles')
-          .update({ company_id: null })
-          .eq('id', supplierToDelete.supabaseUserId);
-      } catch (e) {
-        console.warn('Erreur mise à jour profil:', e);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const res = await fetch(
+            `${supabaseUrl}/functions/v1/delete-supplier-auth`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ userId: supplierToDelete.supabaseUserId }),
+            }
+          );
+          const json = await res.json();
+          if (!res.ok || json.error) {
+            console.warn('[SupplierList] delete-supplier-auth:', json.error);
+            setDeleteError(`Compte supprimé localement mais erreur Auth : ${json.error}`);
+          }
+        }
+      } catch (e: any) {
+        console.warn('[SupplierList] delete error:', e);
+        setDeleteError(`Compte supprimé localement mais erreur Auth : ${e.message}`);
       }
     }
+
+    // Supprimer de la liste locale dans tous les cas
+    setSuppliers(suppliers.filter(s => s.id !== id));
   };
 
   const startEditing = (supplier: Supplier) => {
@@ -146,11 +168,45 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     setEditForm({});
   };
 
-  const saveEditing = () => {
+  const saveEditing = async () => {
     if (!canEdit) return;
     if (!editForm.name?.trim()) return;
-    
-    setSuppliers(suppliers.map(s => 
+    setEditError(null);
+
+    const original = suppliers.find(s => s.id === editingId);
+    const emailChanged = original?.email && editForm.email && editForm.email.trim() !== original.email;
+    const hasSupabaseAccount = !!original?.supabaseUserId;
+
+    // Si l'email a changé et qu'il y a un compte Supabase Auth → appeler l'edge function
+    if (emailChanged && hasSupabaseAccount) {
+      setEditSaving(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Session admin introuvable');
+
+        const res = await fetch(
+          `${supabaseUrl}/functions/v1/update-supplier-email`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ userId: original.supabaseUserId, newEmail: editForm.email!.trim() }),
+          }
+        );
+        const json = await res.json();
+        if (!res.ok || json.error) throw new Error(json.error ?? 'Erreur edge function');
+      } catch (err: any) {
+        setEditError(`Erreur mise à jour courriel Auth : ${err.message}`);
+        setEditSaving(false);
+        return;
+      } finally {
+        setEditSaving(false);
+      }
+    }
+
+    setSuppliers(suppliers.map(s =>
       s.id === editingId ? { ...s, ...editForm } as Supplier : s
     ));
     setEditingId(null);
@@ -350,6 +406,13 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
           </div>
         </div>
 
+        {/* Erreur suppression */}
+        {deleteError && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            ⚠ {deleteError}
+          </div>
+        )}
+
         {/* Liste des cartes */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {suppliers.map(supplier => {
@@ -447,19 +510,22 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
                   <div className="mt-4 pt-3 border-t border-slate-100 pl-3">
                       {isEditing ? (
-                        <div className="flex gap-2 justify-end">
-                            <button 
-                              onClick={cancelEditing}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded hover:bg-slate-200"
-                            >
+                        <div className="flex flex-col gap-2">
+                          {editError && (
+                            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{editError}</p>
+                          )}
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={cancelEditing} disabled={editSaving}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-50">
                               <X className="w-3 h-3" /> Annuler
                             </button>
-                            <button 
-                              onClick={saveEditing}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
-                            >
-                              <Check className="w-3 h-3" /> Enregistrer
+                            <button onClick={saveEditing} disabled={editSaving}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-60">
+                              {editSaving
+                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Mise à jour...</>
+                                : <><Check className="w-3 h-3" /> Enregistrer</>}
                             </button>
+                          </div>
                         </div>
                       ) : (
                         <>
