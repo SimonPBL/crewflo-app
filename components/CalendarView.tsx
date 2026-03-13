@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Project, Supplier, Task, Conflict } from '../types';
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin } from 'lucide-react';
 import { ConflictAlert } from './ConflictAlert';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import html2canvas from 'html2canvas';
@@ -1060,9 +1060,17 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         {/* Ligne info mobile : nom calendrier + compte */}
         {isMobile && (
           <div className="flex items-center justify-between w-full">
-            <span className="text-sm font-bold text-slate-800 truncate max-w-[60%]">
-              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
-            </span>
+            <div className="flex flex-col min-w-0 max-w-[60%]">
+              <span className="text-sm font-bold text-slate-800 truncate">
+                {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
+              </span>
+              {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
+                <span className="text-xs text-slate-400 truncate flex items-center gap-0.5">
+                  <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                  {projects.find(p => p.id === currentProjectId)?.address}
+                </span>
+              )}
+            </div>
             {(() => {
               const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
               const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
@@ -1082,9 +1090,17 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           </div>
         )}
         <div className="flex items-center gap-4 flex-wrap">
-          <h2 className="text-xl font-bold text-slate-800 hidden lg:block">
-            {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
-          </h2>
+          <div className="hidden lg:block">
+            <h2 className="text-xl font-bold text-slate-800 leading-tight">
+              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
+            </h2>
+            {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {projects.find(p => p.id === currentProjectId)?.address}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
             <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
             <span className="px-4 text-sm font-bold capitalize min-w-[140px] text-center">{allMonthsData[0]?.monthLabel}</span>

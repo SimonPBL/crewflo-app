@@ -14,13 +14,6 @@ export interface Project {
   status: 'planning' | 'active' | 'completed';
 }
 
-export interface TaskNote {
-  text: string;
-  authorName: string;
-  authorId: string;
-  updatedAt: string;
-}
-
 export interface Task {
   id: string;
   projectId: string;
@@ -31,10 +24,6 @@ export interface Task {
   start: string;      // ISO Date String
   end: string;        // ISO Date String
   createdAt?: string; // ISO Date String — set at creation, never modified
-  taskStatus?: 'pending' | 'confirmed' | 'declined';
-  confirmedBySupplier?: boolean;
-  supplierNotes?: TaskNote;
-  adminNote?: TaskNote;   // note de l'admin — visible par tous, éditable admin seulement
 }
 
 export interface Conflict {
@@ -44,13 +33,15 @@ export interface Conflict {
   message: string;
 }
 
-export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks';
+export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai';
 
 export const TRADES = [
   'Électricien',
   'Plombier',
   'Ventilation',
   'Charpentier',
+  'Menuisier',
+  'Carreleur',
   'Peintre',
   'Maçon',
   'Couvreur',

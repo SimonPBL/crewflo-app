@@ -28,6 +28,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
   // ── Filtre & tri ───────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'planning' | 'active' | 'completed'>('all');
+  const [showCompleted, setShowCompleted] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'status'>('name');
 
   // ── Progression des finitions ──────────────────────────────────────────────
@@ -128,7 +129,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.address.toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'all' || p.status === filterStatus;
-      return matchSearch && matchStatus;
+      const matchCompleted = showCompleted || p.status !== 'completed';
+      return matchSearch && matchStatus && matchCompleted;
     })
     .sort((a, b) => {
       if (sortBy === 'status') {
@@ -147,7 +149,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
         </h2>
 
         {/* Barre de filtre / recherche */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-6">
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input
@@ -158,17 +160,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
               className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
-          <div className="flex gap-2">
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value as any)}
-              className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="active">En cours</option>
-              <option value="planning">Planification</option>
-              <option value="completed">Terminé</option>
-            </select>
+          <div className="flex gap-2 flex-wrap">
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
@@ -177,6 +169,15 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
               <option value="name">Trier : Nom</option>
               <option value="status">Trier : Statut</option>
             </select>
+            <button
+              onClick={() => setShowCompleted(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors
+                ${showCompleted
+                  ? 'bg-slate-700 text-white border-slate-700'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+            >
+              {showCompleted ? '✓ Terminés visibles' : 'Afficher les terminés'}
+            </button>
           </div>
         </div>
 
@@ -224,10 +225,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
             const st = statusLabel(project.status);
 
             return (
-              <div key={project.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-4">
-                <div className="flex items-start gap-4 flex-1 w-full">
-                  <div className="bg-blue-100 p-3 rounded-full text-blue-600 hidden sm:block flex-shrink-0">
-                    <Building2 className="w-6 h-6" />
+              <div key={project.id} className="bg-white px-4 py-3 rounded-lg border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-3">
+                <div className="flex items-start gap-3 flex-1 w-full">
+                  <div className="bg-blue-100 p-2 rounded-lg text-blue-600 hidden sm:block flex-shrink-0">
+                    <Building2 className="w-5 h-5" />
                   </div>
 
                   <div className="flex-1 w-full">
@@ -276,8 +277,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                       </div>
                     ) : (
                       <div>
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h4 className="font-bold text-slate-800 text-lg">{project.name}</h4>
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <h4 className="font-semibold text-slate-800 text-base">{project.name}</h4>
                           {canEdit && (
                             <button
                               onClick={() => startEditing(project)}
@@ -289,12 +290,12 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                           )}
                         </div>
                         {project.address && (
-                          <div className="flex items-center gap-1 text-slate-500 text-sm mt-1">
-                            <MapPin className="w-4 h-4" />
+                          <div className="flex items-center gap-1 text-slate-400 text-xs mt-0.5">
+                            <MapPin className="w-3 h-3" />
                             <span>{project.address}</span>
                           </div>
                         )}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${st.cls}`}>
                             {st.label}
                           </span>
