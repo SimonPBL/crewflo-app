@@ -128,15 +128,14 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     // Supprimer le compte Supabase Auth si existant
     if (supplierToDelete?.supabaseUserId) {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        if (accessToken) {
           const res = await fetch(
             `${supabaseUrl}/functions/v1/delete-supplier-auth`,
             {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`,
+                'Authorization': `Bearer ${accessToken}`,
               },
               body: JSON.stringify({ userId: supplierToDelete.supabaseUserId }),
             }

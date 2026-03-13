@@ -77,6 +77,7 @@ const App = () => {
   const isLoggedInRef = useRef(false); // ref pour éviter stale closure dans onAuthStateChange
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
   const [userEmail, setUserEmail] = useState<string>('');
+  const [accessToken, setAccessToken] = useState<string>('');
   const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const fetchUserRole = async () => {
@@ -87,6 +88,7 @@ const App = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       if (user?.email) setUserEmail(user.email.toLowerCase());
+      if (session?.access_token) setAccessToken(session.access_token);
 
       const { data, error } = await supabase
         .from('profiles')
@@ -125,6 +127,7 @@ const App = () => {
       const { data } = await supabase.auth.getSession();
       isLoggedInRef.current = !!data.session;
       setIsLoggedIn(!!data.session);
+      if (data.session?.access_token) setAccessToken(data.session.access_token);
 
       if (data.session) {
         await fetchUserRole();
@@ -536,7 +539,7 @@ const App = () => {
           />
         );
       case 'suppliers':
-        return <SupplierList suppliers={suppliers} setSuppliers={setSuppliers} canEdit={canEdit} />;
+        return <SupplierList suppliers={suppliers} setSuppliers={setSuppliers} canEdit={canEdit} accessToken={accessToken} />;
       case 'projects':
         return <ProjectList projects={visibleProjects} setProjects={setProjects} canEdit={canEdit} />;
       case 'ai':
