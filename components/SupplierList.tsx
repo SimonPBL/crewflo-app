@@ -183,6 +183,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
       setEditSaving(true);
       try {
         const token = getToken ? await getToken() : '';
+        console.log('[SupplierList] getToken result — length:', token.length, '| first20:', token.slice(0, 20));
         if (!token) throw new Error('Session admin introuvable');
 
         const res = await fetch(

@@ -539,7 +539,7 @@ const App = () => {
           />
         );
       case 'suppliers':
-        return <SupplierList suppliers={suppliers} setSuppliers={setSuppliers} canEdit={canEdit} getToken={async () => { const { data } = await supabase.auth.getSession(); return data.session?.access_token ?? ''; }} />;
+        return <SupplierList suppliers={suppliers} setSuppliers={setSuppliers} canEdit={canEdit} getToken={async () => { const { data } = await supabase.auth.getSession(); const t = data.session?.access_token ?? ''; console.log('[App] getToken called — session exists:', !!data.session, '| token length:', t.length); return t; }} />;
       case 'projects':
         return <ProjectList projects={visibleProjects} setProjects={setProjects} canEdit={canEdit} />;
       case 'ai':
