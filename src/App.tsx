@@ -329,6 +329,11 @@ const App = () => {
     ? (suppliers.find(s => s.email?.toLowerCase() === userEmail) ?? null)
     : null;
 
+  // Projets visibles pour un fournisseur : seulement ceux où il a au moins une tâche
+  const visibleProjects = role === 'supplier' && supplierSelf
+    ? projects.filter(p => tasks.some(t => t.projectId === p.id && t.supplierId === supplierSelf.id))
+    : projects;
+
   // cloudDataLoaded — vrai après que les données cloud soient arrivées
   useEffect(() => {
     if (!cloudDataLoaded && (statusS === 'saved' || statusP === 'saved' || statusT === 'saved')) {
@@ -519,7 +524,7 @@ const App = () => {
         return (
           <CalendarView
             canEdit={canEdit}
-            projects={projects}
+            projects={visibleProjects}
             suppliers={suppliers}
             tasks={tasks}
             setTasks={setTasks}
@@ -533,7 +538,7 @@ const App = () => {
       case 'suppliers':
         return <SupplierList suppliers={suppliers} setSuppliers={setSuppliers} canEdit={canEdit} />;
       case 'projects':
-        return <ProjectList projects={projects} setProjects={setProjects} canEdit={canEdit} />;
+        return <ProjectList projects={visibleProjects} setProjects={setProjects} canEdit={canEdit} />;
       case 'ai':
         return <AIAssistant tasks={tasks} suppliers={suppliers} projects={projects} />;
       case 'mytasks':
@@ -667,7 +672,7 @@ const App = () => {
           </button>
 
           <div className="pt-4 pb-2 text-xs font-bold text-slate-500 uppercase px-3">Projets</div>
-          {projects.map(p => (
+          {visibleProjects.map(p => (
             <button key={p.id} onClick={() => { setCurrentView('calendar'); setSelectedProjectId(p.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentView === 'calendar' && selectedProjectId === p.id ? 'bg-blue-900/50 text-blue-200 border border-blue-800' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
               <div className="w-2 h-2 rounded-full bg-blue-500" />
               <span className="truncate">{p.name}</span>
@@ -680,9 +685,11 @@ const App = () => {
             <Building2 className="w-5 h-5" /> Chantiers
           </button>
 
-          <button onClick={() => { setCurrentView('suppliers'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'suppliers' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-            <Users className="w-5 h-5" /> Fournisseurs
-          </button>
+          {canEdit && (
+            <button onClick={() => { setCurrentView('suppliers'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'suppliers' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <Users className="w-5 h-5" /> Fournisseurs
+            </button>
+          )}
 
           <button onClick={() => { setCurrentView('ai'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'ai' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
             <Sparkles className="w-5 h-5" /> Assistant IA
