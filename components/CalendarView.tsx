@@ -1278,7 +1278,27 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               <h3 className="text-base font-bold text-slate-800">
                 Tâches du {dayModalDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
               </h3>
-              <div className="w-16" />
+              {canEdit ? (
+                <button
+                  onClick={() => {
+                    setIsDayModalOpen(false);
+                    const start = new Date(dayModalDate); start.setHours(7,0,0,0);
+                    const end = new Date(dayModalDate); end.setHours(17,0,0,0);
+                    const startIso = start.toISOString();
+                    const endIso = end.toISOString();
+                    setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
+                    setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
+                    setEditingTaskId(null);
+                    setIsViewOnly(false);
+                    setIsModalOpen(true);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-full"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Ajouter
+                </button>
+              ) : (
+                <div className="w-16" />
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
@@ -1301,7 +1321,16 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                           type="button"
                           onClick={() => {
                             setIsDayModalOpen(false);
-                            openTaskViewOnly(t);
+                            if (canEdit) {
+                              // Admin → ouvre en mode édition complète
+                              setNewTask({ ...t });
+                              setSelectedTaskDays(initSelectedDaysFromRange(t.start, t.end));
+                              setEditingTaskId(t.id);
+                              setIsViewOnly(false);
+                              setIsModalOpen(true);
+                            } else {
+                              openTaskViewOnly(t);
+                            }
                           }}
                           className="w-full text-left p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition"
                         >
