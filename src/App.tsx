@@ -20,6 +20,7 @@ const STORE_KEY_ROLE = "crewflo_role";
 
 // ── Bannière de mise à jour PWA ──────────────────────────────────────────────
 const UpdateBanner = () => {
+  const [dismissed, setDismissed] = React.useState(false);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -42,14 +43,14 @@ const UpdateBanner = () => {
     },
   });
 
-  if (!needRefresh) return null;
+  if (!needRefresh || dismissed) return null;
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl border border-blue-500 animate-in slide-in-from-bottom">
       <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
       <span className="text-sm font-medium">Nouvelle version disponible</span>
       <button
-        onClick={() => updateServiceWorker(true)}
+        onClick={() => { setDismissed(true); updateServiceWorker(true); }}
         className="ml-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-lg transition-colors"
       >
         Mettre à jour
