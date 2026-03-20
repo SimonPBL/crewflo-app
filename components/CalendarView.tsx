@@ -460,6 +460,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 ${isPdf ? 'min-h-[100px] p-1 border-r border-b border-slate-200' : 'min-h-[100px] p-1'}
                                 ${!isCurrentMonth ? 'bg-slate-50/50' : ''} 
                                 ${isCurrentMonth && getCCQHoliday(day) ? '!bg-orange-50' : ''}
+                                ${isCurrentMonth && !getCCQHoliday(day) && (day.getDay() === 0 || day.getDay() === 6) ? '!bg-blue-50' : ''}
                                 ${(interactive || !canEdit) ? 'hover:bg-slate-50 cursor-pointer' : ''} 
                                 ${selected ? '!bg-blue-100 ring-inset ring-2 ring-blue-300' : ''}
                                 transition-colors
