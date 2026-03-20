@@ -150,6 +150,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   // Helper pour formater le texte
+  // Initiales à partir du nom (max 3 lettres)
+  const getInitials = (name: string) => {
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) return name.slice(0, 3).toUpperCase();
+    return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
+  };
+
   const formatLabel = (text: string | undefined) => {
     if (!text) return '';
     return text;
@@ -433,28 +440,36 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     </div>
                                     )}
 
-                                    {/* Texte — prend tout l'espace */}
+                                    {/* Texte — compact sur écran, complet en PDF */}
                                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                        {currentProjectId ? (
-                                          <>
-                                            <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
-                                              {formatLabel(task.title)}
-                                            </div>
-                                            <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>
-                                              {formatLabel(supplier?.name)}
-                                            </div>
-                                          </>
+                                        {isPdf ? (
+                                          // PDF : texte complet
+                                          currentProjectId ? (
+                                            <>
+                                              <div className="font-bold leading-tight text-xs mb-0.5">{formatLabel(task.title)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-1 pt-1 border-t border-black/10 uppercase tracking-wide">{formatLabel(supplier?.name)}</div>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <div className="font-bold leading-tight text-xs mb-0.5">{formatLabel(supplier?.name)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-1 pt-1 border-t border-black/10 uppercase tracking-wide">{project?.name}</div>
+                                              {project?.address && <div className="opacity-75 leading-tight text-[9px]">📍 {project.address}</div>}
+                                            </>
+                                          )
                                         ) : (
+                                          // Écran : initiales + adresse courte sur une ligne
                                           <>
-                                            <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>
-                                              {formatLabel(supplier?.name)}
+                                            <div className="font-bold leading-tight truncate" style={{fontSize:'8px'}}>
+                                              {supplier ? getInitials(supplier.name) : '?'}
                                             </div>
-                                            <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>
-                                              {project?.name}
-                                            </div>
-                                            {project?.address && (
-                                              <div className={`opacity-75 leading-tight break-words ${isPdf ? 'text-[9px]' : 'text-[9px] mt-0.5'}`}>
-                                                📍 {project.address}
+                                            {!currentProjectId && project?.address && (
+                                              <div className="leading-tight truncate opacity-75" style={{fontSize:'7px'}}>
+                                                {project.address.split(',')[0].trim()}
+                                              </div>
+                                            )}
+                                            {currentProjectId && task.title && (
+                                              <div className="leading-tight truncate opacity-90" style={{fontSize:'7px'}}>
+                                                {task.title}
                                               </div>
                                             )}
                                           </>

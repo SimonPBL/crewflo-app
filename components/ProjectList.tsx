@@ -29,6 +29,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'planning' | 'active' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'status'>('name');
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // ── Progression des finitions ──────────────────────────────────────────────
   const supabase = getSupabase();
@@ -128,7 +129,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.address.toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'all' || p.status === filterStatus;
-      return matchSearch && matchStatus;
+      const matchCompleted = showCompleted || p.status !== 'completed';
+      return matchSearch && matchStatus && matchCompleted;
     })
     .sort((a, b) => {
       if (sortBy === 'status') {
@@ -177,6 +179,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
               <option value="name">Trier : Nom</option>
               <option value="status">Trier : Statut</option>
             </select>
+            <button
+              onClick={() => setShowCompleted(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors
+                ${showCompleted ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+            >
+              {showCompleted ? '✓ Terminés visibles' : 'Afficher les terminés'}
+            </button>
           </div>
         </div>
 

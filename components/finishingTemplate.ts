@@ -221,6 +221,14 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
               { key: 'combo_bain',       label: 'Combo bain-douche', presets: ['Acrylique 5\'', 'Acrylique 6\'', 'Céramique'] },
             ],
           },
+          {
+            key: 'backsplash', label: 'Niche',
+            materialChoices: [
+              { key: 'ceramique',       label: 'Céramique',       presets: backsplashPresets },
+              { key: 'metal_stainless', label: 'Métal Stainless', presets: ['Dimensions standard', 'Sur mesure'] },
+              { key: 'metal_noir',      label: 'Métal Noir',      presets: ['Dimensions standard', 'Sur mesure'] },
+            ],
+          },
           { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
           { key: 'toilette',     label: 'Toilette',                    presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
           { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
@@ -238,6 +246,14 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
               { key: 'combo_bain',       label: 'Combo bain-douche', presets: ['Acrylique 5\'', 'Céramique'] },
             ],
           },
+          {
+            key: 'backsplash', label: 'Niche',
+            materialChoices: [
+              { key: 'ceramique',       label: 'Céramique',       presets: backsplashPresets },
+              { key: 'metal_stainless', label: 'Métal Stainless', presets: ['Dimensions standard', 'Sur mesure'] },
+              { key: 'metal_noir',      label: 'Métal Noir',      presets: ['Dimensions standard', 'Sur mesure'] },
+            ],
+          },
           { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
           { key: 'toilette',     label: 'Toilette',                    presets: ['Bidet', 'Standard 2 boutons', 'Standard clanche'] },
           { key: 'miroir',       label: 'Miroir / Armoire à pharmacie', presets: ['Miroir simple', 'Armoire pharmacie 1 porte', 'Armoire pharmacie 2 portes', 'Miroir LED intégré'] },
@@ -251,6 +267,14 @@ export const FINISHING_TEMPLATE: CategoryDef[] = [
             materialChoices: [
               { key: 'douche_ceramique', label: 'Douche céramique', presets: ['32x32', '36x36', '36x48'] },
               { key: 'douche_acrylique', label: 'Douche acrylique', presets: ['32x32', '36x36', '36x48'] },
+            ],
+          },
+          {
+            key: 'backsplash', label: 'Niche',
+            materialChoices: [
+              { key: 'ceramique',       label: 'Céramique',       presets: backsplashPresets },
+              { key: 'metal_stainless', label: 'Métal Stainless', presets: ['Dimensions standard', 'Sur mesure'] },
+              { key: 'metal_noir',      label: 'Métal Noir',      presets: ['Dimensions standard', 'Sur mesure'] },
             ],
           },
           { key: 'porte_douche', label: 'Porte / Paroi de douche',    presets: ['Verre clair semi-frameless', 'Verre clair frameless', 'Verre dépoli', 'Rideau', 'Ouverture walk-in'] },
