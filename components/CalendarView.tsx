@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Project, Supplier, Task, Conflict } from '../types';
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X } from 'lucide-react';
 import { ConflictAlert } from './ConflictAlert';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import html2canvas from 'html2canvas';
@@ -17,8 +17,6 @@ interface CalendarViewProps {
   canEdit: boolean;
   onUpdateSupplierNote?: (taskId: string, note: { text: string; authorName: string; authorId: string; updatedAt: string }) => void;
   supplierSelf?: { id: string; name: string } | null;
-  userEmail?: string;
-  userRole?: string;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -29,9 +27,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   currentProjectId,
   canEdit,
   onUpdateSupplierNote,
-  supplierSelf,
-  userEmail,
-  userRole
+  supplierSelf
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthsToShow, setMonthsToShow] = useState<number>(1); // 1, 3, 6, 12
@@ -43,29 +39,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
 
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false); // État pour la modale email
+  const [isAllDay, setIsAllDay] = useState(true);
   const [newTask, setNewTask] = useState<Partial<Task>>({});
   const [showNotes, setShowNotes] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [finishingsMap, setFinishingsMap] = useState<Record<string, any>>({});
   const [filterSupplierId, setFilterSupplierId] = useState<string>('all');
-
-  // ── Détection mobile ────────────────────────────────────────────────────────
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  const [mobileTab, setMobileTab] = useState<'calendar' | 'tasks'>('calendar');
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
-
-  // Helper : initiales fournisseur (max 3 lettres)
-  const getInitials = (name: string) => {
-    const words = name.trim().split(/\s+/);
-    if (words.length === 1) return name.slice(0, 3).toUpperCase();
-    return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
-  };
 
   // États pour le Drag & Drop de sélection de date (Main View)
   const [isDragging, setIsDragging] = useState(false);
@@ -136,6 +116,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
         setEditingTaskId(null);
         setIsViewOnly(false);
+        setIsAllDay(true);
         setIsModalOpen(true);
         
         setDragStart(null);
@@ -217,7 +198,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     
     const firstDayOfMonth = new Date(year, month, 1);
     const dayOfWeek = firstDayOfMonth.getDay();
-    const diff = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+    const diff = dayOfWeek; // Sunday=0 is first day of week
     
     const startDate = new Date(firstDayOfMonth);
     startDate.setDate(firstDayOfMonth.getDate() - diff);
@@ -308,244 +289,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
 
-  // ── Vue Calendrier Mobile (plein écran avec écussons) ────────────────────
-  const MobileCalendarView = ({ tasksToRender }: { tasksToRender: Task[] }) => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const grid = allMonthsData[0];
-    const weekDays = ['L','M','M','J','V','S','D'];
-
-    const getTasksForDay = (date: Date) => {
-      const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
-      const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
-      return tasksToRender.filter(t => {
-        const tStart = new Date(t.start);
-        const tEnd = new Date(t.end);
-        return tStart <= dayEnd && tEnd >= dayStart;
-      });
-    };
-
-    const openDay = (day: Date, isCurrentMonth: boolean, dayTasksForDay: Task[] = []) => {
-      if (!isCurrentMonth) return;
-      if (!canEdit) {
-        openDayDetails(day);
-      } else if (dayTasksForDay.length > 0) {
-        // Admin + tâches existantes → voir détails du jour
-        openDayDetails(day);
-      } else {
-        // Admin + jour vide → ouvrir modale d'ajout
-        const start = new Date(day); start.setHours(7,0,0,0);
-        const end = new Date(day); end.setHours(17,0,0,0);
-        const startIso = start.toISOString();
-        const endIso = end.toISOString();
-        setNewTask({
-          projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''),
-          start: startIso, end: endIso,
-          supplierId: suppliers.length > 0 ? suppliers[0].id : '',
-        });
-        setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
-        setEditingTaskId(null);
-        setIsViewOnly(false);
-        setIsModalOpen(true);
-      }
-    };
-
-    return (
-      <div className="flex flex-col h-full overflow-hidden">
-        {/* En-tête jours de semaine */}
-        <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200 flex-none">
-          {weekDays.map((d,i) => (
-            <div key={i} className="text-center text-[10px] font-bold text-slate-400 uppercase py-1.5">{d}</div>
-          ))}
-        </div>
-        {/* Grille des jours */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-7 bg-slate-200 gap-px">
-            {grid.days.map((day, i) => {
-              const isToday = day.toDateString() === today.toDateString();
-              const isCurrentMonth = day.getMonth() === grid.monthIndex;
-              const dayTasks = isCurrentMonth ? getTasksForDay(day) : [];
-              const uniqueSuppliers = Array.from(new Map(dayTasks.map(t => [t.supplierId, t])).values());
-
-              return (
-                <div
-                  key={i}
-                  onClick={() => openDay(day, isCurrentMonth, dayTasks)}
-                  className={`bg-white flex flex-col min-h-[64px] p-1 transition-colors
-                    ${isCurrentMonth ? 'cursor-pointer active:bg-slate-50' : 'bg-slate-50/60'}
-                  `}
-                >
-                  {/* Numéro du jour */}
-                  <div className="text-right mb-1">
-                    <span className={`text-xs font-medium inline-flex items-center justify-center w-5 h-5 rounded-full
-                      ${isToday ? 'bg-blue-600 text-white font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-300'}
-                    `}>
-                      {day.getDate()}
-                    </span>
-                  </div>
-                  {/* Écussons fournisseurs */}
-                  <div className="flex flex-col gap-px w-full">
-                    {uniqueSuppliers.slice(0, 4).map(task => {
-                      const supplier = suppliers.find(s => s.id === task.supplierId);
-                      const project = projects.find(p => p.id === task.projectId);
-                      const colorClass = supplier?.color || 'bg-gray-200 text-gray-800';
-                      const initials = supplier ? getInitials(supplier.name) : '?';
-                      const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
-                      const isConfirmed = (task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined';
-                      const isDeclined = task.taskStatus === 'declined';
-                      const hasNote = task.adminNote?.text || task.supplierNotes?.text;
-                      const addressLine = !currentProjectId
-                        ? (project?.address ? project.address.split(',')[0].trim() : project?.name ?? '')
-                        : (task.title ?? '');
-                      return (
-                        <span
-                          key={task.supplierId}
-                          className={`flex items-center rounded w-full px-0.5 py-px border border-black/10 gap-px
-                            ${colorClass.split(' ').slice(0,2).join(' ')}
-                            ${hasConflict ? 'ring-1 ring-red-500' : ''}
-                          `}
-                          title={supplier?.name}
-                        >
-                          {/* Initiales + adresse */}
-                          <span className="flex flex-col flex-1 min-w-0 leading-tight">
-                            <span className="font-bold truncate" style={{fontSize:'7px'}}>{initials}</span>
-                            {addressLine && <span className="truncate opacity-75" style={{fontSize:'6px'}}>{addressLine}</span>}
-                          </span>
-                          {/* Icônes statut */}
-                          <span className="flex flex-col gap-px items-center flex-shrink-0">
-                            {hasConflict && <span className="w-2 h-2 bg-red-500 rounded-full flex items-center justify-center"><AlertTriangle className="w-1.5 h-1.5 text-white" /></span>}
-                            {isConfirmed && <span className="w-2 h-2 bg-green-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-1.5 h-1.5 fill-none stroke-white stroke-2"><polyline points="1.5,5 4,7.5 8.5,2.5" /></svg></span>}
-                            {isDeclined && <span className="w-2 h-2 bg-red-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-1.5 h-1.5 stroke-white fill-none stroke-2"><line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/><line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/></svg></span>}
-                            {hasNote && <span className="w-2 h-2 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold" style={{fontSize:'5px'}}>!</span>}
-                          </span>
-                        </span>
-                      );
-                    })}
-                    {uniqueSuppliers.length > 4 && (
-                      <span className="flex items-center justify-center w-full rounded bg-slate-200 text-slate-500 font-bold border border-slate-300" style={{fontSize:'7px',padding:'1px 0'}}>
-                        +{uniqueSuppliers.length - 4}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Vue Agenda Mobile (liste des tâches) ──────────────────────────────────
-  const AgendaView = ({ tasksToRender }: { tasksToRender: Task[] }) => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const grid = allMonthsData[0];
-
-    const tasksByDay = useMemo(() => {
-      const map: Record<string, Task[]> = {};
-      const monthStart = new Date(grid.year, grid.monthIndex, 1);
-      const monthEnd = new Date(grid.year, grid.monthIndex + 1, 0);
-      monthEnd.setHours(23,59,59,999);
-      const cur = new Date(monthStart);
-      while (cur <= monthEnd) {
-        const key = cur.toDateString();
-        const dayStart = new Date(cur); dayStart.setHours(0,0,0,0);
-        const dayEnd = new Date(cur); dayEnd.setHours(23,59,59,999);
-        const dayTasks = tasksToRender.filter(t => {
-          const tStart = new Date(t.start);
-          const tEnd = new Date(t.end);
-          return tStart <= dayEnd && tEnd >= dayStart;
-        });
-        if (dayTasks.length > 0) map[key] = dayTasks;
-        cur.setDate(cur.getDate() + 1);
-      }
-      return map;
-    }, [tasksToRender, grid]);
-
-    const sortedDays = Object.keys(tasksByDay).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
-
-    const openDay = (day: Date) => {
-      if (!canEdit) { openDayDetails(day); return; }
-      const start = new Date(day); start.setHours(7,0,0,0);
-      const end = new Date(day); end.setHours(17,0,0,0);
-      const startIso = start.toISOString();
-      const endIso = end.toISOString();
-      setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
-      setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
-      setEditingTaskId(null); setIsViewOnly(false); setIsModalOpen(true);
-    };
-
-    return (
-      <div className="flex-1 overflow-y-auto bg-slate-50">
-        {sortedDays.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2">
-            <CalendarIcon className="w-8 h-8 opacity-30" />
-            <span>Aucune tâche ce mois-ci</span>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-200">
-            {sortedDays.map(key => {
-              const day = new Date(key);
-              const isToday = day.toDateString() === today.toDateString();
-              const dayTasks = tasksByDay[key];
-              return (
-                <div key={key} className="bg-white">
-                  <div
-                    className={`flex items-center gap-3 px-4 py-2 border-b border-slate-100 cursor-pointer ${isToday ? 'bg-blue-50' : ''}`}
-                    onClick={() => openDay(day)}
-                  >
-                    <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-full flex-shrink-0 ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                      <span className="text-[10px] uppercase leading-none font-medium">{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
-                      <span className="text-lg font-bold leading-tight">{day.getDate()}</span>
-                    </div>
-                    <span className="text-xs text-slate-400 capitalize flex-1">{day.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</span>
-                    {canEdit && <Plus className="w-4 h-4 text-slate-400" />}
-                  </div>
-                  <div className="divide-y divide-slate-50">
-                    {dayTasks.map(task => {
-                      const supplier = suppliers.find(s => s.id === task.supplierId);
-                      const project = projects.find(p => p.id === task.projectId);
-                      const colorClass = supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
-                      const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
-                      const isConfirmed = (task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined';
-                      const isDeclined = task.taskStatus === 'declined';
-                      const hasNote = task.adminNote?.text || task.supplierNotes?.text;
-                      return (
-                        <div key={task.id} onClick={(e) => { e.stopPropagation(); handleEditTask(e, task); }}
-                          className="flex items-stretch gap-0 mx-3 my-2 rounded-lg overflow-hidden shadow-sm cursor-pointer active:scale-[0.98] transition-transform">
-                          <div className={`w-2 flex-shrink-0 ${colorClass.split(' ')[0]}`} />
-                          <div className="flex-1 bg-white px-3 py-2.5 border border-l-0 border-slate-200 rounded-r-lg">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-sm text-slate-800 truncate">{currentProjectId ? task.title : supplier?.name}</div>
-                                <div className="text-xs text-slate-500 truncate mt-0.5">{currentProjectId ? supplier?.name : project?.name}</div>
-                                {!currentProjectId && project?.address && <div className="text-xs text-slate-400 truncate">📍 {project.address}</div>}
-                                <div className="text-xs text-slate-400 mt-1">
-                                  {new Date(task.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                                  {task.end !== task.start && ` → ${new Date(task.end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`}
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                {hasConflict && <span className="bg-red-500 text-white rounded-full p-0.5"><AlertTriangle className="w-3 h-3" /></span>}
-                                {isConfirmed && <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-3 h-3 text-white fill-none stroke-current stroke-2"><polyline points="1.5,5 4,7.5 8.5,2.5" /></svg></span>}
-                                {isDeclined && <span className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"><svg viewBox="0 0 10 10" className="w-3 h-3 stroke-white fill-none stroke-2"><line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/><line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/></svg></span>}
-                                {hasNote && <span className="w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center text-white text-[9px] font-bold">!</span>}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-    const CalendarGrid = ({ tasksToRender, interactive = true, isPdf = false }: { tasksToRender: Task[], interactive?: boolean, isPdf?: boolean }) => {
+  const CalendarGrid = ({ tasksToRender, interactive = true, isPdf = false }: { tasksToRender: Task[], interactive?: boolean, isPdf?: boolean }) => {
     const getTasksForDay = (date: Date) => {
         const dayStart = new Date(date);
         dayStart.setHours(0,0,0,0);
@@ -558,16 +302,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         });
     };
 
-    const weekDaysHeader = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    const weekDaysHeader = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
     // Determine grid columns based on monthsToShow
     let gridColsClass = "flex flex-col gap-8";
-    if (!isPdf && monthsToShow > 1) {
-       gridColsClass = "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6";
-       if (monthsToShow >= 6) gridColsClass = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4";
+    if (!isPdf && monthsToShow === 4) {
+      gridColsClass = "grid grid-cols-1 md:grid-cols-2 gap-6";
+    } else if (!isPdf && monthsToShow > 1) {
+      gridColsClass = "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6";
     }
     if (isPdf) {
-        // PDF Layout: For 12 months, maybe 3x4?
         gridColsClass = "grid grid-cols-3 gap-4";
         if (monthsToShow === 1) gridColsClass = "block";
     }
@@ -579,9 +323,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     key={`${monthData.year}-${monthData.monthIndex}`} 
                     className={`border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm h-fit ${isPdf ? 'break-inside-avoid border-2 border-slate-800' : ''}`}
                 >
-                    {/* Month Header - Now Inside Each Card */}
-                    <div className={`py-2 px-4 border-b border-slate-200 font-bold text-slate-700 text-center ${isPdf ? 'bg-slate-100 text-lg' : 'bg-slate-50'}`}>
-                         {monthData.monthLabel}
+                    {/* Month Header — cliquable en vue 4 mois */}
+                    <div
+                      className={`py-2 px-4 border-b border-slate-200 font-bold text-slate-700 text-center ${isPdf ? 'bg-slate-100 text-lg' : 'bg-slate-50'} ${monthsToShow === 4 && !isPdf ? 'cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors select-none' : ''}`}
+                      onClick={() => {
+                        if (monthsToShow === 4 && !isPdf) {
+                          setCurrentDate(new Date(monthData.year, monthData.monthIndex, 1));
+                          setMonthsToShow(1);
+                        }
+                      }}
+                    >
+                      {monthData.monthLabel}
+                      {monthsToShow === 4 && !isPdf && <span className="ml-1 text-xs text-slate-400 font-normal">↗</span>}
                     </div>
 
                     {/* Week Header */}
@@ -636,6 +389,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
                                 setEditingTaskId(null);
                                 setIsViewOnly(false);
+                                setIsAllDay(true);
                                 setIsModalOpen(true);
                               }
                             }}
@@ -784,7 +538,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const MiniCalendarSelector = () => {
     const grid = generateMonthGrid(miniCalendarMonth, 0);
-    const weekDays = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    const weekDays = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
     const isSelected = (date: Date) => selectedTaskDays.has(date.setHours(0,0,0,0));
 
     return (
@@ -1056,51 +810,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-2 md:gap-0 z-20 shadow-sm">
-        {/* Ligne info mobile : nom calendrier + compte */}
-        {isMobile && (
-          <div className="flex items-center justify-between w-full">
-            <div className="flex flex-col min-w-0 max-w-[60%]">
-              <span className="text-sm font-bold text-slate-800 truncate">
-                {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
-              </span>
-              {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
-                <span className="text-xs text-slate-400 truncate flex items-center gap-0.5">
-                  <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                  {projects.find(p => p.id === currentProjectId)?.address}
-                </span>
-              )}
-            </div>
-            {(() => {
-              const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
-              const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
-              return (
-                <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium
-                  ${canEdit ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}
-                `}>
-                  {canEdit ? (
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  ) : (
-                    <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
-                  )}
-                  {canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · {userEmail ?? ''}
-                </span>
-              );
-            })()}
-          </div>
-        )}
+      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-4 md:gap-0 z-20 shadow-sm">
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="hidden lg:block">
-            <h2 className="text-xl font-bold text-slate-800 leading-tight">
-              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
-            </h2>
-            {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
-              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {projects.find(p => p.id === currentProjectId)?.address}
-              </p>
-            )}
-          </div>
+          <h2 className="text-xl font-bold text-slate-800 hidden lg:block">
+            {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
+          </h2>
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
             <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
             <span className="px-4 text-sm font-bold capitalize min-w-[140px] text-center">{allMonthsData[0]?.monthLabel}</span>
@@ -1121,11 +835,15 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-
+            {/* Toggle vue 1 mois / 4 mois */}
+            <div className="flex bg-slate-100 rounded-lg p-1">
+              <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
+              <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
+            </div>
             <div className="flex items-center gap-2">
-                <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm hidden sm:block"><Mail className="w-4 h-4" /></button>
-                <button onClick={downloadAllPDF} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm hidden sm:block">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
-                                {canEdit && !isMobile && (
+                <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm block"><Mail className="w-4 h-4" /></button>
+                <button onClick={downloadAllPDF} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm block">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
+                                {canEdit && (
 <button 
                     onClick={() => {
                     if (!canEdit) return;
@@ -1152,39 +870,12 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </div>
       </div>
 
-      <div className={`flex-1 ${isMobile ? "overflow-hidden" : "overflow-y-auto"} bg-slate-100 relative`}>
-        <div className={isMobile ? "h-full flex flex-col select-none" : "p-4 min-h-full select-none"}>
+      <div className="flex-1 overflow-y-auto bg-slate-100 relative">
+        <div className="p-4 min-h-full select-none">
           <ConflictAlert conflicts={conflicts} />
-          {!isMobile && <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} />}
-          {isMobile && mobileTab === 'calendar' && <MobileCalendarView tasksToRender={visibleTasks} />}
-          {isMobile && mobileTab === 'tasks' && <AgendaView tasksToRender={visibleTasks} />}
+          <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} />
         </div>
       </div>
-
-      {/* Barre d'onglets mobile */}
-      {isMobile && (
-        <div className="flex-none flex border-t border-slate-200 bg-white safe-area-bottom">
-          <button
-            onClick={() => setMobileTab('calendar')}
-            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
-              ${mobileTab === 'calendar' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}
-            `}
-          >
-            <CalendarIcon className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Calendrier</span>
-          </button>
-          <button
-            onClick={() => setMobileTab('tasks')}
-            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors
-              ${mobileTab === 'tasks' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}
-            `}
-          >
-            <Clock className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Tâches</span>
-          </button>
-        </div>
-      )}
-
 
       {isExporting && (
   <div className="fixed top-0 left-0 z-[-50] w-[1300px] pointer-events-none opacity-0 overflow-hidden">
@@ -1278,27 +969,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               <h3 className="text-base font-bold text-slate-800">
                 Tâches du {dayModalDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
               </h3>
-              {canEdit ? (
-                <button
-                  onClick={() => {
-                    setIsDayModalOpen(false);
-                    const start = new Date(dayModalDate); start.setHours(7,0,0,0);
-                    const end = new Date(dayModalDate); end.setHours(17,0,0,0);
-                    const startIso = start.toISOString();
-                    const endIso = end.toISOString();
-                    setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
-                    setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
-                    setEditingTaskId(null);
-                    setIsViewOnly(false);
-                    setIsModalOpen(true);
-                  }}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-full"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Ajouter
-                </button>
-              ) : (
-                <div className="w-16" />
-              )}
+              <div className="w-16" />
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
@@ -1322,11 +993,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                           onClick={() => {
                             setIsDayModalOpen(false);
                             if (canEdit) {
-                              // Admin → ouvre en mode édition complète
                               setNewTask({ ...t });
                               setSelectedTaskDays(initSelectedDaysFromRange(t.start, t.end));
                               setEditingTaskId(t.id);
                               setIsViewOnly(false);
+                              setIsAllDay(new Date(t.start).getHours() === 7 || new Date(t.start).getHours() === 0);
                               setIsModalOpen(true);
                             } else {
                               openTaskViewOnly(t);
@@ -1570,40 +1241,30 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                    <MiniCalendarSelector />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                     <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Début (H)</label>
-                        <input 
-                            type="time" 
-                            className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-center font-mono"
-                            value={newTask.start ? new Date(newTask.start).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '07:00'}
-                            onChange={(e) => {
-                                if(newTask.start) {
-                                    const [h, m] = e.target.value.split(':');
-                                    const d = new Date(newTask.start);
-                                    d.setHours(parseInt(h), parseInt(m));
-                                    setNewTask({...newTask, start: d.toISOString()});
-                                }
-                            }}
-                        />
-                     </div>
-                     <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fin (H)</label>
-                         <input 
-                            type="time" 
-                            className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-center font-mono"
-                            value={newTask.end ? new Date(newTask.end).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '17:00'}
-                            onChange={(e) => {
-                                if(newTask.end) {
-                                    const [h, m] = e.target.value.split(':');
-                                    const d = new Date(newTask.end);
-                                    d.setHours(parseInt(h), parseInt(m));
-                                    setNewTask({...newTask, end: d.toISOString()});
-                                }
-                            }}
-                        />
-                     </div>
+                {/* Toggle Jour entier */}
+                <div className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg border border-slate-200 mb-2">
+                  <span className="text-sm font-medium text-slate-700">Jour entier</span>
+                  <button type="button" onClick={() => setIsAllDay(v => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAllDay ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isAllDay ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
+                {!isAllDay && (
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Début (H)</label>
+                      <input type="time" className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-center font-mono"
+                        value={newTask.start ? new Date(newTask.start).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '07:00'}
+                        onChange={(e) => { if (newTask.start) { const [h,m] = e.target.value.split(':'); const d = new Date(newTask.start); d.setHours(parseInt(h),parseInt(m)); setNewTask({...newTask, start: d.toISOString()}); }}} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fin (H)</label>
+                      <input type="time" className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-center font-mono"
+                        value={newTask.end ? new Date(newTask.end).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '17:00'}
+                        onChange={(e) => { if (newTask.end) { const [h,m] = e.target.value.split(':'); const d = new Date(newTask.end); d.setHours(parseInt(h),parseInt(m)); setNewTask({...newTask, end: d.toISOString()}); }}} />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

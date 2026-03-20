@@ -352,7 +352,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
         {/* Liste des cartes */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {suppliers.map(supplier => {
+          {[...suppliers].sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })).map(supplier => {
               const isEditing = editingId === supplier.id;
 
               return (
@@ -388,11 +388,13 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                           </div>
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Courriel (connexion)</label>
-                          <div className="w-full p-1.5 border border-slate-200 rounded text-sm bg-slate-50 text-slate-500 flex items-center justify-between gap-2">
-                            <span>{editForm.email || '—'}</span>
-                            {editForm.email && <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">🔒 Non modifiable</span>}
-                          </div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Emails (séparés par virgule)</label>
+                          <input 
+                            type="text" 
+                            value={editForm.email || ''} 
+                            onChange={e => setEditForm({...editForm, email: e.target.value})}
+                            className="w-full p-1.5 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none bg-white"
+                          />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Couleur</label>

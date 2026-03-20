@@ -333,9 +333,17 @@ const App = () => {
     : null;
 
   // Projets visibles pour un fournisseur : seulement ceux où il a au moins une tâche
-  const visibleProjects = role === 'supplier' && supplierSelf
+  // On attend cloudDataLoaded pour éviter la liste vide pendant le chargement
+  const visibleProjects = role === 'supplier' && supplierSelf && cloudDataLoaded
     ? projects.filter(p => tasks.some(t => t.projectId === p.id && t.supplierId === supplierSelf.id))
+    : role === 'supplier' && supplierSelf && !cloudDataLoaded
+    ? [] // encore en chargement — on affiche rien plutôt qu'une liste incorrecte
     : projects;
+
+  // Projets dans la sidebar : exclure les terminés + tri alphabétique
+  const sidebarProjects = [...visibleProjects]
+    .filter(p => p.status !== 'completed')
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
 
   // cloudDataLoaded — vrai après que les données cloud soient arrivées
   useEffect(() => {
@@ -675,7 +683,7 @@ const App = () => {
           </button>
 
           <div className="pt-4 pb-2 text-xs font-bold text-slate-500 uppercase px-3">Projets</div>
-          {visibleProjects.map(p => (
+          {sidebarProjects.map(p => (
             <button key={p.id} onClick={() => { setCurrentView('calendar'); setSelectedProjectId(p.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentView === 'calendar' && selectedProjectId === p.id ? 'bg-blue-900/50 text-blue-200 border border-blue-800' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
               <div className="w-2 h-2 rounded-full bg-blue-500" />
               <span className="truncate">{p.name}</span>
