@@ -422,7 +422,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     return (
         <div className={gridColsClass}>
-            {(isMobile || !canEdit ? autoMonthsData : allMonthsData).map((monthData, idx) => (
+            {(isMobile ? autoMonthsData : (!canEdit && !isMobileScreen) ? (() => {
+              // Fournisseur desktop : auto-plage ou monthsToShow selon toggle
+              if (monthsToShow > 1) return allMonthsData; // toggle pressed by supplier
+              return autoMonthsData; // default: show all assigned months
+            })() : allMonthsData).map((monthData, idx) => (
                 <div 
                     key={`${monthData.year}-${monthData.monthIndex}`} 
                     className={`border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm h-fit ${isPdf ? 'break-inside-avoid border-2 border-slate-800' : ''}`}
@@ -1031,8 +1035,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                   ? <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                   : <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
                 }
-                <span className="hidden sm:inline">{displayName} · </span>
-                {userEmail ?? ''}
+                {displayName} · {userEmail ?? ''}
               </span>
             );
           })()}
@@ -1061,6 +1064,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             <div className="flex bg-slate-100 rounded-lg p-1">
               <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
               <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
+              {!canEdit && <button onClick={() => setMonthsToShow(12)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 12 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Tout</button>}
             </div>
           )}
           <div className="flex items-center gap-2 ml-auto">
@@ -1099,37 +1103,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       {isExporting && (
   <div className="fixed top-0 left-0 z-[-50] w-[1300px] pointer-events-none opacity-0 overflow-hidden">
     <div ref={pdfContainerRef}>
-      {/* Page 1 — Calendrier global */}
-      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id="all">
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Calendrier Global</h1>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{allMonthsData[0]?.monthLabel}</div>
-          </div>
-        </div>
-        <p className="text-slate-500">CrewFlo - Vue d'ensemble</p>
-        <CalendarGrid tasksToRender={tasks} interactive={false} isPdf={true} />
-        <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
-      </div>
-
-      {/* Page 2 — Détails des tâches (global) */}
-      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasklist" data-project-id="all">
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
-            <div className="text-slate-500 text-sm">Calendrier Global</div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{allMonthsData[0]?.monthLabel}</div>
-          </div>
-        </div>
-        <TaskDetailsTable tasksForPage={tasks} />
-        <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
-      </div>
-
-      {/* Pages par chantier */}
+      {/* Pages par chantier — pas de vue globale, toujours par chantier */}
       {projects.map((project) => (
         <React.Fragment key={project.id}>
           <div className="pdf-page bg-white" data-pdf-type="tasks" data-project-id={project.id}
@@ -1202,10 +1176,38 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                                   {isCurrent&&dayTasks.map(t=>{
                                     const sup=suppliers.find(s=>s.id===t.supplierId);
                                     const [bg2,tc] = (sup?.color||'bg-gray-200 text-gray-800').split(' ');
-                                    const bgMap: Record<string,string> = {'bg-red-200':'#fecaca','bg-orange-200':'#fed7aa','bg-amber-200':'#fde68a','bg-yellow-200':'#fef08a','bg-lime-200':'#d9f99d','bg-green-200':'#bbf7d0','bg-emerald-200':'#a7f3d0','bg-teal-200':'#99f6e4','bg-cyan-200':'#a5f3fc','bg-sky-200':'#bae6fd','bg-blue-200':'#bfdbfe','bg-indigo-200':'#c7d2fe','bg-violet-200':'#ddd6fe','bg-purple-200':'#e9d5ff','bg-pink-200':'#fbcfe8','bg-rose-200':'#fecdd3','bg-slate-200':'#e2e8f0','bg-gray-200':'#e5e7eb'};
-                                    const tcMap: Record<string,string> = {'text-red-800':'#991b1b','text-orange-800':'#9a3412','text-amber-800':'#92400e','text-yellow-800':'#854d0e','text-lime-800':'#3f6212','text-green-800':'#166534','text-emerald-800':'#065f46','text-teal-800':'#115e59','text-cyan-800':'#155e75','text-sky-800':'#075985','text-blue-800':'#1e40af','text-indigo-800':'#3730a3','text-violet-800':'#5b21b6','text-purple-800':'#6b21a8','text-pink-800':'#9d174d','text-rose-800':'#9f1239','text-slate-800':'#1e293b','text-gray-800':'#1f2937'};
-                                    const cellBg = bgMap[bg2]||'#e5e7eb';
-                                    const cellTc = tcMap[tc]||'#1f2937';
+                                    const bgMap: Record<string,string> = {
+                                      'bg-red-200':'#fecaca','bg-red-300':'#fca5a5',
+                                      'bg-orange-200':'#fed7aa','bg-orange-300':'#fdba74',
+                                      'bg-amber-200':'#fde68a','bg-amber-300':'#fcd34d',
+                                      'bg-yellow-200':'#fef08a','bg-yellow-300':'#fde047',
+                                      'bg-lime-200':'#d9f99d','bg-lime-300':'#bef264',
+                                      'bg-green-200':'#bbf7d0','bg-green-300':'#86efac',
+                                      'bg-emerald-200':'#a7f3d0','bg-emerald-300':'#6ee7b7',
+                                      'bg-teal-200':'#99f6e4','bg-teal-300':'#5eead4',
+                                      'bg-cyan-200':'#a5f3fc','bg-cyan-300':'#67e8f9',
+                                      'bg-sky-200':'#bae6fd','bg-sky-300':'#7dd3fc',
+                                      'bg-blue-200':'#bfdbfe','bg-blue-300':'#93c5fd',
+                                      'bg-indigo-200':'#c7d2fe','bg-indigo-300':'#a5b4fc',
+                                      'bg-violet-200':'#ddd6fe','bg-violet-300':'#c4b5fd',
+                                      'bg-purple-200':'#e9d5ff','bg-purple-300':'#d8b4fe',
+                                      'bg-pink-200':'#fbcfe8','bg-pink-300':'#f9a8d4',
+                                      'bg-rose-200':'#fecdd3','bg-rose-300':'#fda4af',
+                                      'bg-slate-200':'#e2e8f0','bg-gray-200':'#e5e7eb',
+                                    };
+                                    const tcMap: Record<string,string> = {
+                                      'text-red-800':'#991b1b','text-orange-800':'#9a3412',
+                                      'text-amber-800':'#92400e','text-yellow-800':'#854d0e',
+                                      'text-lime-800':'#3f6212','text-green-800':'#166534',
+                                      'text-emerald-800':'#065f46','text-teal-800':'#115e59',
+                                      'text-cyan-800':'#155e75','text-sky-800':'#075985',
+                                      'text-blue-800':'#1e40af','text-indigo-800':'#3730a3',
+                                      'text-violet-800':'#5b21b6','text-purple-800':'#6b21a8',
+                                      'text-pink-800':'#9d174d','text-rose-800':'#9f1239',
+                                      'text-slate-800':'#1e293b','text-gray-800':'#1f2937',
+                                    };
+                                    const cellBg = bgMap[bg2] || '#bfdbfe';
+                                    const cellTc = tcMap[tc] || '#1e40af';
                                     const init = sup ? getInit(sup.name) : '?';
                                     return (
                                       <div key={t.id} style={{background:cellBg,color:cellTc,borderRadius:'3px',padding:`1px 3px`,marginBottom:'1px',fontSize:`${TASK_FONT}px`,fontWeight:'bold',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',lineHeight:1.3}}>
