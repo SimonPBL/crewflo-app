@@ -502,8 +502,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             </div>
                             {/* Congé CCQ */}
                             {isCurrentMonth && !isPdf && getCCQHoliday(day) && (
-                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight bg-orange-100 border border-orange-300" style={{fontSize:'6px', color:'#c2410c'}}>
-                                CCQ
+                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight bg-orange-100 border border-orange-300 truncate" style={{fontSize:'6px', color:'#c2410c'}} title={getCCQHoliday(day) ?? ''}>
+                                {getCCQHoliday(day)}
                               </div>
                             )}
                             {isPdf && getCCQHoliday(day) && (
