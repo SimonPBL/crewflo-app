@@ -13,10 +13,12 @@ interface CalendarViewProps {
   suppliers: Supplier[];
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  currentProjectId: string | null; // null means 'all projects' (Master View)
+  currentProjectId: string | null;
   canEdit: boolean;
   onUpdateSupplierNote?: (taskId: string, note: { text: string; authorName: string; authorId: string; updatedAt: string }) => void;
   supplierSelf?: { id: string; name: string } | null;
+  userEmail?: string;
+  userRole?: string;
 }
 
 // ── Congés CCQ ─────────────────────────────────────────────────
@@ -94,7 +96,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   currentProjectId,
   canEdit,
   onUpdateSupplierNote,
-  supplierSelf
+  supplierSelf,
+  userEmail,
+  userRole,
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthsToShow, setMonthsToShow] = useState<number>(1); // 1, 3, 6, 12
@@ -117,6 +121,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [pdfSelectedProject, setPdfSelectedProject] = useState<string>('all');
   const [pdfIncludeTasks, setPdfIncludeTasks] = useState(true);
   const [pdfIncludeFinitions, setPdfIncludeFinitions] = useState(false);
+  const [pdfIncludeTaskList, setPdfIncludeTaskList] = useState(true);
   const [finishingsMap, setFinishingsMap] = useState<Record<string, any>>({});
   const [filterSupplierId, setFilterSupplierId] = useState<string>('all');
 
@@ -818,12 +823,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const allPages = Array.from(pdfContainerRef.current.querySelectorAll('.pdf-page'));
       const pages = allPages.filter(page => {
         const el = page as HTMLElement;
-        const isTaskPage = el.dataset.pdfType === 'tasks' || !el.dataset.pdfType;
-        const isFinPage = el.dataset.pdfType === 'finitions';
+        const pdfType = el.dataset.pdfType;
+        const isCalendarPage = pdfType === 'tasks' || !pdfType;
+        const isTaskListPage = pdfType === 'tasklist';
+        const isFinPage = pdfType === 'finitions';
         const pageProject = el.dataset.projectId;
-        if (filterProjectId && pageProject && pageProject !== filterProjectId) return false;
+        if (filterProjectId && pageProject && pageProject !== 'all' && pageProject !== filterProjectId) return false;
         if (isFinPage && !includeFinitions) return false;
-        if (isTaskPage && !includeTasks) return false;
+        if (isCalendarPage && !includeTasks) return false;
+        if (isTaskListPage && !includeTaskList) return false;
         return true;
       });
       for (let i = 0; i < pages.length; i++) {
@@ -979,11 +987,68 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-4 md:gap-0 z-20 shadow-sm">
-        <div className="flex items-center gap-4 flex-wrap">
-          <h2 className="text-xl font-bold text-slate-800 hidden lg:block">
-            {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
-          </h2>
+      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-2 md:gap-0 z-20 shadow-sm">
+        {/* Barre info : nom calendrier + compte connecté */}
+        <div className="flex items-center justify-between w-full md:hidden">
+          <div className="flex flex-col min-w-0 max-w-[55%]">
+            <span className="text-sm font-bold text-slate-800 truncate">
+              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
+            </span>
+            {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
+              <span className="text-xs text-slate-400 truncate flex items-center gap-0.5">
+                <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                {projects.find(p => p.id === currentProjectId)?.address}
+              </span>
+            )}
+          </div>
+          {(() => {
+            const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
+            const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
+            return (
+              <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium flex-shrink-0
+                ${canEdit ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                {canEdit
+                  ? <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                  : <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
+                }
+                {canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · {userEmail ?? ''}
+              </span>
+            );
+          })()}
+        </div>
+        {/* Desktop : nom chantier + infos compte à droite */}
+        <div className="hidden md:flex items-center gap-4 flex-wrap flex-1">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 leading-tight">
+              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
+            </h2>
+            {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {projects.find(p => p.id === currentProjectId)?.address}
+              </p>
+            )}
+          </div>
+        </div>
+        {/* Compte connecté — desktop, affiché en haut à droite */}
+        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+          {(() => {
+            const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
+            const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
+            return (
+              <span className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium border
+                ${canEdit ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                {canEdit
+                  ? <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                  : <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
+                }
+                {canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · {userEmail ?? ''}
+              </span>
+            );
+          })()}
+        </div>
+        {/* Navigation mois — visible partout */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
             <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
             <span className="px-4 text-sm font-bold capitalize min-w-[140px] text-center">
@@ -1071,7 +1136,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       </div>
 
       {/* Page 2 — Détails des tâches (global) */}
-      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id="all">
+      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasklist" data-project-id="all">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
@@ -1178,7 +1243,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             })()}
           </div>
 
-          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id={project.id}>
+          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasklist" data-project-id={project.id}>
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
@@ -1590,8 +1655,15 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                   <label className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
                     <input type="checkbox" checked={pdfIncludeTasks} onChange={e => setPdfIncludeTasks(e.target.checked)} className="w-4 h-4 accent-blue-600" />
                     <div>
-                      <div className="text-sm font-medium text-slate-700">Calendrier des tâches</div>
+                      <div className="text-sm font-medium text-slate-700">Calendrier visuel</div>
                       <div className="text-xs text-slate-400">Grille mensuelle avec les tâches planifiées</div>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={pdfIncludeTaskList ?? true} onChange={e => setPdfIncludeTaskList(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                    <div>
+                      <div className="text-sm font-medium text-slate-700">Liste des tâches</div>
+                      <div className="text-xs text-slate-400">Tableau détaillé : fournisseur, dates, titre, notes</div>
                     </div>
                   </label>
                   <label className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
@@ -1607,10 +1679,10 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             <div className="px-4 pb-4 pt-2 flex gap-2">
               <button onClick={() => setIsPdfModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Annuler</button>
               <button
-                disabled={!pdfIncludeTasks && !pdfIncludeFinitions}
+                disabled={!pdfIncludeTasks && !pdfIncludeFinitions && !(pdfIncludeTaskList ?? true)}
                 onClick={async () => {
                   setIsPdfModalOpen(false);
-                  await downloadAllPDF(pdfSelectedProject === 'all' ? undefined : pdfSelectedProject, pdfIncludeTasks, pdfIncludeFinitions);
+                  await downloadAllPDF(pdfSelectedProject === 'all' ? undefined : pdfSelectedProject, pdfIncludeTasks, pdfIncludeFinitions, pdfIncludeTaskList ?? true);
                 }}
                 className="flex-1 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 disabled:opacity-40 flex items-center justify-center gap-2"
               >
