@@ -324,23 +324,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return grids;
   }, [currentDate, monthsToShow]);
 
-  // Sur mobile : calculer la plage de mois couverts par les tâches visibles
-  const mobileMonthsData = useMemo(() => {
-    if (!isMobileScreen) return allMonthsData;
-    const dates = visibleTasks.flatMap(t => [new Date(t.start), new Date(t.end)]);
-    if (dates.length === 0) return [generateMonthGrid(currentDate, 0)];
-    const minD = new Date(Math.min(...dates.map(d => d.getTime())));
-    const maxD = new Date(Math.max(...dates.map(d => d.getTime())));
-    const start = new Date(minD.getFullYear(), minD.getMonth(), 1);
-    const end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
-    const grids = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      grids.push(generateMonthGrid(cur, 0));
-      cur.setMonth(cur.getMonth() + 1);
-    }
-    return grids;
-  }, [isMobileScreen, visibleTasks, currentDate, allMonthsData]);
 
   // Détection des conflits (Global)
   const conflicts = useMemo(() => {
@@ -975,6 +958,24 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     if (filterSupplierId !== 'all') filtered = filtered.filter(t => t.supplierId === filterSupplierId);
     return filtered;
   }, [tasks, currentProjectId, filterSupplierId]);
+
+  // Sur mobile : calculer la plage de mois couverts par les tâches visibles
+  const mobileMonthsData = useMemo(() => {
+    if (!isMobileScreen) return allMonthsData;
+    const dates = visibleTasks.flatMap((t: any) => [new Date(t.start), new Date(t.end)]);
+    if (dates.length === 0) return [generateMonthGrid(currentDate, 0)];
+    const minD = new Date(Math.min(...dates.map((d: Date) => d.getTime())));
+    const maxD = new Date(Math.max(...dates.map((d: Date) => d.getTime())));
+    const start = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    const end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
+    const grids = [];
+    const cur = new Date(start);
+    while (cur <= end) {
+      grids.push(generateMonthGrid(cur, 0));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return grids;
+  }, [isMobileScreen, visibleTasks, currentDate, allMonthsData]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
