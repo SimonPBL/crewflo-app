@@ -1250,6 +1250,57 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                       );
                     })}
                   </div>
+                  {/* Légende des fournisseurs */}
+                  {(() => {
+                    const supplierIds = [...new Set(projectTasks.map(t => t.supplierId))];
+                    const legendSuppliers = supplierIds.map(id => suppliers.find(s => s.id === id)).filter(Boolean);
+                    if (legendSuppliers.length === 0) return null;
+                    return (
+                      <div style={{marginTop:'10px',padding:'8px 12px',background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'6px',display:'flex',flexWrap:'wrap',gap:'12px',alignItems:'center'}}>
+                        <div style={{fontSize:'10px',fontWeight:'bold',color:'#475569',marginRight:'4px'}}>Légende :</div>
+                        {legendSuppliers.map((sup: any) => {
+                          const parts = (sup.color || 'bg-gray-200 text-gray-800').split(' ');
+                          const bg2 = parts[0];
+                          const bgMap: Record<string,string> = {
+                            'bg-red-200':'#fecaca','bg-orange-200':'#fed7aa','bg-amber-200':'#fde68a',
+                            'bg-yellow-200':'#fef08a','bg-lime-200':'#d9f99d','bg-green-200':'#bbf7d0',
+                            'bg-emerald-200':'#a7f3d0','bg-teal-200':'#99f6e4','bg-cyan-200':'#a5f3fc',
+                            'bg-sky-200':'#bae6fd','bg-blue-200':'#bfdbfe','bg-indigo-200':'#c7d2fe',
+                            'bg-violet-200':'#ddd6fe','bg-purple-200':'#e9d5ff','bg-fuchsia-200':'#f5d0fe',
+                            'bg-pink-200':'#fbcfe8','bg-rose-200':'#fecdd3','bg-slate-200':'#e2e8f0',
+                            'bg-gray-200':'#e5e7eb',
+                            'bg-red-400':'#f87171','bg-orange-400':'#fb923c','bg-amber-400':'#fbbf24',
+                            'bg-lime-400':'#a3e635','bg-green-500':'#22c55e','bg-teal-500':'#14b8a6',
+                            'bg-cyan-500':'#06b6d4','bg-blue-500':'#3b82f6','bg-indigo-500':'#6366f1',
+                            'bg-purple-500':'#a855f7','bg-pink-500':'#ec4899',
+                          };
+                          const borderMap: Record<string,string> = {
+                            'bg-red-200':'#fca5a5','bg-orange-200':'#fdba74','bg-amber-200':'#fcd34d',
+                            'bg-yellow-200':'#fde047','bg-lime-200':'#bef264','bg-green-200':'#86efac',
+                            'bg-emerald-200':'#6ee7b7','bg-teal-200':'#5eead4','bg-cyan-200':'#67e8f9',
+                            'bg-sky-200':'#7dd3fc','bg-blue-200':'#93c5fd','bg-indigo-200':'#a5b4fc',
+                            'bg-violet-200':'#c4b5fd','bg-purple-200':'#d8b4fe','bg-fuchsia-200':'#e879f9',
+                            'bg-pink-200':'#f9a8d4','bg-rose-200':'#fda4af',
+                            'bg-red-400':'#ef4444','bg-orange-400':'#f97316','bg-amber-400':'#f59e0b',
+                            'bg-lime-400':'#84cc16','bg-green-500':'#16a34a','bg-teal-500':'#0d9488',
+                            'bg-cyan-500':'#0891b2','bg-blue-500':'#2563eb','bg-indigo-500':'#4f46e5',
+                            'bg-purple-500':'#9333ea','bg-pink-500':'#db2777',
+                          };
+                          const init = sup.name.trim().split(/\s+/).slice(0,3).map((w:string)=>w[0]).join('').toUpperCase();
+                          const cellBg = bgMap[bg2] ?? '#ddd6fe';
+                          const cellBorder = borderMap[bg2] ?? '#a78bfa';
+                          return (
+                            <div key={sup.id} style={{display:'flex',alignItems:'center',gap:'5px'}}>
+                              <div style={{width:'18px',height:'18px',borderRadius:'3px',background:cellBg,border:`1.5px solid ${cellBorder}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'8px',fontWeight:'bold',color:'#1e293b',flexShrink:0}}>
+                                {init}
+                              </div>
+                              <span style={{fontSize:'10px',color:'#334155',fontWeight:'500'}}>{sup.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   <div style={{fontSize:'10px',color:'#94a3b8',textAlign:'center',marginTop:'8px'}}>CrewFlo — Généré le {new Date().toLocaleString()}</div>
                 </>
               );
