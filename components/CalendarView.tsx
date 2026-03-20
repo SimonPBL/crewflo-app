@@ -1126,9 +1126,9 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 : startMonth.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
               // Initiales fournisseur (max 3 lettres)
               const getInit = (name: string) => name.trim().split(/\s+/).slice(0,3).map((w:string)=>w[0]).join('').toUpperCase();
-              const CELL_H = months.length <= 2 ? 80 : months.length <= 4 ? 64 : months.length <= 6 ? 52 : 42;
-              const FONT = months.length <= 4 ? 9 : 7;
-              const TASK_FONT = months.length <= 4 ? 8 : 7;
+              const CELL_H = months.length <= 2 ? 100 : months.length <= 4 ? 80 : months.length <= 6 ? 62 : 50;
+              const FONT = months.length <= 4 ? 10 : 8;
+              const TASK_FONT = months.length <= 4 ? 10 : 8;
               return (
                 <>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px',borderBottom:'2px solid #1e293b',paddingBottom:'8px'}}>
@@ -1172,46 +1172,72 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                               const bg = !isCurrent?'#f8fafc':ccq?'#fff7ed':isWE?'#eff6ff':'#ffffff';
                               return (
                                 <div key={i} style={{borderRight:'1px solid #f1f5f9',borderBottom:'1px solid #f1f5f9',minHeight:`${CELL_H}px`,background:bg,padding:'2px'}}>
-                                  <div style={{textAlign:'right',fontSize:`${FONT}px`,fontWeight:'bold',color:isCurrent?'#475569':'#cbd5e1',lineHeight:1,marginBottom:'1px'}}>{day.getDate()}</div>
+                                  <div style={{textAlign:'right',fontSize:`${FONT}px`,fontWeight:'bold',color:isCurrent?'#334155':'#cbd5e1',lineHeight:1,marginBottom:'2px',background:'rgba(255,255,255,0.85)',borderRadius:'2px',padding:'0 1px',display:'inline-block',float:'right'}}>{day.getDate()}</div>
+                                  <div style={{clear:'both'}}/>
                                   {isCurrent&&ccq&&<div style={{fontSize:'5px',color:'#c2410c',background:'#ffedd5',borderRadius:'2px',padding:'0 2px',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',marginBottom:'1px'}}>CCQ</div>}
                                   {isCurrent&&dayTasks.map(t=>{
                                     const sup=suppliers.find(s=>s.id===t.supplierId);
-                                    const [bg2,tc] = (sup?.color||'bg-gray-200 text-gray-800').split(' ');
+                                    const colorStr = sup?.color || 'bg-gray-200 text-gray-800 border-gray-300';
+                                    const parts = colorStr.split(' ');
+                                    const bg2 = parts[0] || 'bg-gray-200';
+                                    const tc = parts[1] || 'text-gray-800';
+                                    // Mapping complet de toutes les couleurs CrewFlo
                                     const bgMap: Record<string,string> = {
-                                      'bg-red-200':'#fecaca','bg-red-300':'#fca5a5',
-                                      'bg-orange-200':'#fed7aa','bg-orange-300':'#fdba74',
-                                      'bg-amber-200':'#fde68a','bg-amber-300':'#fcd34d',
-                                      'bg-yellow-200':'#fef08a','bg-yellow-300':'#fde047',
-                                      'bg-lime-200':'#d9f99d','bg-lime-300':'#bef264',
-                                      'bg-green-200':'#bbf7d0','bg-green-300':'#86efac',
-                                      'bg-emerald-200':'#a7f3d0','bg-emerald-300':'#6ee7b7',
-                                      'bg-teal-200':'#99f6e4','bg-teal-300':'#5eead4',
-                                      'bg-cyan-200':'#a5f3fc','bg-cyan-300':'#67e8f9',
-                                      'bg-sky-200':'#bae6fd','bg-sky-300':'#7dd3fc',
-                                      'bg-blue-200':'#bfdbfe','bg-blue-300':'#93c5fd',
-                                      'bg-indigo-200':'#c7d2fe','bg-indigo-300':'#a5b4fc',
-                                      'bg-violet-200':'#ddd6fe','bg-violet-300':'#c4b5fd',
-                                      'bg-purple-200':'#e9d5ff','bg-purple-300':'#d8b4fe',
-                                      'bg-pink-200':'#fbcfe8','bg-pink-300':'#f9a8d4',
-                                      'bg-rose-200':'#fecdd3','bg-rose-300':'#fda4af',
-                                      'bg-slate-200':'#e2e8f0','bg-gray-200':'#e5e7eb',
+                                      // Teintes claires -200
+                                      'bg-red-200':'#fecaca','bg-orange-200':'#fed7aa','bg-amber-200':'#fde68a',
+                                      'bg-yellow-200':'#fef08a','bg-lime-200':'#d9f99d','bg-green-200':'#bbf7d0',
+                                      'bg-emerald-200':'#a7f3d0','bg-teal-200':'#99f6e4','bg-cyan-200':'#a5f3fc',
+                                      'bg-sky-200':'#bae6fd','bg-blue-200':'#bfdbfe','bg-indigo-200':'#c7d2fe',
+                                      'bg-violet-200':'#ddd6fe','bg-purple-200':'#e9d5ff','bg-fuchsia-200':'#f5d0fe',
+                                      'bg-pink-200':'#fbcfe8','bg-rose-200':'#fecdd3','bg-slate-200':'#e2e8f0',
+                                      'bg-gray-200':'#e5e7eb',
+                                      // Teintes saturées -400 / -500
+                                      'bg-red-400':'#f87171','bg-orange-400':'#fb923c','bg-amber-400':'#fbbf24',
+                                      'bg-lime-400':'#a3e635','bg-green-500':'#22c55e','bg-teal-500':'#14b8a6',
+                                      'bg-cyan-500':'#06b6d4','bg-blue-500':'#3b82f6','bg-indigo-500':'#6366f1',
+                                      'bg-purple-500':'#a855f7','bg-pink-500':'#ec4899',
                                     };
                                     const tcMap: Record<string,string> = {
-                                      'text-red-800':'#991b1b','text-orange-800':'#9a3412',
-                                      'text-amber-800':'#92400e','text-yellow-800':'#854d0e',
-                                      'text-lime-800':'#3f6212','text-green-800':'#166534',
-                                      'text-emerald-800':'#065f46','text-teal-800':'#115e59',
-                                      'text-cyan-800':'#155e75','text-sky-800':'#075985',
-                                      'text-blue-800':'#1e40af','text-indigo-800':'#3730a3',
-                                      'text-violet-800':'#5b21b6','text-purple-800':'#6b21a8',
+                                      'text-red-800':'#991b1b','text-orange-800':'#9a3412','text-amber-800':'#92400e',
+                                      'text-yellow-800':'#854d0e','text-lime-800':'#3f6212','text-green-800':'#166534',
+                                      'text-emerald-800':'#065f46','text-teal-800':'#115e59','text-cyan-800':'#155e75',
+                                      'text-sky-800':'#075985','text-blue-800':'#1e40af','text-indigo-800':'#3730a3',
+                                      'text-violet-800':'#5b21b6','text-purple-800':'#6b21a8','text-fuchsia-800':'#86198f',
                                       'text-pink-800':'#9d174d','text-rose-800':'#9f1239',
                                       'text-slate-800':'#1e293b','text-gray-800':'#1f2937',
+                                      'text-white':'#ffffff',
                                     };
-                                    const cellBg = bgMap[bg2] || '#bfdbfe';
-                                    const cellTc = tcMap[tc] || '#1e40af';
+                                    const cellBg = bgMap[bg2] ?? '#ddd6fe';
+                                    const cellTc = tcMap[tc] ?? '#5b21b6';
+                                    // Bordure légèrement plus foncée pour démarquer du fond weekend
+                                    const borderMap: Record<string,string> = {
+                                      'bg-red-200':'#fca5a5','bg-orange-200':'#fdba74','bg-amber-200':'#fcd34d',
+                                      'bg-yellow-200':'#fde047','bg-lime-200':'#bef264','bg-green-200':'#86efac',
+                                      'bg-emerald-200':'#6ee7b7','bg-teal-200':'#5eead4','bg-cyan-200':'#67e8f9',
+                                      'bg-sky-200':'#7dd3fc','bg-blue-200':'#93c5fd','bg-indigo-200':'#a5b4fc',
+                                      'bg-violet-200':'#c4b5fd','bg-purple-200':'#d8b4fe','bg-fuchsia-200':'#e879f9',
+                                      'bg-pink-200':'#f9a8d4','bg-rose-200':'#fda4af',
+                                      'bg-red-400':'#ef4444','bg-orange-400':'#f97316','bg-amber-400':'#f59e0b',
+                                      'bg-lime-400':'#84cc16','bg-green-500':'#16a34a','bg-teal-500':'#0d9488',
+                                      'bg-cyan-500':'#0891b2','bg-blue-500':'#2563eb','bg-indigo-500':'#4f46e5',
+                                      'bg-purple-500':'#9333ea','bg-pink-500':'#db2777',
+                                    };
+                                    const cellBorder = borderMap[bg2] ?? '#a78bfa';
                                     const init = sup ? getInit(sup.name) : '?';
+                                    const taskFontSize = months.length <= 4 ? '10px' : '8px';
+                                    const taskPadH = months.length <= 4 ? '2px 4px' : '1px 2px';
+                                    const taskMinH = months.length <= 4 ? '18px' : '14px';
                                     return (
-                                      <div key={t.id} style={{background:cellBg,color:cellTc,borderRadius:'3px',padding:`1px 3px`,marginBottom:'1px',fontSize:`${TASK_FONT}px`,fontWeight:'bold',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',lineHeight:1.3}}>
+                                      <div key={t.id} style={{
+                                        background:cellBg, color:cellTc,
+                                        border:`1.5px solid ${cellBorder}`,
+                                        borderRadius:'3px', padding:taskPadH,
+                                        marginBottom:'2px', fontSize:taskFontSize,
+                                        fontWeight:'bold', overflow:'hidden',
+                                        whiteSpace:'nowrap', textOverflow:'ellipsis',
+                                        lineHeight:1.4, minHeight:taskMinH,
+                                        display:'flex', alignItems:'center',
+                                      }}>
                                         {init}
                                       </div>
                                     );
