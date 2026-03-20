@@ -812,7 +812,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       }
       setFinishingsMap(finMap);
       setIsExporting(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 800));
       if (!pdfContainerRef.current) throw new Error("Container not found");
       
       // Activer la compression dans jsPDF
@@ -1065,6 +1065,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
               <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
               {!canEdit && <button onClick={() => setMonthsToShow(12)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 12 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Tout</button>}
+              {canEdit && <button onClick={() => setMonthsToShow(12)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 12 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Tout</button>}
             </div>
           )}
           <div className="flex items-center gap-2 ml-auto">
@@ -1100,9 +1101,9 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </div>
       </div>
 
-      {isExporting && (
-  <div className="fixed top-0 left-0 z-[-50] w-[1300px] pointer-events-none opacity-0 overflow-hidden">
-    <div ref={pdfContainerRef}>
+      {/* Conteneur PDF — toujours rendu mais hors écran pour html2canvas */}
+      <div style={{position:'fixed', top:0, left:'-9999px', width:'1400px', pointerEvents:'none', zIndex:-100}}>
+        <div ref={pdfContainerRef}>
       {/* Pages par chantier — pas de vue globale, toujours par chantier */}
       {projects.map((project) => (
         <React.Fragment key={project.id}>
@@ -1259,8 +1260,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </React.Fragment>
       ))}
     </div>
-  </div>
-)}
+      </div>
 
       {/* Day Details Modal (Supplier) */}
       {isDayModalOpen && dayModalDate && (
