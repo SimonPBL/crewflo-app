@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Project, Supplier, Task, Conflict } from '../types';
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin } from 'lucide-react';
 import { ConflictAlert } from './ConflictAlert';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import html2canvas from 'html2canvas';
@@ -791,7 +791,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setIsEmailModalOpen(false);
   };
 
-  const downloadAllPDF = async (filterProjectId?: string, includeTasks = true, includeFinitions = false) => {
+  const downloadAllPDF = async (filterProjectId?: string, includeTasks = true, includeFinitions = false, includeTaskList = true) => {
     try {
       // Récupérer les finitions de tous les chantiers depuis Supabase
       const supabase = getSupabase();
@@ -970,19 +970,30 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
   // Sur mobile : calculer la plage de mois couverts par les tâches visibles
   const mobileMonthsData = useMemo(() => {
     if (!isMobileScreen) return allMonthsData;
-    const dates = visibleTasks.flatMap((t: any) => [new Date(t.start), new Date(t.end)]);
-    if (dates.length === 0) return [generateMonthGrid(currentDate, 0)];
-    const minD = new Date(Math.min(...dates.map((d: Date) => d.getTime())));
-    const maxD = new Date(Math.max(...dates.map((d: Date) => d.getTime())));
-    const start = new Date(minD.getFullYear(), minD.getMonth(), 1);
-    const end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
-    const grids = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      grids.push(generateMonthGrid(cur, 0));
-      cur.setMonth(cur.getMonth() + 1);
+    try {
+      const dates = visibleTasks
+        .flatMap((t: any) => [new Date(t.start), new Date(t.end)])
+        .filter(d => !isNaN(d.getTime()));
+      if (dates.length === 0) return [generateMonthGrid(currentDate, 0)];
+      const minTs = Math.min(...dates.map(d => d.getTime()));
+      const maxTs = Math.max(...dates.map(d => d.getTime()));
+      if (isNaN(minTs) || isNaN(maxTs)) return [generateMonthGrid(currentDate, 0)];
+      const minD = new Date(minTs);
+      const maxD = new Date(maxTs);
+      const start = new Date(minD.getFullYear(), minD.getMonth(), 1);
+      const end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
+      const grids = [];
+      const cur = new Date(start);
+      let safety = 0;
+      while (cur <= end && safety < 36) {
+        grids.push(generateMonthGrid(cur, 0));
+        cur.setMonth(cur.getMonth() + 1);
+        safety++;
+      }
+      return grids.length > 0 ? grids : [generateMonthGrid(currentDate, 0)];
+    } catch {
+      return [generateMonthGrid(currentDate, 0)];
     }
-    return grids;
   }, [isMobileScreen, visibleTasks, currentDate, allMonthsData]);
 
   return (
