@@ -422,7 +422,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     return (
         <div className={gridColsClass}>
-            {(isMobile ? mobileMonthsData : allMonthsData).map((monthData, idx) => (
+            {(isMobile || !canEdit ? autoMonthsData : allMonthsData).map((monthData, idx) => (
                 <div 
                     key={`${monthData.year}-${monthData.monthIndex}`} 
                     className={`border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm h-fit ${isPdf ? 'break-inside-avoid border-2 border-slate-800' : ''}`}
@@ -835,19 +835,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         return true;
       });
       for (let i = 0; i < pages.length; i++) {
-          const canvas = await html2canvas(pages[i] as HTMLElement, { 
-              scale: 1.5, // 1.5 est un bon compromis qualité/taille
-              backgroundColor: '#ffffff' 
+          const el = pages[i] as HTMLElement;
+          const isLandscape = el.style.width === '1400px' || el.dataset.pdfType === 'tasks';
+          const canvas = await html2canvas(el, {
+              scale: 1.2,
+              backgroundColor: '#ffffff',
+              width: isLandscape ? 1400 : undefined,
+              windowWidth: isLandscape ? 1400 : undefined,
           });
-          
-          if (i > 0) pdf.addPage('a4', 'landscape');
-          
-          // Conversion en JPEG (image/jpeg) avec qualité 0.75 (75%) au lieu de PNG
-          // Le PNG est très lourd pour les images complexes. Le JPEG réduit massivement la taille.
-          const imgData = canvas.toDataURL('image/jpeg', 0.75);
-          
-          // Ajout avec compression FAST
-          pdf.addImage(imgData, 'JPEG', 0, 0, 297, (canvas.height * 297) / canvas.width, undefined, 'FAST');
+
+          if (i > 0) pdf.addPage('a4', isLandscape ? 'landscape' : 'portrait');
+
+          const pageW = isLandscape ? 297 : 210;
+          const pageH = isLandscape ? 210 : 297;
+          const imgData = canvas.toDataURL('image/jpeg', 0.80);
+          const ratio = Math.min(pageW / (canvas.width / 3.7795), pageH / (canvas.height / 3.7795));
+          const w = (canvas.width / 3.7795) * ratio;
+          const h = (canvas.height / 3.7795) * ratio;
+          pdf.addImage(imgData, 'JPEG', (pageW-w)/2, 0, w, h, undefined, 'FAST');
       }
       pdf.save(`Rapport_Chantier_${new Date().toISOString().slice(0,10)}.pdf`);
     } catch (err) {
@@ -967,9 +972,10 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     return filtered;
   }, [tasks, currentProjectId, filterSupplierId]);
 
-  // Sur mobile : calculer la plage de mois couverts par les tâches visibles
-  const mobileMonthsData = useMemo(() => {
-    if (!isMobileScreen) return allMonthsData;
+  // Fournisseurs ET mobile : afficher tous les mois couverts par les tâches
+  const autoMonthsData = useMemo(() => {
+    const useAuto = isMobileScreen || !canEdit; // mobile OU fournisseur
+    if (!useAuto) return allMonthsData;
     try {
       const dates = visibleTasks
         .flatMap((t: any) => [new Date(t.start), new Date(t.end)])
@@ -994,7 +1000,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     } catch {
       return [generateMonthGrid(currentDate, 0)];
     }
-  }, [isMobileScreen, visibleTasks, currentDate, allMonthsData]);
+  }, [isMobileScreen, canEdit, visibleTasks, currentDate, allMonthsData]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
@@ -1015,8 +1021,9 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           </div>
           {/* Pastille compte connecté */}
           {(() => {
-            const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
-            const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
+            const selfSupplier = supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
+            const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? 'bg-slate-300';
+            const displayName = canEdit ? 'Admin' : (selfSupplier?.name ?? supplierSelf?.name ?? 'Fournisseur');
             return (
               <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-medium border flex-shrink-0
                 ${canEdit ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
@@ -1024,7 +1031,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                   ? <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                   : <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
                 }
-                <span className="hidden sm:inline">{canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · </span>
+                <span className="hidden sm:inline">{displayName} · </span>
                 {userEmail ?? ''}
               </span>
             );
@@ -1036,8 +1043,8 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
             <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-4 h-4" /></button>
             <span className="px-3 text-sm font-bold capitalize min-w-[130px] text-center">
-              {isMobileScreen && mobileMonthsData.length > 1
-                ? `${mobileMonthsData[0]?.monthLabel} — ${mobileMonthsData[mobileMonthsData.length-1]?.monthLabel}`
+              {(isMobileScreen || !canEdit) && autoMonthsData.length > 1
+                ? `${autoMonthsData[0]?.monthLabel} — ${autoMonthsData[autoMonthsData.length-1]?.monthLabel}`
                 : allMonthsData[0]?.monthLabel}
             </span>
             <button onClick={nextPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronRight className="w-4 h-4" /></button>
@@ -1125,85 +1132,84 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       {/* Pages par chantier */}
       {projects.map((project) => (
         <React.Fragment key={project.id}>
-          <div className="pdf-page bg-white p-8 mb-8" data-pdf-type="tasks" data-project-id={project.id}>
+          <div className="pdf-page bg-white" data-pdf-type="tasks" data-project-id={project.id}
+            style={{width:'1400px', padding:'24px', boxSizing:'border-box'}}>
             {(() => {
               const projectTasks = tasks.filter(t => t.projectId === project.id);
-              // Calculer la plage de mois couverts par les tâches du chantier
-              const dates = projectTasks.flatMap(t => [new Date(t.start), new Date(t.end)]);
-              const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : new Date();
-              const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
-              const startMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-              const endMonth = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
-              // Générer tous les mois entre start et end
+              const validDates = projectTasks.flatMap(t => [new Date(t.start), new Date(t.end)]).filter(d => !isNaN(d.getTime()));
+              const minD = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : new Date();
+              const maxD = validDates.length > 0 ? new Date(Math.max(...validDates.map(d => d.getTime()))) : new Date();
+              const startMonth = new Date(minD.getFullYear(), minD.getMonth(), 1);
+              const endMonth = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
               const months: Date[] = [];
               const cur = new Date(startMonth);
-              while (cur <= endMonth) {
-                months.push(new Date(cur));
-                cur.setMonth(cur.getMonth() + 1);
-              }
+              let s = 0;
+              while (cur <= endMonth && s < 24) { months.push(new Date(cur)); cur.setMonth(cur.getMonth()+1); s++; }
+              const cols = months.length <= 2 ? months.length : months.length <= 4 ? 2 : months.length <= 6 ? 3 : 4;
               const rangeLabel = months.length > 1
-                ? `${startMonth.toLocaleDateString('fr-FR', {month:'long', year:'numeric'})} — ${endMonth.toLocaleDateString('fr-FR', {month:'long', year:'numeric'})}`
-                : startMonth.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+                ? `${startMonth.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})} — ${endMonth.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}`
+                : startMonth.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+              // Initiales fournisseur (max 3 lettres)
+              const getInit = (name: string) => name.trim().split(/\s+/).slice(0,3).map((w:string)=>w[0]).join('').toUpperCase();
+              const CELL_H = months.length <= 2 ? 80 : months.length <= 4 ? 64 : months.length <= 6 ? 52 : 42;
+              const FONT = months.length <= 4 ? 9 : 7;
+              const TASK_FONT = months.length <= 4 ? 8 : 7;
               return (
                 <>
-                  <div className="flex justify-between items-center mb-4 border-b pb-4">
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'12px',borderBottom:'2px solid #1e293b',paddingBottom:'8px'}}>
                     <div>
-                      <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
-                      <p className="text-slate-500">{project.address}</p>
+                      <div style={{fontSize:'20px',fontWeight:'bold',color:'#0f172a'}}>{project.name}</div>
+                      {project.address && <div style={{fontSize:'11px',color:'#64748b',marginTop:'2px'}}>{project.address}</div>}
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{rangeLabel}</div>
-                    </div>
+                    <div style={{fontSize:'11px',fontWeight:'bold',background:'#f1f5f9',padding:'4px 10px',borderRadius:'6px',color:'#475569'}}>{rangeLabel}</div>
                   </div>
-                  {/* Grille compacte de tous les mois — 2 colonnes max */}
-                  <div className={`gap-2 mb-4 ${months.length === 1 ? 'grid grid-cols-1' : months.length <= 2 ? 'grid grid-cols-2' : months.length <= 4 ? 'grid grid-cols-2' : months.length <= 6 ? 'grid grid-cols-3' : 'grid grid-cols-4'}`}>
+                  <div style={{display:'grid', gridTemplateColumns:`repeat(${cols}, 1fr)`, gap:'8px'}}>
                     {months.map((monthDate) => {
-                      const year = monthDate.getFullYear();
-                      const month = monthDate.getMonth();
-                      const firstDay = new Date(year, month, 1);
-                      const dayOfWeek = firstDay.getDay();
-                      const startDate = new Date(firstDay);
-                      startDate.setDate(firstDay.getDate() - dayOfWeek);
+                      const yr = monthDate.getFullYear();
+                      const mo = monthDate.getMonth();
+                      const firstDay = new Date(yr, mo, 1);
+                      const offset = firstDay.getDay();
+                      const startD = new Date(firstDay); startD.setDate(1 - offset);
                       const days: Date[] = [];
-                      const d = new Date(startDate);
-                      for (let i = 0; i < 42; i++) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
-                      const monthLabel = monthDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-                      const weekDaysPdf = ['D','L','M','M','J','V','S'];
+                      const dd = new Date(startD);
+                      for (let i=0;i<42;i++){days.push(new Date(dd));dd.setDate(dd.getDate()+1);}
+                      const ml = monthDate.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
                       return (
-                        <div key={`${year}-${month}`} className="border border-slate-300 rounded overflow-hidden">
-                          <div className="bg-slate-800 text-white text-center py-1.5 text-sm font-bold capitalize">{monthLabel}</div>
-                          <div className="grid grid-cols-7 bg-slate-100">
-                            {weekDaysPdf.map((d,i) => <div key={i} className="text-center text-[9px] font-bold text-slate-500 py-1">{d}</div>)}
+                        <div key={`${yr}-${mo}`} style={{border:'1px solid #cbd5e1',borderRadius:'6px',overflow:'hidden'}}>
+                          <div style={{background:'#1e293b',color:'white',textAlign:'center',padding:'5px 0',fontSize:'11px',fontWeight:'bold',textTransform:'capitalize'}}>{ml}</div>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',background:'#f8fafc'}}>
+                            {['D','L','M','M','J','V','S'].map((d,i)=>(
+                              <div key={i} style={{textAlign:'center',fontSize:'8px',fontWeight:'bold',color:'#94a3b8',padding:'3px 0'}}>{d}</div>
+                            ))}
                           </div>
-                          <div className="grid grid-cols-7">
-                            {days.map((day, i) => {
-                              const isCurrentMonth = day.getMonth() === month;
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}}>
+                            {days.map((day,i) => {
+                              const isCurrent = day.getMonth()===mo;
                               const dayStr = day.toISOString().slice(0,10);
-                              const dayTasksPdf = projectTasks.filter(t => {
-                                const ts = new Date(t.start); ts.setHours(0,0,0,0);
-                                const te = new Date(t.end); te.setHours(23,59,59,999);
-                                const dc = new Date(day); dc.setHours(12,0,0,0);
-                                return dc >= ts && dc <= te;
-                              });
-                              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                              const isWE = day.getDay()===0||day.getDay()===6;
                               const ccq = CCQ_HOLIDAYS[dayStr];
+                              const dayTasks = projectTasks.filter(t=>{
+                                const ts=new Date(t.start);ts.setHours(0,0,0,0);
+                                const te=new Date(t.end);te.setHours(23,59,59,999);
+                                const dc=new Date(day);dc.setHours(12,0,0,0);
+                                return dc>=ts&&dc<=te;
+                              });
+                              const bg = !isCurrent?'#f8fafc':ccq?'#fff7ed':isWE?'#eff6ff':'#ffffff';
                               return (
-                                <div key={i} className={`border-b border-r border-slate-100 p-px
-                                  ${!isCurrentMonth ? 'bg-slate-50' : isWeekend ? 'bg-blue-50' : ccq ? 'bg-orange-50' : 'bg-white'}`}
-                                  style={{minHeight: months.length <= 2 ? '72px' : months.length <= 4 ? '52px' : months.length <= 6 ? '40px' : '30px'}}>
-                                  <div className={`text-right font-bold leading-none mb-px ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-600'}`}
-                                    style={{fontSize: months.length <= 4 ? '9px' : '7px'}}>{day.getDate()}</div>
-                                  {isCurrentMonth && ccq && (
-                                    <div className="text-orange-600 bg-orange-100 rounded truncate leading-tight mb-px" style={{fontSize:'5px'}}>{ccq.replace("Congé CCQ", "CCQ")}</div>
-                                  )}
-                                  {dayTasksPdf.map(t => {
-                                    const sup = suppliers.find(s => s.id === t.supplierId);
-                                    const colorClass = sup?.color || 'bg-gray-200 text-gray-800';
-                                    const nameShort = sup ? (sup.name.length > 12 ? sup.name.slice(0,12)+'…' : sup.name) : '?';
+                                <div key={i} style={{borderRight:'1px solid #f1f5f9',borderBottom:'1px solid #f1f5f9',minHeight:`${CELL_H}px`,background:bg,padding:'2px'}}>
+                                  <div style={{textAlign:'right',fontSize:`${FONT}px`,fontWeight:'bold',color:isCurrent?'#475569':'#cbd5e1',lineHeight:1,marginBottom:'1px'}}>{day.getDate()}</div>
+                                  {isCurrent&&ccq&&<div style={{fontSize:'5px',color:'#c2410c',background:'#ffedd5',borderRadius:'2px',padding:'0 2px',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',marginBottom:'1px'}}>CCQ</div>}
+                                  {isCurrent&&dayTasks.map(t=>{
+                                    const sup=suppliers.find(s=>s.id===t.supplierId);
+                                    const [bg2,tc] = (sup?.color||'bg-gray-200 text-gray-800').split(' ');
+                                    const bgMap: Record<string,string> = {'bg-red-200':'#fecaca','bg-orange-200':'#fed7aa','bg-amber-200':'#fde68a','bg-yellow-200':'#fef08a','bg-lime-200':'#d9f99d','bg-green-200':'#bbf7d0','bg-emerald-200':'#a7f3d0','bg-teal-200':'#99f6e4','bg-cyan-200':'#a5f3fc','bg-sky-200':'#bae6fd','bg-blue-200':'#bfdbfe','bg-indigo-200':'#c7d2fe','bg-violet-200':'#ddd6fe','bg-purple-200':'#e9d5ff','bg-pink-200':'#fbcfe8','bg-rose-200':'#fecdd3','bg-slate-200':'#e2e8f0','bg-gray-200':'#e5e7eb'};
+                                    const tcMap: Record<string,string> = {'text-red-800':'#991b1b','text-orange-800':'#9a3412','text-amber-800':'#92400e','text-yellow-800':'#854d0e','text-lime-800':'#3f6212','text-green-800':'#166534','text-emerald-800':'#065f46','text-teal-800':'#115e59','text-cyan-800':'#155e75','text-sky-800':'#075985','text-blue-800':'#1e40af','text-indigo-800':'#3730a3','text-violet-800':'#5b21b6','text-purple-800':'#6b21a8','text-pink-800':'#9d174d','text-rose-800':'#9f1239','text-slate-800':'#1e293b','text-gray-800':'#1f2937'};
+                                    const cellBg = bgMap[bg2]||'#e5e7eb';
+                                    const cellTc = tcMap[tc]||'#1f2937';
+                                    const init = sup ? getInit(sup.name) : '?';
                                     return (
-                                      <div key={t.id} className={`rounded px-0.5 mb-px truncate font-semibold leading-tight ${colorClass.split(' ').slice(0,2).join(' ')}`}
-                                        style={{fontSize: months.length <= 4 ? '8px' : '6px', paddingTop:'1px', paddingBottom:'1px'}}>
-                                        {nameShort}
+                                      <div key={t.id} style={{background:cellBg,color:cellTc,borderRadius:'3px',padding:`1px 3px`,marginBottom:'1px',fontSize:`${TASK_FONT}px`,fontWeight:'bold',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',lineHeight:1.3}}>
+                                        {init}
                                       </div>
                                     );
                                   })}
@@ -1215,7 +1221,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                       );
                     })}
                   </div>
-                  <div className="text-xs text-slate-400 text-center">CrewFlo — Généré le {new Date().toLocaleString()}</div>
+                  <div style={{fontSize:'10px',color:'#94a3b8',textAlign:'center',marginTop:'8px'}}>CrewFlo — Généré le {new Date().toLocaleString()}</div>
                 </>
               );
             })()}
