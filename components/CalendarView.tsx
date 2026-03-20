@@ -324,6 +324,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return grids;
   }, [currentDate, monthsToShow]);
 
+  // Sur mobile : calculer la plage de mois couverts par les tâches visibles
+  const mobileMonthsData = useMemo(() => {
+    if (!isMobileScreen) return allMonthsData;
+    const dates = visibleTasks.flatMap(t => [new Date(t.start), new Date(t.end)]);
+    if (dates.length === 0) return [generateMonthGrid(currentDate, 0)];
+    const minD = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxD = new Date(Math.max(...dates.map(d => d.getTime())));
+    const start = new Date(minD.getFullYear(), minD.getMonth(), 1);
+    const end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
+    const grids = [];
+    const cur = new Date(start);
+    while (cur <= end) {
+      grids.push(generateMonthGrid(cur, 0));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return grids;
+  }, [isMobileScreen, visibleTasks, currentDate, allMonthsData]);
+
   // Détection des conflits (Global)
   const conflicts = useMemo(() => {
     const foundConflicts: Conflict[] = [];
@@ -416,7 +434,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     return (
         <div className={gridColsClass}>
-            {allMonthsData.map((monthData, idx) => (
+            {(isMobile ? mobileMonthsData : allMonthsData).map((monthData, idx) => (
                 <div 
                     key={`${monthData.year}-${monthData.monthIndex}`} 
                     className={`border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm h-fit ${isPdf ? 'break-inside-avoid border-2 border-slate-800' : ''}`}
@@ -967,7 +985,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           </h2>
           <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
             <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
-            <span className="px-4 text-sm font-bold capitalize min-w-[140px] text-center">{allMonthsData[0]?.monthLabel}</span>
+            <span className="px-4 text-sm font-bold capitalize min-w-[140px] text-center">
+              {isMobileScreen && mobileMonthsData.length > 1
+                ? `${mobileMonthsData[0]?.monthLabel} — ${mobileMonthsData[mobileMonthsData.length-1]?.monthLabel}`
+                : allMonthsData[0]?.monthLabel}
+            </span>
             <button onClick={nextPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronRight className="w-5 h-5" /></button>
           </div>
           <button onClick={goToToday} className="text-xs font-medium text-blue-600 hover:text-blue-800 underline">Aujourd'hui</button>
@@ -985,11 +1007,13 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            {/* Toggle vue 1 mois / 4 mois */}
-            <div className="flex bg-slate-100 rounded-lg p-1">
-              <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
-              <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
-            </div>
+            {/* Toggle vue 1 mois / 4 mois — desktop seulement */}
+            {!isMobileScreen && (
+              <div className="flex bg-slate-100 rounded-lg p-1">
+                <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
+                <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
+              </div>
+            )}
             <div className="flex items-center gap-2">
                 <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm block"><Mail className="w-4 h-4" /></button>
                 <button onClick={() => setIsPdfModalOpen(true)} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm block" title="Télécharger PDF">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
@@ -1063,18 +1087,94 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       {/* Pages par chantier */}
       {projects.map((project) => (
         <React.Fragment key={project.id}>
-          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id={project.id}>
-            <div className="flex justify-between items-center mb-6 border-b pb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
-                <p className="text-slate-500">{project.address}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{allMonthsData[0]?.monthLabel}</div>
-              </div>
-            </div>
-            <CalendarGrid tasksToRender={tasks.filter(t => t.projectId === project.id)} interactive={false} isPdf={true} />
-            <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
+          <div className="pdf-page bg-white p-8 mb-8" data-pdf-type="tasks" data-project-id={project.id}>
+            {(() => {
+              const projectTasks = tasks.filter(t => t.projectId === project.id);
+              // Calculer la plage de mois couverts par les tâches du chantier
+              const dates = projectTasks.flatMap(t => [new Date(t.start), new Date(t.end)]);
+              const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : new Date();
+              const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : new Date();
+              const startMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+              const endMonth = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+              // Générer tous les mois entre start et end
+              const months: Date[] = [];
+              const cur = new Date(startMonth);
+              while (cur <= endMonth) {
+                months.push(new Date(cur));
+                cur.setMonth(cur.getMonth() + 1);
+              }
+              const rangeLabel = months.length > 1
+                ? `${startMonth.toLocaleDateString('fr-FR', {month:'long', year:'numeric'})} — ${endMonth.toLocaleDateString('fr-FR', {month:'long', year:'numeric'})}`
+                : startMonth.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+              return (
+                <>
+                  <div className="flex justify-between items-center mb-4 border-b pb-4">
+                    <div>
+                      <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
+                      <p className="text-slate-500">{project.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{rangeLabel}</div>
+                    </div>
+                  </div>
+                  {/* Grille compacte de tous les mois — 2 colonnes max */}
+                  <div className={`grid gap-4 mb-4 ${months.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {months.map((monthDate) => {
+                      const year = monthDate.getFullYear();
+                      const month = monthDate.getMonth();
+                      const firstDay = new Date(year, month, 1);
+                      const dayOfWeek = firstDay.getDay();
+                      const startDate = new Date(firstDay);
+                      startDate.setDate(firstDay.getDate() - dayOfWeek);
+                      const days: Date[] = [];
+                      const d = new Date(startDate);
+                      for (let i = 0; i < 42; i++) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+                      const monthLabel = monthDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+                      const weekDaysPdf = ['D','L','M','M','J','V','S'];
+                      return (
+                        <div key={`${year}-${month}`} className="border border-slate-300 rounded overflow-hidden">
+                          <div className="bg-slate-800 text-white text-center py-1.5 text-sm font-bold capitalize">{monthLabel}</div>
+                          <div className="grid grid-cols-7 bg-slate-100">
+                            {weekDaysPdf.map((d,i) => <div key={i} className="text-center text-[9px] font-bold text-slate-500 py-1">{d}</div>)}
+                          </div>
+                          <div className="grid grid-cols-7">
+                            {days.map((day, i) => {
+                              const isCurrentMonth = day.getMonth() === month;
+                              const dayStr = day.toISOString().slice(0,10);
+                              const dayTasksPdf = projectTasks.filter(t => {
+                                const ts = new Date(t.start); ts.setHours(0,0,0,0);
+                                const te = new Date(t.end); te.setHours(23,59,59,999);
+                                const dc = new Date(day); dc.setHours(12,0,0,0);
+                                return dc >= ts && dc <= te;
+                              });
+                              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                              const ccq = CCQ_HOLIDAYS[dayStr];
+                              return (
+                                <div key={i} className={`border-b border-r border-slate-100 min-h-[52px] p-0.5 text-[9px]
+                                  ${!isCurrentMonth ? 'bg-slate-50' : isWeekend ? 'bg-blue-50' : ccq ? 'bg-orange-50' : 'bg-white'}`}>
+                                  <div className={`text-right font-medium mb-0.5 ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-600'}`}>{day.getDate()}</div>
+                                  {isCurrentMonth && ccq && <div className="text-[6px] text-orange-600 bg-orange-100 rounded px-0.5 truncate mb-0.5">{ccq}</div>}
+                                  {dayTasksPdf.map(t => {
+                                    const sup = suppliers.find(s => s.id === t.supplierId);
+                                    const colorClass = sup?.color || 'bg-gray-200 text-gray-800';
+                                    return (
+                                      <div key={t.id} className={`rounded px-0.5 mb-0.5 truncate text-[7px] font-medium leading-tight ${colorClass.split(' ').slice(0,2).join(' ')}`}>
+                                        {sup ? (sup.name.length > 8 ? sup.name.slice(0,8)+'…' : sup.name) : '?'}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-slate-400 text-center">CrewFlo — Généré le {new Date().toLocaleString()}</div>
+                </>
+              );
+            })()}
           </div>
 
           <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id={project.id}>
