@@ -1151,16 +1151,16 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                               const ccq = CCQ_HOLIDAYS[dayStr];
                               return (
-                                <div key={i} className={`border-b border-r border-slate-100 min-h-[52px] p-0.5 text-[9px]
+                                <div key={i} className={`border-b border-r border-slate-100 min-h-[90px] p-1
                                   ${!isCurrentMonth ? 'bg-slate-50' : isWeekend ? 'bg-blue-50' : ccq ? 'bg-orange-50' : 'bg-white'}`}>
-                                  <div className={`text-right font-medium mb-0.5 ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-600'}`}>{day.getDate()}</div>
-                                  {isCurrentMonth && ccq && <div className="text-[6px] text-orange-600 bg-orange-100 rounded px-0.5 truncate mb-0.5">{ccq}</div>}
+                                  <div className={`text-right text-[10px] font-bold mb-0.5 ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-700'}`}>{day.getDate()}</div>
+                                  {isCurrentMonth && ccq && <div className="text-[7px] text-orange-600 bg-orange-100 rounded px-0.5 truncate mb-0.5 leading-tight">{ccq}</div>}
                                   {dayTasksPdf.map(t => {
                                     const sup = suppliers.find(s => s.id === t.supplierId);
                                     const colorClass = sup?.color || 'bg-gray-200 text-gray-800';
                                     return (
-                                      <div key={t.id} className={`rounded px-0.5 mb-0.5 truncate text-[7px] font-medium leading-tight ${colorClass.split(' ').slice(0,2).join(' ')}`}>
-                                        {sup ? (sup.name.length > 8 ? sup.name.slice(0,8)+'…' : sup.name) : '?'}
+                                      <div key={t.id} className={`rounded px-1 py-px mb-0.5 truncate text-[9px] font-semibold leading-snug ${colorClass.split(' ').slice(0,2).join(' ')}`}>
+                                        {sup?.name ?? '?'}
                                       </div>
                                     );
                                   })}
