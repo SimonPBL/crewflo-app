@@ -19,6 +19,73 @@ interface CalendarViewProps {
   supplierSelf?: { id: string; name: string } | null;
 }
 
+// ── Congés CCQ ─────────────────────────────────────────────────
+// METTRE À JOUR CHAQUE ANNÉE — Source : https://www.ccq.org/calendrier
+// Congés annuels de la construction (industrie de la construction, Québec)
+const CCQ_HOLIDAYS: Record<string, string> = {
+  // 2026
+  '2026-01-01': 'Jour de l'An',
+  '2026-01-02': 'Lendemain du Jour de l'An',
+  '2026-04-03': 'Vendredi Saint',
+  '2026-04-06': 'Lundi de Pâques',
+  '2026-05-18': 'Journée nationale des Patriotes',
+  '2026-06-24': 'Fête nationale du Québec',
+  '2026-07-01': 'Fête du Canada',
+  '2026-07-20': 'Congé CCQ — début vacances construction',
+  '2026-07-21': 'Congé CCQ',
+  '2026-07-22': 'Congé CCQ',
+  '2026-07-23': 'Congé CCQ',
+  '2026-07-24': 'Congé CCQ',
+  '2026-07-27': 'Congé CCQ',
+  '2026-07-28': 'Congé CCQ',
+  '2026-07-29': 'Congé CCQ',
+  '2026-07-30': 'Congé CCQ',
+  '2026-07-31': 'Congé CCQ — fin vacances construction',
+  '2026-09-07': 'Fête du Travail',
+  '2026-10-12': 'Action de grâce',
+  '2026-12-24': 'Veille de Noël',
+  '2026-12-25': 'Noël',
+  '2026-12-26': 'Lendemain de Noël',
+  '2026-12-27': 'Congé CCQ',
+  '2026-12-28': 'Congé CCQ',
+  '2026-12-29': 'Congé CCQ',
+  '2026-12-30': 'Congé CCQ',
+  '2026-12-31': 'Congé CCQ — fin congés hiver',
+  // 2027
+  '2027-01-01': 'Jour de l'An',
+  '2027-03-26': 'Vendredi Saint',
+  '2027-03-29': 'Lundi de Pâques',
+  '2027-05-24': 'Journée nationale des Patriotes',
+  '2027-06-24': 'Fête nationale du Québec',
+  '2027-07-01': 'Fête du Canada',
+  '2027-07-19': 'Congé CCQ — début vacances construction',
+  '2027-07-20': 'Congé CCQ',
+  '2027-07-21': 'Congé CCQ',
+  '2027-07-22': 'Congé CCQ',
+  '2027-07-23': 'Congé CCQ',
+  '2027-07-26': 'Congé CCQ',
+  '2027-07-27': 'Congé CCQ',
+  '2027-07-28': 'Congé CCQ',
+  '2027-07-29': 'Congé CCQ',
+  '2027-07-30': 'Congé CCQ — fin vacances construction',
+  '2027-09-06': 'Fête du Travail',
+  '2027-10-11': 'Action de grâce',
+  '2027-12-24': 'Veille de Noël',
+  '2027-12-25': 'Noël',
+  '2027-12-26': 'Lendemain de Noël',
+  '2027-12-27': 'Congé CCQ',
+  '2027-12-28': 'Congé CCQ',
+  '2027-12-29': 'Congé CCQ',
+  '2027-12-30': 'Congé CCQ',
+  '2027-12-31': 'Congé CCQ — fin congés hiver',
+};
+
+const getCCQHoliday = (date: Date): string | null => {
+  const key = date.toISOString().slice(0, 10);
+  return CCQ_HOLIDAYS[key] ?? null;
+};
+// ────────────────────────────────────────────────────────────────
+
 export const CalendarView: React.FC<CalendarViewProps> = ({
   projects,
   suppliers,
@@ -40,10 +107,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false); // État pour la modale email
   const [isAllDay, setIsAllDay] = useState(true);
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+  const [showNotesSuggestions, setShowNotesSuggestions] = useState(false);
   const [newTask, setNewTask] = useState<Partial<Task>>({});
   const [showNotes, setShowNotes] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfSelectedProject, setPdfSelectedProject] = useState<string>('all');
+  const [pdfIncludeTasks, setPdfIncludeTasks] = useState(true);
+  const [pdfIncludeFinitions, setPdfIncludeFinitions] = useState(false);
   const [finishingsMap, setFinishingsMap] = useState<Record<string, any>>({});
   const [filterSupplierId, setFilterSupplierId] = useState<string>('all');
 
@@ -164,6 +237,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  // Historique autocomplete : titres et notes déjà utilisés
+  const titleHistory = React.useMemo(() =>
+    [...new Set(tasks.map((t: any) => t.title).filter(Boolean))].sort() as string[],
+    [tasks]
+  );
+  const notesHistory = React.useMemo(() =>
+    [...new Set(tasks.map((t: any) => t.notes).filter(Boolean))].sort() as string[],
+    [tasks]
+  );
 
   const formatLabel = (text: string | undefined) => {
     if (!text) return '';
@@ -376,6 +459,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 bg-white flex flex-col relative group 
                                 ${isPdf ? 'min-h-[100px] p-1 border-r border-b border-slate-200' : 'min-h-[100px] p-1'}
                                 ${!isCurrentMonth ? 'bg-slate-50/50' : ''} 
+                                ${isCurrentMonth && getCCQHoliday(day) ? '!bg-orange-50' : ''}
                                 ${(interactive || !canEdit) ? 'hover:bg-slate-50 cursor-pointer' : ''} 
                                 ${selected ? '!bg-blue-100 ring-inset ring-2 ring-blue-300' : ''}
                                 transition-colors
@@ -411,11 +495,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             onMouseDown={(e) => interactive && handleDayMouseDown(day, e)}
                             onMouseEnter={() => interactive && handleDayMouseEnter(day)}
                         >
-                            <div className={`text-right text-xs font-medium mb-1 ${isToday ? 'text-blue-600 font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'} ${isPdf ? 'text-sm mb-2' : ''}`}>
+                            <div className={`text-right text-xs font-medium mb-0.5 ${isToday ? 'text-blue-600 font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'} ${isPdf ? 'text-sm mb-2' : ''}`}>
                             <span className={`${isToday ? 'bg-blue-100 px-1.5 py-0.5 rounded-full' : ''}`}>
                                 {day.getDate()}
                             </span>
                             </div>
+                            {/* Congé CCQ */}
+                            {isCurrentMonth && !isPdf && getCCQHoliday(day) && (
+                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight bg-orange-100 border border-orange-300" style={{fontSize:'6px', color:'#c2410c'}}>
+                                CCQ
+                              </div>
+                            )}
+                            {isPdf && getCCQHoliday(day) && (
+                              <div className="w-full mb-1 px-1 py-0.5 rounded text-center text-[8px] leading-tight bg-orange-100 border border-orange-300 text-orange-700 font-medium">
+                                {getCCQHoliday(day)}
+                              </div>
+                            )}
                             <div className="flex-1 flex flex-col gap-1">
                             {dayTasks.map(task => {
                                 const supplier = suppliers.find(s => s.id === task.supplierId);
@@ -689,7 +784,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setIsEmailModalOpen(false);
   };
 
-  const downloadAllPDF = async () => {
+  const downloadAllPDF = async (filterProjectId?: string, includeTasks = true, includeFinitions = false) => {
     try {
       // Récupérer les finitions de tous les chantiers depuis Supabase
       const supabase = getSupabase();
@@ -717,7 +812,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           compress: true 
       });
 
-      const pages = pdfContainerRef.current.querySelectorAll('.pdf-page');
+      // Filtrer selon les sélections
+      const allPages = Array.from(pdfContainerRef.current.querySelectorAll('.pdf-page'));
+      const pages = allPages.filter(page => {
+        const el = page as HTMLElement;
+        const isTaskPage = el.dataset.pdfType === 'tasks' || !el.dataset.pdfType;
+        const isFinPage = el.dataset.pdfType === 'finitions';
+        const pageProject = el.dataset.projectId;
+        if (filterProjectId && pageProject && pageProject !== filterProjectId) return false;
+        if (isFinPage && !includeFinitions) return false;
+        if (isTaskPage && !includeTasks) return false;
+        return true;
+      });
       for (let i = 0; i < pages.length; i++) {
           const canvas = await html2canvas(pages[i] as HTMLElement, { 
               scale: 1.5, // 1.5 est un bon compromis qualité/taille
@@ -885,7 +991,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             </div>
             <div className="flex items-center gap-2">
                 <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm block"><Mail className="w-4 h-4" /></button>
-                <button onClick={downloadAllPDF} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm block">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
+                <button onClick={() => setIsPdfModalOpen(true)} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm block" title="Télécharger PDF">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
                                 {canEdit && (
 <button 
                     onClick={() => {
@@ -924,7 +1030,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
   <div className="fixed top-0 left-0 z-[-50] w-[1300px] pointer-events-none opacity-0 overflow-hidden">
     <div ref={pdfContainerRef}>
       {/* Page 1 — Calendrier global */}
-      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]">
+      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id="all">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Calendrier Global</h1>
@@ -939,7 +1045,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       </div>
 
       {/* Page 2 — Détails des tâches (global) */}
-      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]">
+      <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id="all">
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
@@ -956,7 +1062,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       {/* Pages par chantier */}
       {projects.map((project) => (
         <React.Fragment key={project.id}>
-          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]">
+          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id={project.id}>
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900">{project.name}</h1>
@@ -970,7 +1076,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
           </div>
 
-          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]">
+          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasks" data-project-id={project.id}>
             <div className="flex justify-between items-center mb-6 border-b pb-4">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
@@ -984,7 +1090,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
           </div>
 
-          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]">
+          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="finitions" data-project-id={project.id}>
             <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900">Finitions choisies</h1>
@@ -1125,14 +1231,30 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Titre</label>
-                <input
-                  type="text"
-                  value={newTask.title || ''}
-                  disabled={isViewOnly}
-                  onChange={e => setNewTask({...newTask, title: e.target.value})}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                  placeholder="Ex: Électricité"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newTask.title || ''}
+                    disabled={isViewOnly}
+                    onChange={e => { setNewTask({...newTask, title: e.target.value}); setShowTitleSuggestions(true); }}
+                    onFocus={() => setShowTitleSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 150)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                    placeholder="Ex: Électricité"
+                    autoComplete="off"
+                  />
+                  {showTitleSuggestions && !isViewOnly && titleHistory.filter((h: string) => h.toLowerCase().includes((newTask.title || '').toLowerCase()) && h !== newTask.title).length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {titleHistory.filter((h: string) => h.toLowerCase().includes((newTask.title || '').toLowerCase()) && h !== newTask.title).slice(0, 8).map((suggestion: string) => (
+                        <button key={suggestion} type="button"
+                          onMouseDown={() => { setNewTask({...newTask, title: suggestion}); setShowTitleSuggestions(false); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 last:border-0">
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
 
@@ -1141,13 +1263,28 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     <span className="text-xs font-bold text-slate-600 uppercase">Notes</span>
   </div>
   <div className="p-3 bg-white">
-    <textarea
-      value={newTask.notes || ''}
-      disabled={isViewOnly}
-      onChange={e => setNewTask({ ...newTask, notes: e.target.value })}
-      className="w-full min-h-[90px] p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-      placeholder="Notes internes…"
-    />
+    <div className="relative">
+      <textarea
+        value={newTask.notes || ''}
+        disabled={isViewOnly}
+        onChange={e => { setNewTask({ ...newTask, notes: e.target.value }); setShowNotesSuggestions(true); }}
+        onFocus={() => setShowNotesSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowNotesSuggestions(false), 150)}
+        className="w-full min-h-[90px] p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+        placeholder="Notes internes…"
+      />
+      {showNotesSuggestions && !isViewOnly && (newTask.notes || '').length > 0 && notesHistory.filter((h: string) => h.toLowerCase().includes((newTask.notes || '').toLowerCase()) && h !== newTask.notes).length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-32 overflow-y-auto">
+          {notesHistory.filter((h: string) => h.toLowerCase().includes((newTask.notes || '').toLowerCase()) && h !== newTask.notes).slice(0, 5).map((suggestion: string) => (
+            <button key={suggestion} type="button"
+              onMouseDown={() => { setNewTask({...newTask, notes: suggestion}); setShowNotesSuggestions(false); }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 last:border-0 truncate">
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   </div>
 </div>
 
@@ -1319,6 +1456,65 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                     </div>
                 </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* PDF Export Modal */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Télécharger PDF</h3>
+              <button onClick={() => setIsPdfModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Chantier */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Chantier</label>
+                <select
+                  value={pdfSelectedProject}
+                  onChange={e => setPdfSelectedProject(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Tous les chantiers</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              {/* Contenu */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Contenu à inclure</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={pdfIncludeTasks} onChange={e => setPdfIncludeTasks(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                    <div>
+                      <div className="text-sm font-medium text-slate-700">Calendrier des tâches</div>
+                      <div className="text-xs text-slate-400">Grille mensuelle avec les tâches planifiées</div>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={pdfIncludeFinitions} onChange={e => setPdfIncludeFinitions(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                    <div>
+                      <div className="text-sm font-medium text-slate-700">Finitions & matériaux</div>
+                      <div className="text-xs text-slate-400">Spécifications confirmées par catégorie</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 pb-4 pt-2 flex gap-2">
+              <button onClick={() => setIsPdfModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Annuler</button>
+              <button
+                disabled={!pdfIncludeTasks && !pdfIncludeFinitions}
+                onClick={async () => {
+                  setIsPdfModalOpen(false);
+                  await downloadAllPDF(pdfSelectedProject === 'all' ? undefined : pdfSelectedProject, pdfIncludeTasks, pdfIncludeFinitions);
+                }}
+                className="flex-1 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" /> Télécharger
+              </button>
+            </div>
           </div>
         </div>
       )}
