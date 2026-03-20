@@ -157,6 +157,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
   };
 
+  // Détection mobile pour affichage calendrier
+  const [isMobileScreen, setIsMobileScreen] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobileScreen(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   const formatLabel = (text: string | undefined) => {
     if (!text) return '';
     return text;
@@ -296,7 +304,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
 
-  const CalendarGrid = ({ tasksToRender, interactive = true, isPdf = false }: { tasksToRender: Task[], interactive?: boolean, isPdf?: boolean }) => {
+  const CalendarGrid = ({ tasksToRender, interactive = true, isPdf = false, isMobile = false }: { tasksToRender: Task[], interactive?: boolean, isPdf?: boolean, isMobile?: boolean }) => {
     const getTasksForDay = (date: Date) => {
         const dayStart = new Date(date);
         dayStart.setHours(0,0,0,0);
@@ -440,24 +448,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     </div>
                                     )}
 
-                                    {/* Texte — compact sur écran, complet en PDF */}
+                                    {/* Texte — complet sur desktop/PDF, initiales sur mobile */}
                                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                        {isPdf ? (
-                                          // PDF : texte complet
+                                        {(!isMobile && !isPdf) || isPdf ? (
+                                          // Desktop + PDF : texte complet
                                           currentProjectId ? (
                                             <>
-                                              <div className="font-bold leading-tight text-xs mb-0.5">{formatLabel(task.title)}</div>
-                                              <div className="opacity-90 leading-tight text-[9px] mt-1 pt-1 border-t border-black/10 uppercase tracking-wide">{formatLabel(supplier?.name)}</div>
+                                              <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>{formatLabel(task.title)}</div>
+                                              <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>{formatLabel(supplier?.name)}</div>
                                             </>
                                           ) : (
                                             <>
-                                              <div className="font-bold leading-tight text-xs mb-0.5">{formatLabel(supplier?.name)}</div>
-                                              <div className="opacity-90 leading-tight text-[9px] mt-1 pt-1 border-t border-black/10 uppercase tracking-wide">{project?.name}</div>
-                                              {project?.address && <div className="opacity-75 leading-tight text-[9px]">📍 {project.address}</div>}
+                                              <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>{formatLabel(supplier?.name)}</div>
+                                              <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>{project?.name}</div>
+                                              {project?.address && (
+                                                <div className={`opacity-75 leading-tight break-words ${isPdf ? 'text-[9px]' : 'text-[9px] mt-0.5'}`}>📍 {project.address}</div>
+                                              )}
                                             </>
                                           )
                                         ) : (
-                                          // Écran : initiales + adresse courte sur une ligne
+                                          // Mobile : initiales + adresse courte
                                           <>
                                             <div className="font-bold leading-tight truncate" style={{fontSize:'8px'}}>
                                               {supplier ? getInitials(supplier.name) : '?'}
@@ -888,7 +898,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       <div className="flex-1 overflow-y-auto bg-slate-100 relative">
         <div className="p-4 min-h-full select-none">
           <ConflictAlert conflicts={conflicts} />
-          <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} />
+          <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} isMobile={isMobileScreen} />
         </div>
       </div>
 
@@ -1238,7 +1248,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none truncate"
                     >
                     <option value="" disabled>Choisir...</option>
-                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {[...suppliers].sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'})).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                 </div>
               </div>
