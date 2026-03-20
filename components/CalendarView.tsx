@@ -450,24 +450,36 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
                                     {/* Texte — complet sur desktop/PDF, initiales sur mobile */}
                                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                        {(!isMobile && !isPdf) || isPdf ? (
-                                          // Desktop + PDF : texte complet
+                                        {isPdf ? (
+                                          // PDF : texte complet
                                           currentProjectId ? (
                                             <>
-                                              <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>{formatLabel(task.title)}</div>
-                                              <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>{formatLabel(supplier?.name)}</div>
+                                              <div className="font-bold leading-tight break-words text-xs mb-0.5">{formatLabel(task.title)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-1 pt-1 border-t border-black/10 uppercase tracking-wide">{formatLabel(supplier?.name)}</div>
                                             </>
                                           ) : (
                                             <>
-                                              <div className={`font-bold leading-tight break-words ${isPdf ? 'text-xs mb-0.5' : ''}`}>{formatLabel(supplier?.name)}</div>
-                                              <div className={`opacity-90 leading-tight border-black/10 break-words ${isPdf ? 'text-[9px] mt-1 pt-1 border-t uppercase tracking-wide' : 'text-[9px] mt-0.5 pt-0.5 border-t'}`}>{project?.name}</div>
-                                              {project?.address && (
-                                                <div className={`opacity-75 leading-tight break-words ${isPdf ? 'text-[9px]' : 'text-[9px] mt-0.5'}`}>📍 {project.address}</div>
-                                              )}
+                                              <div className="font-bold leading-tight break-words text-xs mb-0.5">{formatLabel(supplier?.name)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-1 pt-1 border-t border-black/10 uppercase tracking-wide">{project?.name}</div>
+                                              {project?.address && <div className="opacity-75 leading-tight text-[9px]">📍 {project.address}</div>}
+                                            </>
+                                          )
+                                        ) : (!isMobile && monthsToShow === 1) ? (
+                                          // Desktop 1 mois : texte complet
+                                          currentProjectId ? (
+                                            <>
+                                              <div className="font-bold leading-tight break-words">{formatLabel(task.title)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10">{formatLabel(supplier?.name)}</div>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <div className="font-bold leading-tight break-words">{formatLabel(supplier?.name)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10">{project?.name}</div>
+                                              {project?.address && <div className="opacity-75 leading-tight text-[9px] mt-0.5">📍 {project.address}</div>}
                                             </>
                                           )
                                         ) : (
-                                          // Mobile : initiales + adresse courte
+                                          // Mobile ou vue 4 mois : initiales + adresse courte
                                           <>
                                             <div className="font-bold leading-tight truncate" style={{fontSize:'8px'}}>
                                               {supplier ? getInitials(supplier.name) : '?'}
@@ -486,41 +498,47 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                         )}
                                     </div>
 
-                                    {/* Colonne icônes droite — statuts + notes */}
+                                    {/* Icônes statut — points absolus en haut à droite sur mobile/4mois, colonne sur desktop */}
                                     {!isPdf && (task.taskStatus === 'confirmed' || task.confirmedBySupplier || task.taskStatus === 'declined' || task.supplierNotes?.text || task.adminNote?.text) && (
-                                      <div className="flex flex-col items-center gap-0.5 justify-start pl-0.5 border-l border-black/10 flex-shrink-0">
-                                        {(task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined' && (
-                                          <span className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center" title="Confirmé">
-                                            <svg viewBox="0 0 10 10" className="w-2 h-2 text-white fill-none stroke-current stroke-2">
-                                              <polyline points="1.5,5 4,7.5 8.5,2.5" />
-                                            </svg>
-                                          </span>
-                                        )}
-                                        {task.taskStatus === 'declined' && (
-                                          <span className="w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center" title="Refusé">
-                                            <svg viewBox="0 0 10 10" className="w-2 h-2 stroke-white fill-none stroke-2">
-                                              <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
-                                              <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
-                                            </svg>
-                                          </span>
-                                        )}
-                                        {task.adminNote?.text && (
-                                          <span
-                                            className="w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold leading-none"
-                                            style={{ fontSize: '8px' }}
-                                            title={task.adminNote.text}
-                                          >!
-                                          </span>
-                                        )}
-                                        {task.supplierNotes?.text && (
-                                          <span
-                                            className="w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold leading-none"
-                                            style={{ fontSize: '8px' }}
-                                            title={task.supplierNotes.text}
-                                          >!
-                                          </span>
-                                        )}
-                                      </div>
+                                      (isMobile || monthsToShow > 1) ? (
+                                        // Mobile / 4 mois : petits points absolus top-right
+                                        <div className="absolute top-0.5 right-0.5 flex flex-col gap-px">
+                                          {(task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined' && (
+                                            <span className="w-2 h-2 bg-green-500 rounded-full block" title="Confirmé" />
+                                          )}
+                                          {task.taskStatus === 'declined' && (
+                                            <span className="w-2 h-2 bg-red-500 rounded-full block" title="Refusé" />
+                                          )}
+                                          {(task.adminNote?.text || task.supplierNotes?.text) && (
+                                            <span className="w-2 h-2 bg-amber-400 rounded-full block" title="Note" />
+                                          )}
+                                        </div>
+                                      ) : (
+                                        // Desktop 1 mois : colonne droite avec icônes lisibles
+                                        <div className="flex flex-col items-center gap-0.5 justify-start pl-0.5 border-l border-black/10 flex-shrink-0">
+                                          {(task.taskStatus === 'confirmed' || task.confirmedBySupplier) && task.taskStatus !== 'declined' && (
+                                            <span className="w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center" title="Confirmé">
+                                              <svg viewBox="0 0 10 10" className="w-2 h-2 text-white fill-none stroke-current stroke-2">
+                                                <polyline points="1.5,5 4,7.5 8.5,2.5" />
+                                              </svg>
+                                            </span>
+                                          )}
+                                          {task.taskStatus === 'declined' && (
+                                            <span className="w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center" title="Refusé">
+                                              <svg viewBox="0 0 10 10" className="w-2 h-2 stroke-white fill-none stroke-2">
+                                                <line x1="2.5" y1="2.5" x2="7.5" y2="7.5"/>
+                                                <line x1="7.5" y1="2.5" x2="2.5" y2="7.5"/>
+                                              </svg>
+                                            </span>
+                                          )}
+                                          {task.adminNote?.text && (
+                                            <span className="w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold leading-none" style={{fontSize:'8px'}} title={task.adminNote.text}>!</span>
+                                          )}
+                                          {task.supplierNotes?.text && (
+                                            <span className="w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold leading-none" style={{fontSize:'8px'}} title={task.supplierNotes.text}>!</span>
+                                          )}
+                                        </div>
+                                      )
                                     )}
                                 </div>
                                 );
