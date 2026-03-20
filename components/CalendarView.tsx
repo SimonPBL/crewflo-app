@@ -998,126 +998,87 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="flex-none flex flex-col md:flex-row items-center justify-between p-4 bg-white border-b border-slate-200 gap-2 md:gap-0 z-20 shadow-sm">
-        {/* Barre info : nom calendrier + compte connecté */}
-        <div className="flex items-center justify-between w-full md:hidden">
-          <div className="flex flex-col min-w-0 max-w-[55%]">
-            <span className="text-sm font-bold text-slate-800 truncate">
-              {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
-            </span>
-            {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
-              <span className="text-xs text-slate-400 truncate flex items-center gap-0.5">
-                <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                {projects.find(p => p.id === currentProjectId)?.address}
-              </span>
-            )}
-          </div>
-          {(() => {
-            const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
-            const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
-            return (
-              <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium flex-shrink-0
-                ${canEdit ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
-                {canEdit
-                  ? <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                  : <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
-                }
-                {canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · {userEmail ?? ''}
-              </span>
-            );
-          })()}
-        </div>
-        {/* Desktop : nom chantier + infos compte à droite */}
-        <div className="hidden md:flex items-center gap-4 flex-wrap flex-1">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 leading-tight">
+      <div className="flex-none bg-white border-b border-slate-200 z-20 shadow-sm">
+        {/* Ligne 1 : nom calendrier + compte connecté */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-1 gap-2">
+          {/* Nom chantier + adresse */}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold text-slate-800 leading-tight truncate">
               {currentProjectId ? projects.find(p => p.id === currentProjectId)?.name : "Vue d'ensemble"}
             </h2>
             {currentProjectId && projects.find(p => p.id === currentProjectId)?.address && (
-              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
+              <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
+                <MapPin className="w-3 h-3 flex-shrink-0" />
                 {projects.find(p => p.id === currentProjectId)?.address}
               </p>
             )}
           </div>
-        </div>
-        {/* Compte connecté — desktop, affiché en haut à droite */}
-        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+          {/* Pastille compte connecté */}
           {(() => {
             const selfSupplier = !canEdit && supplierSelf ? suppliers.find(s => s.id === supplierSelf.id) : null;
             const supplierColorBg = selfSupplier?.color?.split(' ')[0] ?? '';
             return (
-              <span className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium border
+              <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-medium border flex-shrink-0
                 ${canEdit ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                 {canEdit
                   ? <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                   : <span className={`w-4 h-4 rounded flex-shrink-0 border border-black/10 ${supplierColorBg}`} />
                 }
-                {canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · {userEmail ?? ''}
+                <span className="hidden sm:inline">{canEdit ? 'Admin' : supplierSelf?.name ?? 'Fournisseur'} · </span>
+                {userEmail ?? ''}
               </span>
             );
           })()}
         </div>
-        {/* Navigation mois — visible partout */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
-            <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-5 h-5" /></button>
-            <span className="px-4 text-sm font-bold capitalize min-w-[140px] text-center">
+        {/* Ligne 2 : navigation + controls */}
+        <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
+          {/* Navigation mois */}
+          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+            <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-4 h-4" /></button>
+            <span className="px-3 text-sm font-bold capitalize min-w-[130px] text-center">
               {isMobileScreen && mobileMonthsData.length > 1
                 ? `${mobileMonthsData[0]?.monthLabel} — ${mobileMonthsData[mobileMonthsData.length-1]?.monthLabel}`
                 : allMonthsData[0]?.monthLabel}
             </span>
-            <button onClick={nextPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronRight className="w-5 h-5" /></button>
+            <button onClick={nextPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronRight className="w-4 h-4" /></button>
           </div>
           <button onClick={goToToday} className="text-xs font-medium text-blue-600 hover:text-blue-800 underline">Aujourd'hui</button>
-        </div>
-
-        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-between md:justify-end flex-wrap">
-            {/* Filtre par fournisseur */}
-            <select
-              value={filterSupplierId}
-              onChange={e => setFilterSupplierId(e.target.value)}
-              className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none max-w-[150px] truncate"
-            >
-              <option value="all">Tous les fournisseurs</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-            {/* Toggle vue 1 mois / 4 mois — desktop seulement */}
-            {!isMobileScreen && (
-              <div className="flex bg-slate-100 rounded-lg p-1">
-                <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
-                <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-                <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm block"><Mail className="w-4 h-4" /></button>
-                <button onClick={() => setIsPdfModalOpen(true)} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm block" title="Télécharger PDF">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>
-                                {canEdit && (
-<button 
-                    onClick={() => {
-                    if (!canEdit) return;
-
-                    if (!canEdit) return;
-
-                    const now = new Date();
-                    const start = new Date(now); start.setHours(7,0,0,0);
-                    const end = new Date(now); end.setHours(17,0,0,0);
-                    const startIso = start.toISOString();
-                    const endIso = end.toISOString();
-                    setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
-                    setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
-                    setEditingTaskId(null);
-        setIsViewOnly(false);
-        setIsModalOpen(true);
-                    }}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm"
-                >
-                    <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Tâche</span>
-                </button>
-                )}
+          {/* Filtre fournisseur */}
+          <select value={filterSupplierId} onChange={e => setFilterSupplierId(e.target.value)}
+            className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none max-w-[140px] truncate">
+            <option value="all">Tous les fournisseurs</option>
+            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          {/* Toggle 1/4 mois — desktop */}
+          {!isMobileScreen && (
+            <div className="flex bg-slate-100 rounded-lg p-1">
+              <button onClick={() => setMonthsToShow(1)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
+              <button onClick={() => setMonthsToShow(4)} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
             </div>
+          )}
+          <div className="flex items-center gap-2 ml-auto">
+            <button onClick={handlePrepareEmail} className="p-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 shadow-sm hidden sm:block"><Mail className="w-4 h-4" /></button>
+            <button onClick={() => setIsPdfModalOpen(true)} disabled={isExporting} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-sm" title="Télécharger PDF">
+              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            </button>
+            {canEdit && (
+              <button onClick={() => {
+                const now = new Date();
+                const start = new Date(now); start.setHours(7,0,0,0);
+                const end = new Date(now); end.setHours(17,0,0,0);
+                const startIso = start.toISOString();
+                const endIso = end.toISOString();
+                setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
+                setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
+                setEditingTaskId(null);
+                setIsViewOnly(false);
+                setIsAllDay(true);
+                setIsModalOpen(true);
+              }} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Tâche</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1195,7 +1156,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                     </div>
                   </div>
                   {/* Grille compacte de tous les mois — 2 colonnes max */}
-                  <div className={`grid gap-4 mb-4 ${months.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div className={`gap-2 mb-4 ${months.length === 1 ? 'grid grid-cols-1' : months.length <= 2 ? 'grid grid-cols-2' : months.length <= 4 ? 'grid grid-cols-2' : months.length <= 6 ? 'grid grid-cols-3' : 'grid grid-cols-4'}`}>
                     {months.map((monthDate) => {
                       const year = monthDate.getFullYear();
                       const month = monthDate.getMonth();
@@ -1227,16 +1188,22 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                               const ccq = CCQ_HOLIDAYS[dayStr];
                               return (
-                                <div key={i} className={`border-b border-r border-slate-100 min-h-[90px] p-1
-                                  ${!isCurrentMonth ? 'bg-slate-50' : isWeekend ? 'bg-blue-50' : ccq ? 'bg-orange-50' : 'bg-white'}`}>
-                                  <div className={`text-right text-[10px] font-bold mb-0.5 ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-700'}`}>{day.getDate()}</div>
-                                  {isCurrentMonth && ccq && <div className="text-[7px] text-orange-600 bg-orange-100 rounded px-0.5 truncate mb-0.5 leading-tight">{ccq}</div>}
+                                <div key={i} className={`border-b border-r border-slate-100 p-px
+                                  ${!isCurrentMonth ? 'bg-slate-50' : isWeekend ? 'bg-blue-50' : ccq ? 'bg-orange-50' : 'bg-white'}`}
+                                  style={{minHeight: months.length <= 2 ? '72px' : months.length <= 4 ? '52px' : months.length <= 6 ? '40px' : '30px'}}>
+                                  <div className={`text-right font-bold leading-none mb-px ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-600'}`}
+                                    style={{fontSize: months.length <= 4 ? '9px' : '7px'}}>{day.getDate()}</div>
+                                  {isCurrentMonth && ccq && (
+                                    <div className="text-orange-600 bg-orange-100 rounded truncate leading-tight mb-px" style={{fontSize:'5px'}}>{ccq.replace("Congé CCQ", "CCQ")}</div>
+                                  )}
                                   {dayTasksPdf.map(t => {
                                     const sup = suppliers.find(s => s.id === t.supplierId);
                                     const colorClass = sup?.color || 'bg-gray-200 text-gray-800';
+                                    const nameShort = sup ? (sup.name.length > 12 ? sup.name.slice(0,12)+'…' : sup.name) : '?';
                                     return (
-                                      <div key={t.id} className={`rounded px-1 py-px mb-0.5 truncate text-[9px] font-semibold leading-snug ${colorClass.split(' ').slice(0,2).join(' ')}`}>
-                                        {sup?.name ?? '?'}
+                                      <div key={t.id} className={`rounded px-0.5 mb-px truncate font-semibold leading-tight ${colorClass.split(' ').slice(0,2).join(' ')}`}
+                                        style={{fontSize: months.length <= 4 ? '8px' : '6px', paddingTop:'1px', paddingBottom:'1px'}}>
+                                        {nameShort}
                                       </div>
                                     );
                                   })}
