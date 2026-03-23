@@ -1101,7 +1101,10 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                   <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Tâche</span>
                 </button>
                 <button onClick={() => setIsScheduleOpen(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm shadow-sm">
+                  disabled={!currentProjectId}
+                  className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm shadow-sm transition-colors
+                    ${currentProjectId ? 'bg-slate-700 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                  title={currentProjectId ? 'Cédule de chantier' : 'Sélectionner un chantier d\'abord'}>
                   <span className="hidden sm:inline">📋 Cédule</span>
                   <span className="sm:hidden">📋</span>
                 </button>
