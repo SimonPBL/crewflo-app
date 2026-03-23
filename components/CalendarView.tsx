@@ -3,6 +3,7 @@ import { Project, Supplier, Task, Conflict } from '../types';
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin } from 'lucide-react';
 import { ConflictAlert } from './ConflictAlert';
 import { ProjectSchedule } from './ProjectSchedule';
+import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -1484,20 +1485,55 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                     disabled={isViewOnly}
                     onChange={e => { setNewTask({...newTask, title: e.target.value}); setShowTitleSuggestions(true); }}
                     onFocus={() => setShowTitleSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 150)}
+                    onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 200)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                    placeholder="Ex: Électricité"
+                    placeholder="Ex: Électricité ou choisir dans la cédule ↓"
                     autoComplete="off"
                   />
-                  {showTitleSuggestions && !isViewOnly && titleHistory.filter((h: string) => h.toLowerCase().includes((newTask.title || '').toLowerCase()) && h !== newTask.title).length > 0 && (
-                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                      {titleHistory.filter((h: string) => h.toLowerCase().includes((newTask.title || '').toLowerCase()) && h !== newTask.title).slice(0, 8).map((suggestion: string) => (
-                        <button key={suggestion} type="button"
+                  {showTitleSuggestions && !isViewOnly && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+                      {/* Suggestions from history */}
+                      {titleHistory.filter((h: string) => h.toLowerCase().includes((newTask.title || '').toLowerCase()) && h !== newTask.title).slice(0, 4).map((suggestion: string) => (
+                        <button key={`hist-${suggestion}`} type="button"
                           onMouseDown={() => { setNewTask({...newTask, title: suggestion}); setShowTitleSuggestions(false); }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 last:border-0">
-                          {suggestion}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 flex items-center gap-2">
+                          <span className="text-slate-400 text-xs">↩</span>{suggestion}
                         </button>
                       ))}
+                      {/* Predefined titles from cédule grouped by category */}
+                      {(newTask.title || '').length === 0 && SCHEDULE_TEMPLATE.map(cat => {
+                        const filtered = cat.items.filter(item =>
+                          !titleHistory.includes(item.label)
+                        );
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div key={cat.key}>
+                            <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                              {cat.emoji} {cat.label}
+                            </div>
+                            {filtered.map(item => (
+                              <button key={item.key} type="button"
+                                onMouseDown={() => { setNewTask({...newTask, title: item.label}); setShowTitleSuggestions(false); }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 flex items-center gap-2">
+                                <span>{item.type === 'delivery' ? '📦' : '📅'}</span>{item.label}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {/* Filtered predefined titles when typing */}
+                      {(newTask.title || '').length > 0 && SCHEDULE_TEMPLATE.flatMap(cat =>
+                        cat.items.filter(item =>
+                          item.label.toLowerCase().includes((newTask.title || '').toLowerCase()) &&
+                          item.label !== newTask.title
+                        ).map(item => (
+                          <button key={`sched-${item.key}`} type="button"
+                            onMouseDown={() => { setNewTask({...newTask, title: item.label}); setShowTitleSuggestions(false); }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 border-b border-slate-100 flex items-center gap-2">
+                            <span>{item.type === 'delivery' ? '📦' : '📅'}</span>{item.label}
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -1787,6 +1823,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                   createdAt: new Date().toISOString(),
                 }));
                 setTasks((prev: any) => [...prev, ...withIds]);
+              }}
+              onRemoveTask={(title) => {
+                setTasks((prev: any) => prev.filter((t: any) =>
+                  !(t.projectId === (currentProjectId || projects[0]?.id) && t.title === title)
+                ));
               }}
               onClose={() => setIsScheduleOpen(false)}
             />

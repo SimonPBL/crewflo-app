@@ -20,6 +20,7 @@ interface Props {
   suppliers: Supplier[];
   existingTasks: Task[];
   onGenerateTasks: (tasks: Omit<Task, 'id' | 'createdAt'>[]) => void;
+  onRemoveTask: (title: string) => void;
   onClose: () => void;
 }
 
@@ -58,7 +59,10 @@ const MiniDatePicker: React.FC<{
     e.stopPropagation();
     if (btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 220) });
+      const popupH = 265;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const topPos = spaceBelow < popupH ? r.top - popupH - 4 : r.bottom + 6;
+      setPos({ top: topPos, left: Math.min(r.left, window.innerWidth - 220) });
     }
     setOpen(v => !v);
   };
@@ -132,7 +136,7 @@ const MiniDatePicker: React.FC<{
 // ── Composant principal ───────────────────────────────────────
 
 export const ProjectSchedule: React.FC<Props> = ({
-  project, suppliers, existingTasks, onGenerateTasks, onClose
+  project, suppliers, existingTasks, onGenerateTasks, onRemoveTask, onClose
 }) => {
   const [entries, setEntries] = useState<Record<string, ScheduleEntry>>({});
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>(
@@ -281,9 +285,23 @@ export const ProjectSchedule: React.FC<Props> = ({
                         </span>
 
                         {isInCal && (
-                          <span className="text-xs text-green-700 bg-green-100 border border-green-300 rounded-full px-2 py-0.5 font-medium flex-shrink-0">
-                            ✓ Au calendrier
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-xs text-green-700 bg-green-100 border border-green-300 rounded-full px-2 py-0.5 font-medium">
+                              ✓ Au calendrier
+                            </span>
+                            <button
+                              onClick={() => {
+                                onRemoveTask(item.label);
+                                setEntry(cat.key, item.key, {
+                                  status: 'pending', supplierId: '', startDate: '', endDate: '', alreadyInCalendar: false
+                                });
+                              }}
+                              className="w-5 h-5 rounded-full bg-red-100 border border-red-300 text-red-500 hover:bg-red-200 flex items-center justify-center flex-shrink-0"
+                              title="Retirer du calendrier et remettre à zéro"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
                         )}
 
                         {!isInCal && (

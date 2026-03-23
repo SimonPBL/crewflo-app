@@ -382,6 +382,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                   setTasks(prev => [...prev, ...withIds]);
                 }
               }}
+              onRemoveTask={(title) => {
+                if (setTasks && scheduleProject) {
+                  setTasks(prev => prev.filter(t =>
+                    !(t.projectId === scheduleProject.id && t.title === title)
+                  ));
+                }
+              }}
               onClose={() => setScheduleProject(null)}
             />
           </div>
