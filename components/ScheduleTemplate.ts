@@ -41,7 +41,8 @@ export const SCHEDULE_TEMPLATE: ScheduleCategory[] = [
     label: 'Structure',
     emoji: '🏗',
     items: [
-      { key: 'livraison_trust',    label: 'Livraison trust / poutrelles', type: 'delivery' },
+      { key: 'livraison_trust',      label: 'Livraison trust',      type: 'delivery' },
+      { key: 'livraison_poutrelles', label: 'Livraison poutrelles',  type: 'delivery' },
       { key: 'structure',          label: 'Structure',                    type: 'task' },
       { key: 'livraison_fenetres', label: 'Livraison fenêtres',           type: 'delivery' },
       { key: 'division',           label: 'Division',                     type: 'task' },

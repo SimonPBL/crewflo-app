@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Project, Supplier, Task, Conflict } from '../types';
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin } from 'lucide-react';
 import { ConflictAlert } from './ConflictAlert';
+import { ProjectSchedule } from './ProjectSchedule';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -118,6 +119,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [pdfSelectedProject, setPdfSelectedProject] = useState<string>('all');
   const [pdfIncludeTasks, setPdfIncludeTasks] = useState(true);
   const [pdfIncludeFinitions, setPdfIncludeFinitions] = useState(false);
@@ -526,7 +528,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             {dayTasks.map(task => {
                                 const supplier = suppliers.find(s => s.id === task.supplierId);
                                 const project = projects.find(p => p.id === task.projectId);
-                                const colorClass = supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
+                                const isDelivery = task.notes?.startsWith('📦 Livraison');
+                                const colorClass = isDelivery
+                                  ? 'bg-amber-200 text-amber-900 border-amber-400'
+                                  : supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
                                 const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
 
                                 const isNew = !isPdf && task.createdAt
@@ -547,6 +552,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     ${!isPdf && isNew ? 'border-l-[3px] border-l-blue-500' : ''}
                                     `}
                                 >
+                                    {/* Icône livraison */}
+                                    {isDelivery && !isPdf && (
+                                      <span className="flex-shrink-0 leading-none" style={{fontSize:'8px'}}>📦</span>
+                                    )}
                                     {/* Seul badge absolu : conflit */}
                                     {hasConflict && (
                                     <div className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 z-20 shadow-sm border border-white">
@@ -1074,21 +1083,28 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             </button>
             {canEdit && (
-              <button onClick={() => {
-                const now = new Date();
-                const start = new Date(now); start.setHours(7,0,0,0);
-                const end = new Date(now); end.setHours(17,0,0,0);
-                const startIso = start.toISOString();
-                const endIso = end.toISOString();
-                setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
-                setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
-                setEditingTaskId(null);
-                setIsViewOnly(false);
-                setIsAllDay(true);
-                setIsModalOpen(true);
-              }} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm">
-                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Tâche</span>
-              </button>
+              <>
+                <button onClick={() => {
+                  const now = new Date();
+                  const start = new Date(now); start.setHours(7,0,0,0);
+                  const end = new Date(now); end.setHours(17,0,0,0);
+                  const startIso = start.toISOString();
+                  const endIso = end.toISOString();
+                  setNewTask({ projectId: currentProjectId || (projects.length > 0 ? projects[0].id : ''), start: startIso, end: endIso, supplierId: suppliers.length > 0 ? suppliers[0].id : '' });
+                  setSelectedTaskDays(initSelectedDaysFromRange(startIso, endIso));
+                  setEditingTaskId(null);
+                  setIsViewOnly(false);
+                  setIsAllDay(true);
+                  setIsModalOpen(true);
+                }} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm shadow-sm">
+                  <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Tâche</span>
+                </button>
+                <button onClick={() => setIsScheduleOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm shadow-sm">
+                  <span className="hidden sm:inline">📋 Cédule</span>
+                  <span className="sm:hidden">📋</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1752,6 +1768,28 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 <Download className="w-4 h-4" /> Télécharger
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cédule Modal */}
+      {isScheduleOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4">
+          <div style={{height:'92vh', maxHeight:'92vh'}} className="bg-white w-full sm:max-w-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-visible">
+            <ProjectSchedule
+              project={currentProjectId ? projects.find(p => p.id === currentProjectId) || projects[0] : projects[0]}
+              suppliers={suppliers}
+              existingTasks={tasks.filter(t => currentProjectId ? t.projectId === currentProjectId : true)}
+              onGenerateTasks={(newTasks) => {
+                const withIds = newTasks.map(t => ({
+                  ...t,
+                  id: crypto.randomUUID(),
+                  createdAt: new Date().toISOString(),
+                }));
+                setTasks((prev: any) => [...prev, ...withIds]);
+              }}
+              onClose={() => setIsScheduleOpen(false)}
+            />
           </div>
         </div>
       )}
