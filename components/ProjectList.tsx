@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Project } from '../types';
-import { Plus, Building2, MapPin, Pencil, Check, X, ClipboardList, Info, Search, SlidersHorizontal } from 'lucide-react';
+import { Project, Supplier, Task } from '../types';
+import { Plus, Building2, MapPin, Pencil, Check, X, ClipboardList, Info, Search, SlidersHorizontal, CalendarRange } from 'lucide-react';
+import { ProjectSchedule } from './ProjectSchedule';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
 import { FINISHING_TEMPLATE } from './finishingTemplate';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
@@ -10,11 +11,14 @@ interface ProjectListProps {
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   canEdit?: boolean;
+  suppliers?: Supplier[];
+  tasks?: Task[];
+  setTasks?: React.Dispatch<React.SetStateAction<Task[]>>;
 }
 
 type ModalTab = 'infos' | 'finitions';
 
-export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects, canEdit = true }) => {
+export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects, canEdit = true, suppliers = [], tasks = [], setTasks }) => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
 
@@ -23,13 +27,13 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
 
   // Modal
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [scheduleProject, setScheduleProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<ModalTab>('infos');
 
   // ── Filtre & tri ───────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'planning' | 'active' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'status'>('name');
-  const [showCompleted, setShowCompleted] = useState(false);
 
   // ── Progression des finitions ──────────────────────────────────────────────
   const supabase = getSupabase();
@@ -129,15 +133,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.address.toLowerCase().includes(search.toLowerCase());
       const matchStatus = filterStatus === 'all' || p.status === filterStatus;
-      const matchCompleted = showCompleted || p.status !== 'completed';
-      return matchSearch && matchStatus && matchCompleted;
+      return matchSearch && matchStatus;
     })
     .sort((a, b) => {
       if (sortBy === 'status') {
         const order = { active: 0, planning: 1, completed: 2 };
         return order[a.status] - order[b.status];
       }
-      return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+      return a.name.localeCompare(b.name, 'fr');
     });
 
   return (
@@ -179,13 +182,6 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
               <option value="name">Trier : Nom</option>
               <option value="status">Trier : Statut</option>
             </select>
-            <button
-              onClick={() => setShowCompleted(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors
-                ${showCompleted ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
-            >
-              {showCompleted ? '✓ Terminés visibles' : 'Afficher les terminés'}
-            </button>
           </div>
         </div>
 
@@ -315,6 +311,15 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                             <ClipboardList className="w-3.5 h-3.5" />
                             Finitions & Notes
                           </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => setScheduleProject(project)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors"
+                            >
+                              <CalendarRange className="w-3.5 h-3.5" />
+                              Cédule
+                            </button>
+                          )}
                         </div>
                         {/* Barre de progression des finitions */}
                         {progressMap[project.id] !== undefined && (() => {
@@ -358,6 +363,30 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
           )}
         </div>
       </div>
+
+      {/* ── MODAL CÉDULE ────────────────────────────────────────── */}
+      {scheduleProject && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4">
+          <div style={{height:'92vh', maxHeight:'92vh'}} className="bg-white w-full sm:max-w-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <ProjectSchedule
+              project={scheduleProject}
+              suppliers={suppliers}
+              existingTasks={tasks.filter(t => t.projectId === scheduleProject.id)}
+              onGenerateTasks={(newTasks) => {
+                if (setTasks) {
+                  const withIds = newTasks.map(t => ({
+                    ...t,
+                    id: crypto.randomUUID(),
+                    createdAt: new Date().toISOString(),
+                  }));
+                  setTasks(prev => [...prev, ...withIds]);
+                }
+              }}
+              onClose={() => setScheduleProject(null)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL FINITIONS ─────────────────────────────────────── */}
       {selectedProject && (

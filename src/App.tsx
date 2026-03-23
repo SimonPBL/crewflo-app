@@ -550,7 +550,7 @@ const App = () => {
       case 'suppliers':
         return <SupplierList suppliers={suppliers} setSuppliers={setSuppliers} canEdit={canEdit} />;
       case 'projects':
-        return <ProjectList projects={visibleProjects} setProjects={setProjects} canEdit={canEdit} />;
+        return <ProjectList projects={visibleProjects} setProjects={setProjects} canEdit={canEdit} suppliers={suppliers} tasks={tasks} setTasks={setTasks} />;
       case 'ai':
         return <AIAssistant tasks={tasks} suppliers={suppliers} projects={projects} />;
       case 'mytasks':
