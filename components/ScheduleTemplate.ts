@@ -54,6 +54,9 @@ export const SCHEDULE_TEMPLATE: ScheduleCategory[] = [
     emoji: '🔧',
     items: [
       { key: 'plomberie_ss',        label: 'Plomberie SS',                   type: 'task' },
+      { key: 'coulee_dalle_ss',     label: 'Coulée dalle SS',                 type: 'task' },
+      { key: 'coulee_garage',       label: 'Coulée garage',                   type: 'task' },
+      { key: 'coulee_balcon',       label: 'Coulée balcon',                   type: 'task' },
       { key: 'mesure_intermat',     label: 'Prise de mesure Intermat',        type: 'task' },
       { key: 'elevation_plomberie', label: 'Élévation plomberie',            type: 'task' },
       { key: 'elevation_ventil',    label: 'Élévation ventilation',           type: 'task' },
@@ -80,6 +83,7 @@ export const SCHEDULE_TEMPLATE: ScheduleCategory[] = [
       { key: 'inst_gypse',      label: 'Installation gypse', type: 'task' },
       { key: 'joints',          label: 'Joints', type: 'task' },
       { key: 'peinture',        label: 'Peinture', type: 'task' },
+      { key: 'finition_elec_pre',   label: 'Finition électricité', type: 'task' },
     ],
   },
   {
@@ -120,9 +124,9 @@ export const SCHEDULE_TEMPLATE: ScheduleCategory[] = [
     items: [
       { key: 'plomberie_finale',   label: 'Plomberie finale',     type: 'task' },
       { key: 'finition_ventil',    label: 'Finition ventilation', type: 'task' },
-      { key: 'finition_elec',      label: 'Finition électricité', type: 'task' },
+      { key: 'menage_rough',       label: 'Ménage rough',         type: 'task' },
       { key: 'peinture_finale',    label: 'Peinture finale',      type: 'task' },
-      { key: 'menage',             label: 'Ménage',               type: 'task' },
+      { key: 'menage',             label: 'Ménage final',         type: 'task' },
     ],
   },
 ];
