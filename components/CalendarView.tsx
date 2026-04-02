@@ -483,15 +483,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           className="rounded-lg px-2 py-1 text-center font-bold text-xs flex-shrink-0">
                           {isDelivery ? '📦' : init}
                         </div>
-                        {/* Main content */}
+                        {/* Main content + dates inline */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-slate-800">{task.title}</span>
                             {supplier && (
                               <span style={{background: chipBg, color: chipTc}}
                                 className="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0">
                                 {supplier.name}
                               </span>
+                            )}
+                            {/* Date inline right after supplier */}
+                            {sameDay ? (
+                              <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex-shrink-0">{startStr}</span>
+                            ) : (
+                              <span className="text-xs text-slate-400 flex-shrink-0">{startStr} → {endStr}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -504,17 +510,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                               <span className="text-xs text-slate-400 truncate max-w-xs">{task.notes}</span>
                             )}
                           </div>
-                        </div>
-                        {/* Dates */}
-                        <div className="text-right flex-shrink-0">
-                          {sameDay ? (
-                            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{startStr}</span>
-                          ) : (
-                            <div className="text-xs text-slate-500">
-                              <div className="font-medium">{startStr}</div>
-                              <div className="text-slate-400">→ {endStr}</div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
