@@ -513,7 +513,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             const dayLabel = day.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
             return (
               <div key={dayStr} className={`rounded-xl border overflow-hidden ${isWE ? 'border-blue-200' : ccq ? 'border-orange-200' : 'border-slate-200'}`}>
-                <div className={`px-3 py-2 flex items-center gap-2 ${isWE ? 'bg-blue-50' : ccq ? 'bg-orange-50' : isToday ? 'bg-blue-600' : 'bg-slate-50'}`}>
+                <div
+                  onClick={() => { setDayModalDate(day); setIsDayModalOpen(true); }}
+                  className={`px-3 py-2 flex items-center gap-2 cursor-pointer ${isWE ? 'bg-blue-50 hover:bg-blue-100' : ccq ? 'bg-orange-50' : isToday ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-50 hover:bg-slate-100'}`}>
                   <span className={`text-sm font-bold capitalize ${isToday ? 'text-white' : 'text-slate-700'}`}>{dayLabel}</span>
                   {ccq && <span className="text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full">{ccq}</span>}
                   {isToday && <span className="text-xs bg-white/30 text-white px-2 py-0.5 rounded-full">Aujourd'hui</span>}
