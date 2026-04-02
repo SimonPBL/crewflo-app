@@ -111,7 +111,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
 
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false); // État pour la modale email
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [selectedEmailSuppliers, setSelectedEmailSuppliers] = useState<string[]>([]);
   const [isAllDay, setIsAllDay] = useState(true);
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
   const [showNotesSuggestions, setShowNotesSuggestions] = useState(false);
@@ -343,7 +344,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         const t1 = tasksToCheck[i];
         const t2 = tasksToCheck[j];
 
-        if (t1.supplierId === t2.supplierId) {
+        // Conflit = même fournisseur + chantiers DIFFÉRENTS + dates qui se chevauchent
+        if (t1.supplierId === t2.supplierId && t1.projectId !== t2.projectId) {
           const start1 = new Date(t1.start).getTime();
           const end1 = new Date(t1.end).getTime();
           const start2 = new Date(t2.start).getTime();
@@ -402,11 +404,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         dayStart.setHours(0,0,0,0);
         const dayEnd = new Date(date);
         dayEnd.setHours(23,59,59,999);
-        return tasksToRender.filter(t => {
+        const matched = tasksToRender.filter(t => {
           const tStart = new Date(t.start);
           const tEnd = new Date(t.end);
           return tStart <= dayEnd && tEnd >= dayStart;
         });
+        // Vue globale (pas de chantier sélectionné) : 1 seul badge par fournisseur par jour
+        if (!currentProjectId) {
+          const seen = new Set<string>();
+          return matched.filter(t => {
+            if (seen.has(t.supplierId)) return false;
+            seen.add(t.supplierId);
+            return true;
+          });
+        }
+        return matched;
     };
 
     const weekDaysHeader = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
@@ -791,12 +803,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
   };
 
-  const handlePrepareEmail = () => setIsEmailModalOpen(true);
+  const handlePrepareEmail = () => {
+    setSelectedEmailSuppliers(suppliers.filter(s => s.email?.trim()).map(s => s.id));
+    setIsEmailModalOpen(true);
+  };
 
   const confirmSendEmail = () => {
-    const supplierEmails = suppliers.filter(s => s.email?.trim()).map(s => s.email).join(',');
+    const supplierEmails = suppliers.filter(s => s.email?.trim() && selectedEmailSuppliers.includes(s.id)).map(s => s.email).join(',');
     const subject = encodeURIComponent(`Cédule Chantier - ${new Date().toLocaleDateString()}`);
-    const body = encodeURIComponent(`Bonjour,\n\nVeuillez trouver ci-joint la cédule de chantier mise à jour.\n\nMerci,\nCrewFlo`);
+    const body = encodeURIComponent(`Bonjour,\n\nVeuillez prendre notes que la cédule a été mise à jour pour un de vos chantiers en cours.\n\nMerci,\nCrewFlo`);
     const link = document.createElement('a');
     link.href = `mailto:?bcc=${supplierEmails}&subject=${subject}&body=${body}`;
     document.body.appendChild(link);
@@ -994,7 +1009,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       const dates = visibleTasks
         .flatMap((t: any) => [new Date(t.start), new Date(t.end)])
         .filter(d => !isNaN(d.getTime()));
-      if (dates.length === 0) return [generateMonthGrid(currentDate, 0)];
+      if (dates.length === 0) return allMonthsData; // admin mobile sans tâches → utilise allMonthsData pour permettre navigation
       const minTs = Math.min(...dates.map(d => d.getTime()));
       const maxTs = Math.max(...dates.map(d => d.getTime()));
       if (isNaN(minTs) || isNaN(maxTs)) return [generateMonthGrid(currentDate, 0)];
@@ -1840,14 +1855,54 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
       {/* Email Modal */}
       {isEmailModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
-            <button onClick={() => setIsEmailModalOpen(false)} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5" /></button>
-            <h3 className="text-lg font-bold mb-4">Confirmation d'envoi</h3>
-            <p className="text-sm text-slate-600 mb-6">Envoyer la cédule à {suppliers.filter(s => s.email).length} fournisseurs ?</p>
-            <div className="flex justify-end gap-3">
-                <button onClick={() => setIsEmailModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Annuler</button>
-                <button onClick={confirmSendEmail} className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2"><Mail className="w-4 h-4" /> Envoyer</button>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800">Envoyer la cédule</h3>
+              <button onClick={() => setIsEmailModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="px-5 py-2 flex-shrink-0">
+              <p className="text-sm text-slate-500 mb-2">Sélectionner les fournisseurs à notifier :</p>
+              <div className="flex gap-2">
+                <button onClick={() => setSelectedEmailSuppliers(suppliers.filter(s => s.email?.trim()).map(s => s.id))}
+                  className="text-xs text-blue-600 hover:underline">Tout sélectionner</button>
+                <span className="text-slate-300">|</span>
+                <button onClick={() => setSelectedEmailSuppliers([])}
+                  className="text-xs text-slate-500 hover:underline">Tout désélectionner</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-2 space-y-2">
+              {suppliers.filter(s => s.email?.trim()).map(s => (
+                <label key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    checked={selectedEmailSuppliers.includes(s.id)}
+                    onChange={e => setSelectedEmailSuppliers(prev =>
+                      e.target.checked ? [...prev, s.id] : prev.filter(id => id !== s.id)
+                    )}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={`w-3 h-3 rounded-sm flex-shrink-0 ${s.color?.split(' ')[0] || 'bg-slate-300'}`} />
+                    <span className="text-sm font-medium text-slate-800 truncate">{s.name}</span>
+                    <span className="text-xs text-slate-400 truncate">{s.email}</span>
+                  </div>
+                </label>
+              ))}
+              {suppliers.filter(s => s.email?.trim()).length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Aucun fournisseur avec une adresse email.</p>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex gap-3">
+              <button onClick={() => setIsEmailModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Annuler</button>
+              <button
+                onClick={confirmSendEmail}
+                disabled={selectedEmailSuppliers.length === 0}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <Mail className="w-4 h-4" />
+                Envoyer ({selectedEmailSuppliers.length})
+              </button>
             </div>
           </div>
         </div>

@@ -40,13 +40,12 @@ export const TRADES = [
   'Plombier',
   'Ventilation',
   'Charpentier',
-  'Menuisier',
-  'Carreleur',
   'Peintre',
   'Maçon',
   'Couvreur',
   'Paysagiste',
   'Cuisiniste',
+  'Plâtrier',
   'Général'
 ];
 
