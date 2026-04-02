@@ -84,6 +84,7 @@ export const SCHEDULE_TEMPLATE: ScheduleCategory[] = [
       { key: 'joints',          label: 'Joints', type: 'task' },
       { key: 'peinture',        label: 'Peinture', type: 'task' },
       { key: 'finition_elec_pre',   label: 'Finition électricité', type: 'task' },
+      { key: 'finition_ventil',     label: 'Finition ventilation', type: 'task' },
     ],
   },
   {
@@ -123,7 +124,6 @@ export const SCHEDULE_TEMPLATE: ScheduleCategory[] = [
     emoji: '✨',
     items: [
       { key: 'plomberie_finale',   label: 'Plomberie finale',     type: 'task' },
-      { key: 'finition_ventil',    label: 'Finition ventilation', type: 'task' },
       { key: 'menage_rough',       label: 'Ménage rough',         type: 'task' },
       { key: 'peinture_finale',    label: 'Peinture finale',      type: 'task' },
       { key: 'menage',             label: 'Ménage final',         type: 'task' },
