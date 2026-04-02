@@ -403,7 +403,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // ── AgendaView component (Option 4) ──────────────────────────
   const AgendaView: React.FC<{ tasksToRender: Task[] }> = ({ tasksToRender }) => {
     const sorted = [...tasksToRender].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-    // Group by day
     const groups: Record<string, Task[]> = {};
     sorted.forEach(task => {
       const tStart = new Date(task.start); tStart.setHours(0,0,0,0);
@@ -421,51 +420,103 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     if (keys.length === 0) return (
       <div className="text-center text-slate-400 text-sm py-12">Aucune tâche à afficher.</div>
     );
+    // Tailwind bg → hex (inline styles to avoid purge issues)
+    const BG: Record<string,string> = {
+      'bg-red-200':'#fecaca','bg-orange-200':'#fed7aa','bg-amber-200':'#fde68a',
+      'bg-yellow-200':'#fef08a','bg-lime-200':'#d9f99d','bg-green-200':'#bbf7d0',
+      'bg-emerald-200':'#a7f3d0','bg-teal-200':'#99f6e4','bg-cyan-200':'#a5f3fc',
+      'bg-sky-200':'#bae6fd','bg-blue-200':'#bfdbfe','bg-indigo-200':'#c7d2fe',
+      'bg-violet-200':'#ddd6fe','bg-purple-200':'#e9d5ff','bg-fuchsia-200':'#f5d0fe',
+      'bg-pink-200':'#fbcfe8','bg-rose-200':'#fecdd3',
+      'bg-red-400':'#f87171','bg-orange-400':'#fb923c','bg-amber-400':'#fbbf24',
+      'bg-lime-400':'#a3e635','bg-green-500':'#22c55e','bg-teal-500':'#14b8a6',
+      'bg-cyan-500':'#06b6d4','bg-blue-500':'#3b82f6','bg-indigo-500':'#6366f1',
+      'bg-purple-500':'#a855f7','bg-pink-500':'#ec4899',
+    };
+    const TC: Record<string,string> = {
+      'text-red-800':'#991b1b','text-orange-800':'#9a3412','text-amber-800':'#92400e',
+      'text-yellow-800':'#854d0e','text-lime-800':'#3f6212','text-green-800':'#166534',
+      'text-emerald-800':'#065f46','text-teal-800':'#115e59','text-cyan-800':'#155e75',
+      'text-sky-800':'#075985','text-blue-800':'#1e40af','text-indigo-800':'#3730a3',
+      'text-violet-800':'#5b21b6','text-purple-800':'#6b21a8','text-fuchsia-800':'#86198f',
+      'text-pink-800':'#9d174d','text-rose-800':'#9f1239','text-white':'#ffffff',
+    };
     return (
-      <div className="space-y-4">
+      <div className="space-y-2 pb-8">
         {keys.map(dateKey => {
           const date = new Date(dateKey + 'T12:00:00');
           const isToday = dateKey === today;
           const ccq = CCQ_HOLIDAYS[dateKey];
           const isWE = date.getDay() === 0 || date.getDay() === 6;
           const dayLabel = date.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+          const headerBg = isToday ? '#1e40af' : isWE ? '#eff6ff' : ccq ? '#fff7ed' : '#f1f5f9';
+          const headerTc = isToday ? '#ffffff' : isWE ? '#1e40af' : ccq ? '#c2410c' : '#475569';
           return (
-            <div key={dateKey}>
-              <div className={`flex items-center gap-2 mb-2 sticky top-0 py-1 z-10 ${isWE ? 'bg-blue-50' : ccq ? 'bg-orange-50' : 'bg-slate-100'}`}>
-                <span className={`text-xs font-bold uppercase tracking-wide ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>{dayLabel}</span>
-                {isToday && <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">Aujourd'hui</span>}
-                {ccq && <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">{ccq}</span>}
+            <div key={dateKey} className="mb-3">
+              {/* Day header — sticky */}
+              <div style={{background: headerBg}} className="flex items-center gap-3 px-3 py-2 rounded-lg mb-2 sticky top-0 z-10">
+                <span style={{color: headerTc}} className="text-sm font-bold capitalize">{dayLabel}</span>
+                {isToday && <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">Aujourd'hui</span>}
+                {ccq && !isToday && <span style={{color:headerTc}} className="text-xs opacity-80">{ccq}</span>}
+                <span style={{color: headerTc, opacity: 0.5}} className="ml-auto text-xs">{groups[dateKey].length} tâche{groups[dateKey].length > 1 ? 's' : ''}</span>
               </div>
-              <div className="space-y-2">
+              {/* Tasks */}
+              <div className="space-y-1.5 pl-1">
                 {groups[dateKey].map(task => {
                   const supplier = suppliers.find(s => s.id === task.supplierId);
                   const project = projects.find(p => p.id === task.projectId);
                   const isDelivery = task.notes?.startsWith('📦 Livraison');
-                  const colorParts = (supplier?.color || 'bg-slate-200 text-slate-800 border-slate-300').split(' ');
-                  const borderColor = isDelivery ? 'border-l-amber-400' : (colorParts[2]?.replace('border-', 'border-l-') || 'border-l-slate-300');
+                  const parts = (supplier?.color || 'bg-slate-300 text-slate-800 border-slate-400').split(' ');
+                  const chipBg = isDelivery ? '#fef9c3' : (BG[parts[0]] ?? '#e2e8f0');
+                  const chipTc = isDelivery ? '#92400e' : (TC[parts[1]] ?? '#1e293b');
+                  const init = supplier ? getInitials(supplier.name) : '?';
+                  const startStr = new Date(task.start).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
+                  const endStr = new Date(task.end).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
+                  const sameDay = task.start.slice(0,10) === task.end.slice(0,10);
                   return (
                     <div key={task.id}
                       onClick={() => { if (canEdit) { handleEditTask(new MouseEvent('click') as any, task); } else { openTaskViewOnly(task); } }}
-                      className={`bg-white rounded-lg border border-slate-200 border-l-4 ${borderColor} p-3 cursor-pointer hover:bg-slate-50 transition-colors`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            {isDelivery && <span className="text-xs">📦</span>}
-                            <span className="text-sm font-semibold text-slate-800 truncate">{task.title}</span>
+                      className="bg-white rounded-xl border border-slate-200 p-3 cursor-pointer hover:shadow-sm hover:border-slate-300 transition-all">
+                      <div className="flex items-center gap-3">
+                        {/* Supplier color chip */}
+                        <div style={{background: chipBg, color: chipTc, minWidth: '2.5rem'}}
+                          className="rounded-lg px-2 py-1 text-center font-bold text-xs flex-shrink-0">
+                          {isDelivery ? '📦' : init}
+                        </div>
+                        {/* Main content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-slate-800">{task.title}</span>
+                            {supplier && (
+                              <span style={{background: chipBg, color: chipTc}}
+                                className="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                                {supplier.name}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs text-slate-500 flex flex-wrap gap-x-2">
-                            {supplier && <span className={`font-medium ${colorParts[1] || 'text-slate-700'}`}>{supplier.name}</span>}
-                            {!currentProjectId && project && <span>· {project.name}</span>}
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {!currentProjectId && project && (
+                              <span className="text-xs text-slate-400 flex items-center gap-0.5">
+                                <MapPin className="w-3 h-3" />{project.name}
+                              </span>
+                            )}
+                            {task.notes && !isDelivery && (
+                              <span className="text-xs text-slate-400 truncate max-w-xs">{task.notes}</span>
+                            )}
                           </div>
                         </div>
+                        {/* Dates */}
                         <div className="text-right flex-shrink-0">
-                          <div className="text-xs text-slate-400">
-                            {new Date(task.start).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}
-                            {task.start.slice(0,10) !== task.end.slice(0,10) && ` → ${new Date(task.end).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`}
-                          </div>
+                          {sameDay ? (
+                            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{startStr}</span>
+                          ) : (
+                            <div className="text-xs text-slate-500">
+                              <div className="font-medium">{startStr}</div>
+                              <div className="text-slate-400">→ {endStr}</div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {task.notes && !isDelivery && <div className="text-xs text-slate-400 mt-1 truncate">{task.notes}</div>}
                     </div>
                   );
                 })}
