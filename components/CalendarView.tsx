@@ -667,16 +667,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         ))}
                     </div>
 
-                    {/* Option 2: Mobile week zoom row labels */}
-                    {isMobile && onWeekClick && monthsToShow === 1 && (
-                      <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
-                        {monthData.days.filter((_,i) => i % 7 === 0).map((weekStart, wi) => (
-                          <button key={wi} onClick={() => onWeekClick(weekStart)}
-                            className="col-span-7 text-left px-2 py-0.5 text-[10px] text-blue-500 hover:bg-blue-50 font-medium border-b border-slate-100 last:border-0 flex items-center gap-1">
-                            <span>Semaine du {weekStart.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</span>
-                            <span className="ml-auto text-blue-400">↗</span>
-                          </button>
-                        ))}
+                    {/* Option 2: Week zoom buttons — toutes les semaines, tous les écrans */}
+                    {onWeekClick && !isPdf && (
+                      <div className="divide-y divide-slate-100 border-b border-slate-200 bg-slate-50">
+                        {monthData.days.filter((_,i) => i % 7 === 0).map((weekStart, wi) => {
+                          const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+                          const inMonth = weekStart.getMonth() === monthData.monthIndex || weekEnd.getMonth() === monthData.monthIndex;
+                          if (!inMonth) return null;
+                          return (
+                            <button key={wi} onClick={() => onWeekClick(weekStart)}
+                              className="w-full text-left px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 font-medium flex items-center gap-1.5 transition-colors">
+                              <span className="bg-blue-600 text-white text-[9px] font-bold px-1 py-0.5 rounded leading-none">↗</span>
+                              <span>Semaine du {weekStart.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     {/* Days Grid */}
@@ -1362,7 +1367,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           ) : weekZoomDate ? (
             <WeekZoomView weekDate={weekZoomDate} tasksToRender={visibleTasks} onBack={() => setWeekZoomDate(null)} interactive={canEdit} />
           ) : (
-            <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} isMobile={isMobileScreen} onWeekClick={isMobileScreen ? (d: Date) => setWeekZoomDate(d) : undefined} />
+            <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} isMobile={isMobileScreen} onWeekClick={(d: Date) => setWeekZoomDate(d)} />
           )}
         </div>
       </div>

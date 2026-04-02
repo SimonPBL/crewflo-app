@@ -46,6 +46,7 @@ export const TRADES = [
   'Paysagiste',
   'Cuisiniste',
   'Plâtrier',
+  'Cimentier',
   'Général'
 ];
 
