@@ -1282,7 +1282,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           <select value={filterSupplierId} onChange={e => setFilterSupplierId(e.target.value)}
             className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none max-w-[140px] truncate">
             <option value="all">Tous les fournisseurs</option>
-            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {[...suppliers].sort((a,b) => a.name.localeCompare(b.name,'fr',{sensitivity:'base'})).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           {/* Toggle 1/4 mois — desktop */}
           {!isMobileScreen && calendarViewMode === 'calendar' && (
@@ -2092,7 +2092,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-2 space-y-2">
-              {suppliers.filter(s => s.email?.trim()).map(s => (
+              {[...suppliers].filter(s => s.email?.trim()).sort((a,b) => a.name.localeCompare(b.name,'fr',{sensitivity:'base'})).map(s => (
                 <label key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
                   <input
                     type="checkbox"
