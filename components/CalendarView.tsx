@@ -667,23 +667,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         ))}
                     </div>
 
-                    {/* Option 2: Week zoom buttons — toutes les semaines, tous les écrans */}
-                    {onWeekClick && !isPdf && (
-                      <div className="divide-y divide-slate-100 border-b border-slate-200 bg-slate-50">
-                        {monthData.days.filter((_,i) => i % 7 === 0).map((weekStart, wi) => {
-                          const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
-                          const inMonth = weekStart.getMonth() === monthData.monthIndex || weekEnd.getMonth() === monthData.monthIndex;
-                          if (!inMonth) return null;
-                          return (
-                            <button key={wi} onClick={() => onWeekClick(weekStart)}
-                              className="w-full text-left px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 font-medium flex items-center gap-1.5 transition-colors">
-                              <span className="bg-blue-600 text-white text-[9px] font-bold px-1 py-0.5 rounded leading-none">↗</span>
-                              <span>Semaine du {weekStart.toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+
                     {/* Days Grid */}
                     <div className={`grid grid-cols-7 bg-slate-200 gap-px ${isPdf ? 'gap-0.5 bg-slate-800 border-b border-slate-800' : ''}`}>
                     {monthData.days.map((day, i) => {
@@ -1367,7 +1351,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           ) : weekZoomDate ? (
             <WeekZoomView weekDate={weekZoomDate} tasksToRender={visibleTasks} onBack={() => setWeekZoomDate(null)} interactive={canEdit} />
           ) : (
-            <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} isMobile={isMobileScreen} onWeekClick={(d: Date) => setWeekZoomDate(d)} />
+            <CalendarGrid tasksToRender={visibleTasks} interactive={canEdit} isMobile={isMobileScreen} onWeekClick={isMobileScreen ? (d: Date) => setWeekZoomDate(d) : undefined} />
           )}
         </div>
       </div>
