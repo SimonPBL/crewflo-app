@@ -1004,7 +1004,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const handlePrepareEmail = () => {
-    setSelectedEmailSuppliers(suppliers.filter(s => s.email?.trim()).map(s => s.id));
+    setSelectedEmailSuppliers([]);
     setIsEmailModalOpen(true);
   };
 
