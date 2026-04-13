@@ -685,9 +685,9 @@ const App = () => {
 
           <div className="pt-4 pb-2 text-xs font-bold text-slate-500 uppercase px-3">Projets</div>
           {sidebarProjects.map(p => (
-            <button key={p.id} onClick={() => { setCurrentView('calendar'); setSelectedProjectId(p.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentView === 'calendar' && selectedProjectId === p.id ? 'bg-blue-900/50 text-blue-200 border border-blue-800' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-              <div className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="truncate">{p.name}</span>
+            <button key={p.id} onClick={() => { setCurrentView('calendar'); setSelectedProjectId(p.id); setIsSidebarOpen(false); }} className={`w-full flex items-start gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${currentView === 'calendar' && selectedProjectId === p.id ? 'bg-blue-900/50 text-blue-200 border border-blue-800' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+              <span className="leading-tight">{p.address || p.name}</span>
             </button>
           ))}
           
