@@ -306,18 +306,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const month = targetDate.getMonth();
     
     const firstDayOfMonth = new Date(year, month, 1);
-    const dayOfWeek = firstDayOfMonth.getDay();
-    const diff = dayOfWeek; // Sunday=0 is first day of week
-    
-    const startDate = new Date(firstDayOfMonth);
-    startDate.setDate(firstDayOfMonth.getDate() - diff);
-    startDate.setHours(0, 0, 0, 0);
+    const dayOfWeek = firstDayOfMonth.getDay(); // used for offset in week header
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+    // Only include actual days of the month (no padding from prev/next month)
     const days = [];
-    const d = new Date(startDate);
-    for (let i = 0; i < 42; i++) {
-      days.push(new Date(d));
-      d.setDate(d.getDate() + 1);
+    for (let d = 1; d <= daysInMonth; d++) {
+      days.push(new Date(year, month, d));
     }
     return {
         monthLabel: targetDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
@@ -670,10 +665,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
                     {/* Days Grid */}
                     <div className={`grid grid-cols-7 bg-slate-200 gap-px ${isPdf ? 'gap-0.5 bg-slate-800 border-b border-slate-800' : ''}`}>
+                    {/* Padding empty cells for first week */}
+                    {Array.from({length: new Date(monthData.year, monthData.monthIndex, 1).getDay()}).map((_,pi) => (
+                      <div key={`pad-${pi}`} className={`bg-white ${isPdf ? 'min-h-[100px] p-1 border-r border-b border-slate-200' : 'min-h-[100px] p-1'}`} />
+                    ))}
                     {monthData.days.map((day, i) => {
                         // Option 2: week row click indicator — tap week label on mobile
                         const isToday = new Date().toDateString() === day.toDateString();
-                        const isCurrentMonth = day.getMonth() === monthData.monthIndex;
+                        const isCurrentMonth = true; // all days are now current month only
                         const dayTasks = getTasksForDay(day);
                         const selected = interactive && isDaySelected(day);
 
