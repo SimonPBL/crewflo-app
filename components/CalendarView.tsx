@@ -744,7 +744,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 const colorClass = isDelivery
                                   ? 'bg-amber-200 text-amber-900 border-amber-400'
                                   : supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
-                                const hasConflict = conflicts.some(c => c.taskA.id === task.id || c.taskB.id === task.id);
+                                // Conflit seulement sur les jours précis où les tâches se chevauchent
+                                const hasConflict = conflicts.some(c => {
+                                  if (c.taskA.id !== task.id && c.taskB.id !== task.id) return false;
+                                  // L'autre tâche du conflit
+                                  const other = c.taskA.id === task.id ? c.taskB : c.taskA;
+                                  // Vérifier si CE jour précis est dans la plage de l'autre tâche
+                                  const otherStart = new Date(other.start); otherStart.setHours(0,0,0,0);
+                                  const otherEnd = new Date(other.end); otherEnd.setHours(23,59,59,999);
+                                  const dayStart = new Date(day); dayStart.setHours(0,0,0,0);
+                                  const dayEnd = new Date(day); dayEnd.setHours(23,59,59,999);
+                                  return dayStart <= otherEnd && dayEnd >= otherStart;
+                                });
 
                                 const isNew = !isPdf && task.createdAt
                                   ? (Date.now() - new Date(task.createdAt).getTime()) < 48 * 60 * 60 * 1000
