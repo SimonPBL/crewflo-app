@@ -1,8 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
 import { Project, Supplier, Task } from '../types';
 import { Check, X, ChevronDown, ChevronRight, AlertCircle, Truck, Calendar, Download, Loader2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 type ItemStatus = 'pending' | 'active' | 'na';
@@ -145,7 +144,6 @@ export const ProjectSchedule: React.FC<Props> = ({
   );
   const [generated, setGenerated] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const pdfRef = useRef<HTMLDivElement>(null);
 
   // Pré-remplir depuis les tâches existantes au chargement
   useEffect(() => {
@@ -212,23 +210,239 @@ export const ProjectSchedule: React.FC<Props> = ({
     setTimeout(() => setGenerated(false), 3000);
   };
 
-  const downloadPDF = async () => {
-    if (!pdfRef.current) return;
+  const downloadPDF = () => {
     setIsExporting(true);
-    await new Promise(r => setTimeout(r, 300));
     try {
-      const canvas = await html2canvas(pdfRef.current, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        width: 794, // A4-ish width
-        windowWidth: 794,
-      });
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215.9, 355.6], compress: true }); // legal
-      const imgData = canvas.toDataURL('image/jpeg', 0.9);
-      const pW = 215.9;
-      const pH = (canvas.height * pW) / canvas.width;
-      pdf.addImage(imgData, 'JPEG', 0, 0, pW, pH, undefined, 'FAST');
-      const fileName = `Cedule_${project.name.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+      // Format 8.5×14 (legal) portrait, unité mm
+      const PW = 215.9, PH = 355.6;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [PW, PH], compress: true });
+
+      // ── Palette ──────────────────────────────────────────────
+      const NAVY   = '#1a3a5c';
+      const HDR    = '#2a4a6b';
+      const EXT_BG = '#2d4a2d';
+      const NOTES  = '#3a3a3a';
+      const YEL    = '#fef9c3';
+      const YELD   = '#ca8a04';
+      const GL     = '#f5f7fa';
+      const GM     = '#d0d0d0';
+
+      const MG = 8;          // margin mm
+      const GAP = 4;         // gap between cols mm
+      const CW = (PW - 2*MG - GAP) / 2;  // ~97mm per col
+      const TW = CW * 0.54;  // tâche col width
+      const DW = CW * 0.23;  // date col width
+      const RH = 5.5;        // row height mm
+      const HDR_H = 5.5;     // col header height
+      const CAT_H = 5;       // category band height
+
+      // ── Helper: hex to rgb ────────────────────────────────────
+      const hex = (h: string) => {
+        const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+        return [r,g,b] as [number,number,number];
+      };
+
+      // ── Helper: filled rect ───────────────────────────────────
+      const fillRect = (x:number,y:number,w:number,h:number,color:string) => {
+        pdf.setFillColor(...hex(color));
+        pdf.rect(x,y,w,h,'F');
+      };
+
+      // ── Helper: border rect ───────────────────────────────────
+      const strokeRect = (x:number,y:number,w:number,h:number,color:string,lw=0.15) => {
+        pdf.setDrawColor(...hex(color));
+        pdf.setLineWidth(lw);
+        pdf.rect(x,y,w,h,'S');
+      };
+
+      // ── Helper: text ─────────────────────────────────────────
+      const txt = (text:string, x:number, y:number, size:number, color:string, bold=false, align:'left'|'center'='left') => {
+        pdf.setFontSize(size);
+        pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+        pdf.setTextColor(...hex(color));
+        if (align === 'center') {
+          pdf.text(text, x, y, {align:'center'});
+        } else {
+          pdf.text(text, x, y);
+        }
+      };
+
+      // ── Helper: col headers ───────────────────────────────────
+      const drawColHdr = (x:number, y:number) => {
+        fillRect(x, y, CW, HDR_H, HDR);
+        txt('TÂCHE',      x+1.5, y+3.5, 6, '#ffffff', true);
+        txt('DATE DÉBUT', x+TW+DW/2, y+3.5, 6, '#ffffff', true, 'center');
+        txt('DATE FIN',   x+TW+DW+DW/2, y+3.5, 6, '#ffffff', true, 'center');
+        pdf.setDrawColor(...hex('#456a8a'));
+        pdf.setLineWidth(0.15);
+        pdf.line(x+TW, y, x+TW, y+HDR_H);
+        pdf.line(x+TW+DW, y, x+TW+DW, y+HDR_H);
+      };
+
+      // ── Helper: task row ──────────────────────────────────────
+      const drawRow = (label:string, isDel:boolean, startD:string, endD:string, x:number, y:number, idx:number) => {
+        const bg = isDel ? YEL : idx%2===0 ? GL : '#ffffff';
+        fillRect(x, y, CW, RH, bg);
+        strokeRect(x, y, CW, RH, GM);
+        pdf.setDrawColor(...hex(GM)); pdf.setLineWidth(0.15);
+        pdf.line(x+TW, y, x+TW, y+RH);
+        pdf.line(x+TW+DW, y, x+TW+DW, y+RH);
+        if (isDel) {
+          pdf.setFillColor(...hex(YELD));
+          pdf.circle(x+2.5, y+RH/2, 1.2, 'F');
+          // Shorten label to fit
+          const maxLabel = pdf.splitTextToSize(label, TW-5);
+          txt(maxLabel[0], x+5, y+3.5, 6.5, '#7a5000', true);
+        } else {
+          const maxLabel = pdf.splitTextToSize(label, TW-3);
+          txt(maxLabel[0], x+1.5, y+3.5, 6.5, '#1a1a1a', false);
+        }
+        txt(startD, x+TW+DW/2, y+3.5, 6.5, '#333333', false, 'center');
+        txt(endD,   x+TW+DW+DW/2, y+3.5, 6.5, '#333333', false, 'center');
+      };
+
+      // ── Date formatter ────────────────────────────────────────
+      const fmtDate = (iso:string) => {
+        if (!iso) return '';
+        const d = new Date(iso + 'T12:00:00');
+        return d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+      };
+
+      // ── Task list ─────────────────────────────────────────────
+      const MAIN_ITEMS: {label:string, del:boolean, catKey:string, itemKey:string}[] = [
+        {label:'Excavation',del:false,catKey:'fondation',itemKey:'excavation'},
+        {label:'Footing',del:false,catKey:'fondation',itemKey:'footing'},
+        {label:'Coffrage fondation',del:false,catKey:'fondation',itemKey:'coffrage_fondation'},
+        {label:'Backfill',del:false,catKey:'fondation',itemKey:'backfill'},
+        {label:'Livraison trust/poutrelle',del:true,catKey:'structure',itemKey:'livraison_trust'},
+        {label:'Structure',del:false,catKey:'structure',itemKey:'structure'},
+        {label:'Trust',del:false,catKey:'structure',itemKey:'trust'},
+        {label:'Bardeaux',del:false,catKey:'structure',itemKey:'bardeaux'},
+        {label:'Livraison fenêtres',del:true,catKey:'structure',itemKey:'livraison_fenetres'},
+        {label:'Mat électrique',del:false,catKey:'structure',itemKey:'mat_electrique'},
+        {label:'Plomberie SS',del:false,catKey:'mecanique_brute',itemKey:'plomberie_ss'},
+        {label:'Uréthane roche',del:false,catKey:'mecanique_brute',itemKey:'urethane_roche'},
+        {label:'Division',del:false,catKey:'mecanique_brute',itemKey:'division'},
+        {label:'Coulée béton',del:false,catKey:'mecanique_brute',itemKey:'coulee_beton'},
+        {label:'Prise de mesure Intermat',del:false,catKey:'mecanique_brute',itemKey:'mesure_intermat'},
+        {label:'Élévation plomberie',del:false,catKey:'mecanique_brute',itemKey:'elevation_plomberie'},
+        {label:'Élévation ventilation',del:false,catKey:'mecanique_brute',itemKey:'elevation_ventil'},
+        {label:'Tuyauterie aspiration centrale',del:false,catKey:'mecanique_brute',itemKey:'aspiration'},
+        {label:'Électricité élévation',del:false,catKey:'mecanique_brute',itemKey:'electricite_elev'},
+        {label:'Uréthane mur',del:false,catKey:'isolation',itemKey:'urethane_mur'},
+        {label:'Porte de garage',del:false,catKey:'isolation',itemKey:'porte_garage'},
+        {label:'Cellulose',del:false,catKey:'isolation',itemKey:'cellulose'},
+        {label:'Tôle système centrale',del:false,catKey:'isolation',itemKey:'tole'},
+        {label:'Livraison gypse',del:true,catKey:'gypse',itemKey:'livraison_gypse'},
+        {label:'Installation gypse',del:false,catKey:'gypse',itemKey:'inst_gypse'},
+        {label:'Joints',del:false,catKey:'gypse',itemKey:'joints'},
+        {label:'Ménage',del:false,catKey:'gypse',itemKey:'menage'},
+        {label:'Peinture',del:false,catKey:'gypse',itemKey:'peinture'},
+        {label:'Livraison céramique',del:true,catKey:'ceramique',itemKey:'livraison_ceramique'},
+        {label:'Installation céramique',del:false,catKey:'ceramique',itemKey:'inst_ceramique'},
+        {label:'Livraison plancher',del:true,catKey:'planchers_escaliers',itemKey:'livraison_plancher'},
+        {label:'Livraison escalier',del:true,catKey:'planchers_escaliers',itemKey:'livraison_escalier'},
+        {label:'Installation escalier',del:false,catKey:'planchers_escaliers',itemKey:'inst_escalier'},
+        {label:'Installation plancher',del:false,catKey:'planchers_escaliers',itemKey:'inst_plancher'},
+        {label:'Livraison armoires',del:true,catKey:'armoires_boiseries',itemKey:'livraison_armoires'},
+        {label:'Installation armoire',del:false,catKey:'armoires_boiseries',itemKey:'inst_armoire'},
+        {label:'Livraison boiseries',del:true,catKey:'armoires_boiseries',itemKey:'livraison_boiseries'},
+        {label:'Installation boiseries',del:false,catKey:'armoires_boiseries',itemKey:'inst_boiseries'},
+        {label:'Plomberie finale',del:false,catKey:'finitions',itemKey:'plomberie_finale'},
+        {label:'Finition électricité',del:false,catKey:'finitions',itemKey:'finition_elec'},
+        {label:'Finition ventilation',del:false,catKey:'finitions',itemKey:'finition_ventil'},
+        {label:'Ménage rough',del:false,catKey:'finitions',itemKey:'menage_rough'},
+        {label:'Peinture finale',del:false,catKey:'finitions',itemKey:'peinture_finale'},
+        {label:'Ménage final',del:false,catKey:'finitions',itemKey:'menage_final'},
+      ];
+      const EXT_L = [
+        {label:'Brique',catKey:'exterieur',itemKey:'brique'},
+        {label:'Revêtement',catKey:'exterieur',itemKey:'revetement'},
+        {label:'Balcon bois',catKey:'exterieur',itemKey:'balcon_bois'},
+      ];
+      const EXT_R = [
+        {label:'Ligne gaz / thermopompe',catKey:'exterieur',itemKey:'ligne_gaz'},
+        {label:'Gouttière',catKey:'exterieur',itemKey:'gouttiere'},
+        {label:'Nivellement final',catKey:'exterieur',itemKey:'nivellement'},
+      ];
+
+      const getD = (catKey:string, itemKey:string) => {
+        const e = entries[`${catKey}_${itemKey}`];
+        return e ? { start: fmtDate(e.startDate), end: fmtDate(e.endDate) } : { start:'', end:'' };
+      };
+
+      const SPLIT = Math.ceil(MAIN_ITEMS.length / 2);
+      const leftItems = MAIN_ITEMS.slice(0, SPLIT);
+      const rightItems = MAIN_ITEMS.slice(SPLIT);
+
+      // ── HEADER ────────────────────────────────────────────────
+      fillRect(0, 0, PW, 16, NAVY);
+      txt('CÉDULE DE CHANTIER', MG, 8, 14, '#ffffff', true);
+      txt('Chantier :', MG, 13, 7, '#a0b8cc');
+      txt(project.address || project.name, MG+16, 13, 7, '#ffffff');
+      // Legend dot
+      pdf.setFillColor(...hex(YELD));
+      pdf.circle(PW-MG-28, 7, 2, 'F');
+      pdf.setDrawColor(...hex('#a07000')); pdf.setLineWidth(0.3);
+      pdf.circle(PW-MG-28, 7, 2, 'S');
+      txt('= Livraison de matériaux', PW-MG-24, 8.5, 6, '#e0c060', false);
+
+      // ── COLUMN HEADERS ────────────────────────────────────────
+      let y = 17;
+      const LX = MG;
+      const RX = MG + CW + GAP;
+      drawColHdr(LX, y);
+      drawColHdr(RX, y);
+      y += HDR_H;
+
+      // ── TASK ROWS ─────────────────────────────────────────────
+      const maxRows = Math.max(leftItems.length, rightItems.length);
+      for (let i = 0; i < maxRows; i++) {
+        if (leftItems[i]) {
+          const {label,del,catKey,itemKey} = leftItems[i];
+          const {start,end} = getD(catKey,itemKey);
+          drawRow(label, del, start, end, LX, y, i);
+        }
+        if (rightItems[i]) {
+          const {label,del,catKey,itemKey} = rightItems[i];
+          const {start,end} = getD(catKey,itemKey);
+          drawRow(label, del, start, end, RX, y, i);
+        }
+        y += RH;
+      }
+
+      // ── TRAVAUX EXTÉRIEURS ────────────────────────────────────
+      y += 2;
+      const EXT_HDR_H = 5;
+      const drawExtSection = (x:number, items:typeof EXT_L) => {
+        fillRect(x, y, CW, EXT_HDR_H, EXT_BG);
+        txt('TRAVAUX EXTÉRIEURS — CALENDRIER FLEXIBLE', x+1.5, y+3.5, 5.5, '#ffffff', true);
+        drawColHdr(x, y+EXT_HDR_H);
+        items.forEach((item,i) => {
+          const {start,end} = getD(item.catKey,item.itemKey);
+          drawRow(item.label, false, start, end, x, y+EXT_HDR_H+HDR_H+(i*RH), i);
+        });
+      };
+      drawExtSection(LX, EXT_L);
+      drawExtSection(RX, EXT_R);
+
+      y += EXT_HDR_H + HDR_H + (3 * RH) + 2;
+
+      // ── NOTES ─────────────────────────────────────────────────
+      fillRect(MG, y, PW-2*MG, 5, NOTES);
+      txt('NOTES & TÂCHES SUPPLÉMENTAIRES', MG+1.5, y+3.5, 5.5, '#ffffff', true);
+      y += 5;
+      for (let i = 0; i < 6; i++) {
+        fillRect(MG, y, PW-2*MG, RH, i%2===0 ? GL : '#ffffff');
+        strokeRect(MG, y, PW-2*MG, RH, GM);
+        y += RH;
+      }
+
+      // ── FOOTER ────────────────────────────────────────────────
+      txt('Habitations PBL  |  CrewFlo  |  Format 8.5×14', MG, PH-3, 5.5, '#94a3b8');
+      txt('Fond jaune = Livraison de matériaux', PW-MG, PH-3, 5.5, '#94a3b8', false, 'center');
+
+      const fileName = `Cedule_${(project.address||project.name).replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
       pdf.save(fileName);
     } catch(e) {
       console.error(e);
@@ -404,147 +618,6 @@ export const ProjectSchedule: React.FC<Props> = ({
         )}
       </div>
     </div>
-    {/* ── PDF PRINTABLE TEMPLATE (off-screen) ─────────────────── */}
-      <div style={{position:'fixed', top:0, left:'-9999px', width:'794px', pointerEvents:'none', zIndex:-1}}>
-        <div ref={pdfRef} style={{width:'794px', background:'#fff', fontFamily:'Helvetica, Arial, sans-serif', fontSize:'10px'}}>
-          {(() => {
-            // Flatten all tasks with their entry data
-            const allItems: {label:string, isDelivery:boolean, start:string, end:string, catKey:string}[] = [];
-            SCHEDULE_TEMPLATE.filter(cat => cat.key !== 'exterieur').forEach(cat => {
-              cat.items.forEach(item => {
-                const key = `${cat.key}_${item.key}`;
-                const entry = entries[key];
-                allItems.push({
-                  label: item.label,
-                  isDelivery: item.type === 'delivery',
-                  start: entry?.startDate || '',
-                  end: entry?.endDate || '',
-                  catKey: cat.key,
-                });
-              });
-            });
-            const extCat = SCHEDULE_TEMPLATE.find(c => c.key === 'exterieur');
-            const extItems = extCat ? extCat.items.map(item => {
-              const key = `exterieur_${item.key}`;
-              const entry = entries[key];
-              return { label: item.label, start: entry?.startDate || '', end: entry?.endDate || '' };
-            }) : [];
-
-            const SPLIT = Math.ceil(allItems.length / 2);
-            const leftItems = allItems.slice(0, SPLIT);
-            const rightItems = allItems.slice(SPLIT);
-            const ROW_H = 22;
-            const COL_W = 375;
-            const TW = COL_W * 0.54;
-            const DW = COL_W * 0.23;
-            const NAVY = '#1a3a5c';
-            const HDR_BG = '#2a4a6b';
-            const EXT_BG = '#2d4a2d';
-            const NOTES_BG = '#3a3a3a';
-            const YELLOW = '#fef9c3';
-            const YELLOW_D = '#ca8a04';
-            const GREY_L = '#f5f7fa';
-            const GREY_M = '#d0d0d0';
-            const GAP = 18;
-            const MARGIN = 18;
-
-            const fmtDate = (d: string) => {
-              if (!d) return '';
-              const dt = new Date(d + 'T12:00:00');
-              return dt.toLocaleDateString('fr-CA', {day:'2-digit', month:'2-digit', year:'2-digit'});
-            };
-
-            const renderRow = (label: string, isDelivery: boolean, start: string, end: string, idx: number) => (
-              <div key={`${label}-${idx}`} style={{
-                display:'flex', height:`${ROW_H}px`,
-                background: isDelivery ? YELLOW : idx % 2 === 0 ? GREY_L : '#fff',
-                borderBottom:`0.5px solid ${GREY_M}`,
-              }}>
-                <div style={{width:`${TW}px`, padding:'0 6px', display:'flex', alignItems:'center', borderRight:`0.5px solid ${GREY_M}`, flexShrink:0}}>
-                  {isDelivery && (
-                    <span style={{width:'8px', height:'8px', borderRadius:'50%', background:YELLOW_D, display:'inline-block', marginRight:'5px', flexShrink:0}} />
-                  )}
-                  <span style={{fontSize:'8.5px', fontWeight: isDelivery ? 'bold' : 'normal', color: isDelivery ? '#7a5000' : '#1a1a1a', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
-                    {label}
-                  </span>
-                </div>
-                <div style={{width:`${DW}px`, padding:'0 4px', display:'flex', alignItems:'center', justifyContent:'center', borderRight:`0.5px solid ${GREY_M}`, fontSize:'8px', color:'#333', flexShrink:0}}>{fmtDate(start)}</div>
-                <div style={{width:`${DW}px`, padding:'0 4px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'8px', color:'#333', flexShrink:0}}>{fmtDate(end)}</div>
-              </div>
-            );
-
-            const renderColHeader = () => (
-              <div style={{display:'flex', height:'22px', background:HDR_BG}}>
-                <div style={{width:`${TW}px`, padding:'0 6px', display:'flex', alignItems:'center', color:'#fff', fontSize:'8px', fontWeight:'bold', borderRight:`0.5px solid #456`, flexShrink:0}}>TÂCHE</div>
-                <div style={{width:`${DW}px`, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'8px', fontWeight:'bold', borderRight:`0.5px solid #456`, flexShrink:0}}>DATE DÉBUT</div>
-                <div style={{width:`${DW}px`, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'8px', fontWeight:'bold', flexShrink:0}}>DATE FIN</div>
-              </div>
-            );
-
-            return (
-              <div>
-                {/* Header */}
-                <div style={{background:NAVY, padding:'10px 18px 8px', display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                  <div>
-                    <div style={{color:'#fff', fontSize:'17px', fontWeight:'bold', letterSpacing:'0.02em'}}>CÉDULE DE CHANTIER</div>
-                    <div style={{color:'#a0b8cc', fontSize:'8.5px', marginTop:'4px', display:'flex', alignItems:'center', gap:'4px'}}>
-                      Chantier :
-                      <span style={{color:'#fff', borderBottom:'0.5px solid #5a7a9a', paddingBottom:'1px', minWidth:'180px', display:'inline-block', marginLeft:'4px'}}>
-                        {project.address || project.name}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{display:'flex', alignItems:'center', gap:'5px', marginTop:'2px'}}>
-                    <span style={{width:'10px', height:'10px', borderRadius:'50%', background:YELLOW_D, border:`1px solid #a07000`, display:'inline-block'}} />
-                    <span style={{color:'#e0c060', fontSize:'7.5px', fontStyle:'italic'}}>= Livraison de matériaux</span>
-                  </div>
-                </div>
-
-                {/* Two columns */}
-                <div style={{display:'flex', margin:`0 ${MARGIN}px`, gap:`${GAP}px`, marginTop:'4px'}}>
-                  {/* Left col */}
-                  <div style={{width:`${COL_W}px`, border:`0.5px solid ${GREY_M}`, overflow:'hidden'}}>
-                    {renderColHeader()}
-                    {leftItems.map((item, i) => renderRow(item.label, item.isDelivery, item.start, item.end, i))}
-                  </div>
-                  {/* Right col */}
-                  <div style={{width:`${COL_W}px`, border:`0.5px solid ${GREY_M}`, overflow:'hidden'}}>
-                    {renderColHeader()}
-                    {rightItems.map((item, i) => renderRow(item.label, item.isDelivery, item.start, item.end, i))}
-                  </div>
-                </div>
-
-                {/* Travaux extérieurs */}
-                {extItems.length > 0 && (
-                  <div style={{display:'flex', margin:`6px ${MARGIN}px 0`, gap:`${GAP}px`}}>
-                    {[extItems.slice(0, Math.ceil(extItems.length/2)), extItems.slice(Math.ceil(extItems.length/2))].map((half, hi) => (
-                      <div key={hi} style={{width:`${COL_W}px`, border:`0.5px solid ${GREY_M}`, overflow:'hidden'}}>
-                        <div style={{background:EXT_BG, color:'#fff', fontSize:'7.5px', fontWeight:'bold', padding:'5px 6px'}}>TRAVAUX EXTÉRIEURS — CALENDRIER FLEXIBLE</div>
-                        {renderColHeader()}
-                        {half.map((item, i) => renderRow(item.label, false, item.start, item.end, i))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Notes */}
-                <div style={{margin:`6px ${MARGIN}px 0`}}>
-                  <div style={{background:NOTES_BG, color:'#fff', fontSize:'7.5px', fontWeight:'bold', padding:'5px 6px'}}>NOTES & TÂCHES SUPPLÉMENTAIRES</div>
-                  {[...Array(6)].map((_,i) => (
-                    <div key={i} style={{height:'22px', background: i%2===0?GREY_L:'#fff', borderBottom:`0.5px solid ${GREY_M}`, border:`0.5px solid ${GREY_M}`}} />
-                  ))}
-                </div>
-
-                {/* Footer */}
-                <div style={{display:'flex', justifyContent:'space-between', padding:'6px 18px 8px', marginTop:'4px'}}>
-                  <span style={{fontSize:'6.5px', color:'#64748b'}}>Habitations PBL  |  CrewFlo  |  Format 8.5×14</span>
-                  <span style={{fontSize:'6.5px', color:'#64748b'}}>Fond jaune = Livraison de matériaux</span>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      </div>
     </>
   );
 };
