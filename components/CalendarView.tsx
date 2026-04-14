@@ -1572,18 +1572,113 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             })()}
           </div>
 
-          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasklist" data-project-id={project.id}>
-            <div className="flex justify-between items-center mb-6 border-b pb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
-                <div className="text-slate-500 text-sm">{project.name}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{allMonthsData[0]?.monthLabel}</div>
-              </div>
-            </div>
-            <TaskDetailsTable tasksForPage={tasks.filter(t => t.projectId === project.id)} />
-            <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
+          <div className="pdf-page bg-white" data-pdf-type="tasklist" data-project-id={project.id}
+            style={{width:'794px', fontFamily:'Helvetica, Arial, sans-serif'}}>
+            {(() => {
+              const projTasks = tasks.filter(t => t.projectId === project.id);
+              const fmtDate = (iso: string) => {
+                if (!iso) return '';
+                const d = new Date(iso + (iso.includes('T') ? '' : 'T12:00:00'));
+                return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(2)}`;
+              };
+              const getTaskDates = (label: string) => {
+                const t = projTasks.find(tk => tk.title === label);
+                return t ? { start: fmtDate(t.start), end: fmtDate(t.end) } : { start:'', end:'' };
+              };
+              const MAIN_ITEMS = [
+                {label:'Excavation',del:false},{label:'Footing',del:false},{label:'Coffrage fondation',del:false},{label:'Backfill',del:false},
+                {label:'Livraison trust/poutrelle',del:true},{label:'Structure',del:false},{label:'Trust',del:false},{label:'Bardeaux',del:false},
+                {label:'Livraison fenêtres',del:true},{label:'Mat électrique',del:false},{label:'Plomberie SS',del:false},
+                {label:'Uréthane roche',del:false},{label:'Division',del:false},{label:'Coulée béton',del:false},
+                {label:'Prise de mesure Intermat',del:false},{label:'Élévation plomberie',del:false},{label:'Élévation ventilation',del:false},
+                {label:'Tuyauterie aspiration centrale',del:false},{label:'Électricité élévation',del:false},{label:'Uréthane mur',del:false},
+                {label:'Porte de garage',del:false},{label:'Cellulose',del:false},{label:'Tôle système centrale',del:false},
+                {label:'Livraison gypse',del:true},{label:'Installation gypse',del:false},{label:'Joints',del:false},
+                {label:'Ménage',del:false},{label:'Peinture',del:false},{label:'Livraison céramique',del:true},
+                {label:'Installation céramique',del:false},{label:'Livraison plancher',del:true},{label:'Livraison escalier',del:true},
+                {label:'Installation escalier',del:false},{label:'Installation plancher',del:false},{label:'Livraison armoires',del:true},
+                {label:'Installation armoire',del:false},{label:'Livraison boiseries',del:true},{label:'Installation boiseries',del:false},
+                {label:'Plomberie finale',del:false},{label:'Finition électricité',del:false},{label:'Finition ventilation',del:false},
+                {label:'Ménage rough',del:false},{label:'Peinture finale',del:false},{label:'Ménage final',del:false},
+              ];
+              const EXT_L = [{label:'Brique'},{label:'Revêtement'},{label:'Balcon bois'}];
+              const EXT_R = [{label:'Ligne gaz / thermopompe'},{label:'Gouttière'},{label:'Nivellement final'}];
+              const SPLIT = Math.ceil(MAIN_ITEMS.length / 2);
+              const leftItems = MAIN_ITEMS.slice(0, SPLIT);
+              const rightItems = MAIN_ITEMS.slice(SPLIT);
+              const NAVY='#1a3a5c', HDR='#2a4a6b', EXT='#2d4a2d', NOTES='#3a3a3a';
+              const YEL='#fef9c3', YELD='#ca8a04', GL='#f5f7fa', GM='#d0d0d0';
+              const CW=363, TW=196, DW=83, RH=21, GAP=16, MG=14;
+              const ColHdr = () => (
+                <div style={{display:'flex',height:'21px',background:HDR}}>
+                  <div style={{width:TW,padding:'0 5px',display:'flex',alignItems:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',borderRight:`0.5px solid #456`,flexShrink:0}}>TÂCHE</div>
+                  <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',borderRight:`0.5px solid #456`,flexShrink:0}}>DATE DÉBUT</div>
+                  <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',flexShrink:0}}>DATE FIN</div>
+                </div>
+              );
+              const Row = ({label,del,idx}:{label:string,del:boolean,idx:number}) => {
+                const {start,end} = getTaskDates(label);
+                return (
+                  <div style={{display:'flex',height:RH,background:del?YEL:idx%2===0?GL:'#fff',borderBottom:`0.5px solid ${GM}`}}>
+                    <div style={{width:TW,padding:'0 5px',display:'flex',alignItems:'center',borderRight:`0.5px solid ${GM}`,flexShrink:0,overflow:'hidden'}}>
+                      {del && <span style={{width:'7px',height:'7px',borderRadius:'50%',background:YELD,display:'inline-block',marginRight:'4px',flexShrink:0}}/>}
+                      <span style={{fontSize:'8px',fontWeight:del?'bold':'normal',color:del?'#7a5000':'#1a1a1a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{label}</span>
+                    </div>
+                    <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'7.5px',color:'#444',borderRight:`0.5px solid ${GM}`,flexShrink:0}}>{start}</div>
+                    <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'7.5px',color:'#444',flexShrink:0}}>{end}</div>
+                  </div>
+                );
+              };
+              return (
+                <div>
+                  {/* Header */}
+                  <div style={{background:NAVY,padding:'9px 14px 7px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                    <div>
+                      <div style={{color:'#fff',fontSize:'16px',fontWeight:'bold',letterSpacing:'0.02em'}}>CÉDULE DE CHANTIER</div>
+                      <div style={{color:'#a0b8cc',fontSize:'8px',marginTop:'4px',display:'flex',alignItems:'center',gap:'3px'}}>
+                        Chantier :
+                        <span style={{color:'#fff',borderBottom:'0.5px solid #5a7a9a',paddingBottom:'1px',minWidth:'160px',display:'inline-block',marginLeft:'3px'}}>{project.address || project.name}</span>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:'4px',marginTop:'3px'}}>
+                      <span style={{width:'9px',height:'9px',borderRadius:'50%',background:YELD,border:'1px solid #a07000',display:'inline-block'}}/>
+                      <span style={{color:'#e0c060',fontSize:'7px',fontStyle:'italic'}}>= Livraison de matériaux</span>
+                    </div>
+                  </div>
+                  {/* 2 colonnes principales */}
+                  <div style={{display:'flex',margin:`3px ${MG}px 0`,gap:GAP}}>
+                    <div style={{width:CW,border:`0.5px solid ${GM}`,overflow:'hidden'}}>
+                      <ColHdr />
+                      {leftItems.map((item,i) => <Row key={item.label} label={item.label} del={item.del} idx={i} />)}
+                    </div>
+                    <div style={{width:CW,border:`0.5px solid ${GM}`,overflow:'hidden'}}>
+                      <ColHdr />
+                      {rightItems.map((item,i) => <Row key={item.label} label={item.label} del={item.del} idx={i} />)}
+                    </div>
+                  </div>
+                  {/* Travaux extérieurs */}
+                  <div style={{display:'flex',margin:`4px ${MG}px 0`,gap:GAP}}>
+                    {[EXT_L, EXT_R].map((half,hi) => (
+                      <div key={hi} style={{width:CW,border:`0.5px solid ${GM}`,overflow:'hidden'}}>
+                        <div style={{background:EXT,color:'#fff',fontSize:'7px',fontWeight:'bold',padding:'4px 5px'}}>TRAVAUX EXTÉRIEURS — CALENDRIER FLEXIBLE</div>
+                        <ColHdr />
+                        {half.map((item,i) => <Row key={item.label} label={item.label} del={false} idx={i} />)}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Notes */}
+                  <div style={{margin:`4px ${MG}px 0`}}>
+                    <div style={{background:NOTES,color:'#fff',fontSize:'7px',fontWeight:'bold',padding:'4px 5px'}}>NOTES & TÂCHES SUPPLÉMENTAIRES</div>
+                    {[...Array(6)].map((_,i) => <div key={i} style={{height:'21px',background:i%2===0?GL:'#fff',borderBottom:`0.5px solid ${GM}`,border:`0.5px solid ${GM}`}}/>)}
+                  </div>
+                  {/* Footer */}
+                  <div style={{display:'flex',justifyContent:'space-between',padding:'5px 14px 8px'}}>
+                    <span style={{fontSize:'6px',color:'#64748b'}}>Habitations PBL  |  CrewFlo  |  Format 8.5×14</span>
+                    <span style={{fontSize:'6px',color:'#64748b'}}>Fond jaune = Livraison de matériaux</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="finitions" data-project-id={project.id}>
