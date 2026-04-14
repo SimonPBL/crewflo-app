@@ -708,52 +708,41 @@ const App = () => {
           </button>
         </nav>
         
-        <div className="p-4 border-t border-slate-800 space-y-3 flex-none bg-slate-900/50">
-          <div className="flex justify-between items-center px-1 mb-1">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Cloud</span>
-            <StatusIndicator />
-          </div>
-
+        <div className="px-3 py-2 border-t border-slate-800 flex-none bg-slate-900/50">
+          {/* Install buttons — only when needed */}
           {!isStandalone && deferredPrompt && (
-            <button onClick={handleInstallClick} className="w-full flex items-center gap-2 px-3 py-2.5 mb-2 rounded text-xs font-bold transition-colors bg-blue-600 text-white hover:bg-blue-500 animate-in slide-in-from-left">
-              <Download className="w-4 h-4" /> Installer l'app
+            <button onClick={handleInstallClick} className="w-full flex items-center gap-2 px-2 py-1.5 mb-1.5 rounded text-[10px] font-bold transition-colors bg-blue-600 text-white hover:bg-blue-500">
+              <Download className="w-3 h-3" /> Installer l'app
             </button>
           )}
-
           {!isStandalone && isIos && (
-            <button onClick={() => setShowIosInstallModal(true)} className="w-full flex items-center gap-2 px-3 py-2.5 mb-2 rounded text-xs font-bold transition-colors bg-blue-600 text-white hover:bg-blue-500 animate-in slide-in-from-left">
-              <Download className="w-4 h-4" /> Installer sur iPhone
+            <button onClick={() => setShowIosInstallModal(true)} className="w-full flex items-center gap-2 px-2 py-1.5 mb-1.5 rounded text-[10px] font-bold transition-colors bg-blue-600 text-white hover:bg-blue-500">
+              <Download className="w-3 h-3" /> Installer sur iPhone
             </button>
           )}
-
-          <button onClick={() => setIsCloudModalOpen(true)} className={`w-full flex items-center gap-2 px-3 py-2.5 rounded text-xs font-bold transition-colors border ${isCloudConnected ? 'bg-green-900/20 text-green-400 border-green-900 hover:bg-green-900/40' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}>
-            {isCloudConnected ? <Wifi className="w-4 h-4" /> : <Cloud className="w-4 h-4" />}
-            {isCloudConnected ? 'Configuration' : 'Mode Collaboration'}
-          </button>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={exportData} className="flex flex-col items-center justify-center p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition-colors" title="Exporter">
-              <Save className="w-4 h-4 mb-1" /> <span className="text-[10px]">Backup</span>
+          {/* Compact row: Cloud + Backup + Restaurer */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setIsCloudModalOpen(true)} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex-1 ${isCloudConnected ? 'bg-green-900/20 text-green-400 border-green-900 hover:bg-green-900/40' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}>
+              {isCloudConnected ? <Wifi className="w-3 h-3 flex-shrink-0" /> : <Cloud className="w-3 h-3 flex-shrink-0" />}
+              <span className="truncate">{isCloudConnected ? 'Config.' : 'Cloud'}</span>
+              <StatusIndicator />
             </button>
-            <button onClick={handleImportClick} className="flex flex-col items-center justify-center p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition-colors" title="Importer">
-              <Upload className="w-4 h-4 mb-1" /> <span className="text-[10px]">Restaurer</span>
+            <button onClick={exportData} className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded text-[10px] transition-colors" title="Backup">
+              <Save className="w-3 h-3" /> Backup
+            </button>
+            <button onClick={handleImportClick} className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded text-[10px] transition-colors" title="Restaurer">
+              <Upload className="w-3 h-3" /> Rest.
             </button>
           </div>
-          
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-          
-          {!isCloudConnected && (
-            <div className="flex items-center gap-2 text-[10px] text-yellow-500 opacity-80 justify-center">
-              <CloudOff className="w-3 h-3 flex-shrink-0" /> <span>Mode Local</span>
-            </div>
-          )}
-
-          <div className="flex justify-between items-center pt-2 border-t border-slate-800 mt-1">
-            <button onClick={resetData} className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-red-400 transition-colors">
-              <RefreshCw className="w-3 h-3" /> Reset
+          {/* Reset + version — même ligne, discret */}
+          <div className="flex justify-between items-center mt-1">
+            {!isCloudConnected && <span className="text-[9px] text-yellow-600 opacity-70 flex items-center gap-0.5"><CloudOff className="w-2.5 h-2.5" /> Local</span>}
+            <button onClick={resetData} className="flex items-center gap-0.5 text-[9px] text-slate-700 hover:text-red-400 transition-colors ml-auto mr-2">
+              <RefreshCw className="w-2.5 h-2.5" /> Reset
             </button>
-            <button onClick={handleUpdateApp} className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-white transition-colors" title="Mettre à jour">
-              <Info className="w-3 h-3" /> v{APP_VERSION}
+            <button onClick={handleUpdateApp} className="flex items-center gap-0.5 text-[9px] text-slate-700 hover:text-white transition-colors" title="Mettre à jour">
+              <Info className="w-2.5 h-2.5" /> v{APP_VERSION}
             </button>
           </div>
         </div>
