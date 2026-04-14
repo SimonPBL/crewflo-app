@@ -1579,7 +1579,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               const fmtDate = (iso: string) => {
                 if (!iso) return '';
                 const d = new Date(iso + (iso.includes('T') ? '' : 'T12:00:00'));
-                return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(2)}`;
+                return d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
               };
               const getTaskDates = (label: string) => {
                 const t = projTasks.find(tk => tk.title === label);
@@ -1608,7 +1608,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               const rightItems = MAIN_ITEMS.slice(SPLIT);
               const NAVY='#1a3a5c', HDR='#2a4a6b', EXT='#2d4a2d', NOTES='#3a3a3a';
               const YEL='#fef9c3', YELD='#ca8a04', GL='#f5f7fa', GM='#d0d0d0';
-              const CW=363, TW=196, DW=83, RH=21, GAP=16, MG=14;
+              const CW=363, TW=180, DW=91, RH=22, GAP=16, MG=14;
               const ColHdr = () => (
                 <div style={{display:'flex',height:'21px',background:HDR}}>
                   <div style={{width:TW,padding:'0 5px',display:'flex',alignItems:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',borderRight:`0.5px solid #456`,flexShrink:0}}>TÂCHE</div>
@@ -1620,9 +1620,9 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 const {start,end} = getTaskDates(label);
                 return (
                   <div style={{display:'flex',height:RH,background:del?YEL:idx%2===0?GL:'#fff',borderBottom:`0.5px solid ${GM}`}}>
-                    <div style={{width:TW,padding:'0 5px',display:'flex',alignItems:'center',borderRight:`0.5px solid ${GM}`,flexShrink:0,overflow:'hidden'}}>
+                    <div style={{width:TW,padding:'0 4px',display:'flex',alignItems:'center',borderRight:`0.5px solid ${GM}`,flexShrink:0}}>
                       {del && <span style={{width:'7px',height:'7px',borderRadius:'50%',background:YELD,display:'inline-block',marginRight:'4px',flexShrink:0}}/>}
-                      <span style={{fontSize:'8px',fontWeight:del?'bold':'normal',color:del?'#7a5000':'#1a1a1a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{label}</span>
+                      <span style={{fontSize:'8px',fontWeight:del?'bold':'normal',color:del?'#7a5000':'#1a1a1a',lineHeight:'1.2'}}>{label}</span>
                     </div>
                     <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'7.5px',color:'#444',borderRight:`0.5px solid ${GM}`,flexShrink:0}}>{start}</div>
                     <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'7.5px',color:'#444',flexShrink:0}}>{end}</div>
