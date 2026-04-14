@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
 import { Project, Supplier, Task } from '../types';
-import { Check, X, ChevronDown, ChevronRight, AlertCircle, Truck, Calendar } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronRight, AlertCircle, Truck, Calendar, Download, Loader2 } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 type ItemStatus = 'pending' | 'active' | 'na';
 
@@ -86,9 +88,8 @@ const MiniDatePicker: React.FC<{
       </button>
 
       {open && (
-        <div className="mini-datepicker-popup" onClick={e => e.stopPropagation()}
-          style={{ position:'fixed', top:pos.top, left:pos.left, width:210, zIndex:99999 }}
-          className="mini-datepicker-popup bg-white border border-slate-200 rounded-xl shadow-2xl p-3">
+        <div className="mini-datepicker-popup bg-white border border-slate-200 rounded-xl shadow-2xl p-3" onClick={e => e.stopPropagation()}
+          style={{ position:'fixed', top:pos.top, left:pos.left, width:210, zIndex:99999 }}>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => { const d = new Date(viewDate); d.setMonth(d.getMonth()-1); setViewDate(d); }}
               className="p-1 hover:bg-slate-100 rounded text-slate-600">‹</button>
@@ -143,6 +144,8 @@ export const ProjectSchedule: React.FC<Props> = ({
     Object.fromEntries(SCHEDULE_TEMPLATE.map(c => [c.key, true]))
   );
   const [generated, setGenerated] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   // Pré-remplir depuis les tâches existantes au chargement
   useEffect(() => {
@@ -209,6 +212,31 @@ export const ProjectSchedule: React.FC<Props> = ({
     setTimeout(() => setGenerated(false), 3000);
   };
 
+  const downloadPDF = async () => {
+    if (!pdfRef.current) return;
+    setIsExporting(true);
+    await new Promise(r => setTimeout(r, 300));
+    try {
+      const canvas = await html2canvas(pdfRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        width: 794, // A4-ish width
+        windowWidth: 794,
+      });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [215.9, 355.6], compress: true }); // legal
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const pW = 215.9;
+      const pH = (canvas.height * pW) / canvas.width;
+      pdf.addImage(imgData, 'JPEG', 0, 0, pW, pH, undefined, 'FAST');
+      const fileName = `Cedule_${project.name.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+      pdf.save(fileName);
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -233,6 +261,11 @@ export const ProjectSchedule: React.FC<Props> = ({
                 : <>📅 Générer {readyToGenerate.length} tâche{readyToGenerate.length > 1 ? 's' : ''}</>}
             </button>
           )}
+          <button onClick={downloadPDF} disabled={isExporting}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-medium transition-colors">
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span className="hidden sm:inline">PDF</span>
+          </button>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
             <X className="w-5 h-5 text-slate-500" />
           </button>
@@ -368,6 +401,149 @@ export const ProjectSchedule: React.FC<Props> = ({
             📅 Générer {readyToGenerate.length} tâche{readyToGenerate.length > 1 ? 's' : ''}
           </button>
         )}
+      </div>
+    </div>
+
+      {/* ── PDF PRINTABLE TEMPLATE (off-screen) ─────────────────── */}
+      <div style={{position:'fixed', top:0, left:'-9999px', width:'794px', pointerEvents:'none', zIndex:-1}}>
+        <div ref={pdfRef} style={{width:'794px', background:'#fff', fontFamily:'Helvetica, Arial, sans-serif', fontSize:'10px'}}>
+          {(() => {
+            // Flatten all tasks with their entry data
+            const allItems: {label:string, isDelivery:boolean, start:string, end:string, catKey:string}[] = [];
+            SCHEDULE_TEMPLATE.filter(cat => cat.key !== 'exterieur').forEach(cat => {
+              cat.items.forEach(item => {
+                const key = `${cat.key}_${item.key}`;
+                const entry = entries[key];
+                allItems.push({
+                  label: item.label,
+                  isDelivery: item.type === 'delivery',
+                  start: entry?.startDate || '',
+                  end: entry?.endDate || '',
+                  catKey: cat.key,
+                });
+              });
+            });
+            const extCat = SCHEDULE_TEMPLATE.find(c => c.key === 'exterieur');
+            const extItems = extCat ? extCat.items.map(item => {
+              const key = `exterieur_${item.key}`;
+              const entry = entries[key];
+              return { label: item.label, start: entry?.startDate || '', end: entry?.endDate || '' };
+            }) : [];
+
+            const SPLIT = Math.ceil(allItems.length / 2);
+            const leftItems = allItems.slice(0, SPLIT);
+            const rightItems = allItems.slice(SPLIT);
+            const ROW_H = 22;
+            const COL_W = 375;
+            const TW = COL_W * 0.54;
+            const DW = COL_W * 0.23;
+            const NAVY = '#1a3a5c';
+            const HDR_BG = '#2a4a6b';
+            const EXT_BG = '#2d4a2d';
+            const NOTES_BG = '#3a3a3a';
+            const YELLOW = '#fef9c3';
+            const YELLOW_D = '#ca8a04';
+            const GREY_L = '#f5f7fa';
+            const GREY_M = '#d0d0d0';
+            const GAP = 18;
+            const MARGIN = 18;
+
+            const fmtDate = (d: string) => {
+              if (!d) return '';
+              const dt = new Date(d + 'T12:00:00');
+              return dt.toLocaleDateString('fr-CA', {day:'2-digit', month:'2-digit', year:'2-digit'});
+            };
+
+            const renderRow = (label: string, isDelivery: boolean, start: string, end: string, idx: number) => (
+              <div key={`${label}-${idx}`} style={{
+                display:'flex', height:`${ROW_H}px`,
+                background: isDelivery ? YELLOW : idx % 2 === 0 ? GREY_L : '#fff',
+                borderBottom:`0.5px solid ${GREY_M}`,
+              }}>
+                <div style={{width:`${TW}px`, padding:'0 6px', display:'flex', alignItems:'center', borderRight:`0.5px solid ${GREY_M}`, flexShrink:0}}>
+                  {isDelivery && (
+                    <span style={{width:'8px', height:'8px', borderRadius:'50%', background:YELLOW_D, display:'inline-block', marginRight:'5px', flexShrink:0}} />
+                  )}
+                  <span style={{fontSize:'8.5px', fontWeight: isDelivery ? 'bold' : 'normal', color: isDelivery ? '#7a5000' : '#1a1a1a', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
+                    {label}
+                  </span>
+                </div>
+                <div style={{width:`${DW}px`, padding:'0 4px', display:'flex', alignItems:'center', justifyContent:'center', borderRight:`0.5px solid ${GREY_M}`, fontSize:'8px', color:'#333', flexShrink:0}}>{fmtDate(start)}</div>
+                <div style={{width:`${DW}px`, padding:'0 4px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'8px', color:'#333', flexShrink:0}}>{fmtDate(end)}</div>
+              </div>
+            );
+
+            const renderColHeader = () => (
+              <div style={{display:'flex', height:'22px', background:HDR_BG}}>
+                <div style={{width:`${TW}px`, padding:'0 6px', display:'flex', alignItems:'center', color:'#fff', fontSize:'8px', fontWeight:'bold', borderRight:`0.5px solid #456`, flexShrink:0}}>TÂCHE</div>
+                <div style={{width:`${DW}px`, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'8px', fontWeight:'bold', borderRight:`0.5px solid #456`, flexShrink:0}}>DATE DÉBUT</div>
+                <div style={{width:`${DW}px`, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'8px', fontWeight:'bold', flexShrink:0}}>DATE FIN</div>
+              </div>
+            );
+
+            return (
+              <div>
+                {/* Header */}
+                <div style={{background:NAVY, padding:'10px 18px 8px', display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                  <div>
+                    <div style={{color:'#fff', fontSize:'17px', fontWeight:'bold', letterSpacing:'0.02em'}}>CÉDULE DE CHANTIER</div>
+                    <div style={{color:'#a0b8cc', fontSize:'8.5px', marginTop:'4px', display:'flex', alignItems:'center', gap:'4px'}}>
+                      Chantier :
+                      <span style={{color:'#fff', borderBottom:'0.5px solid #5a7a9a', paddingBottom:'1px', minWidth:'180px', display:'inline-block', marginLeft:'4px'}}>
+                        {project.address || project.name}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{display:'flex', alignItems:'center', gap:'5px', marginTop:'2px'}}>
+                    <span style={{width:'10px', height:'10px', borderRadius:'50%', background:YELLOW_D, border:`1px solid #a07000`, display:'inline-block'}} />
+                    <span style={{color:'#e0c060', fontSize:'7.5px', fontStyle:'italic'}}>= Livraison de matériaux</span>
+                  </div>
+                </div>
+
+                {/* Two columns */}
+                <div style={{display:'flex', margin:`0 ${MARGIN}px`, gap:`${GAP}px`, marginTop:'4px'}}>
+                  {/* Left col */}
+                  <div style={{width:`${COL_W}px`, border:`0.5px solid ${GREY_M}`, overflow:'hidden'}}>
+                    {renderColHeader()}
+                    {leftItems.map((item, i) => renderRow(item.label, item.isDelivery, item.start, item.end, i))}
+                  </div>
+                  {/* Right col */}
+                  <div style={{width:`${COL_W}px`, border:`0.5px solid ${GREY_M}`, overflow:'hidden'}}>
+                    {renderColHeader()}
+                    {rightItems.map((item, i) => renderRow(item.label, item.isDelivery, item.start, item.end, i))}
+                  </div>
+                </div>
+
+                {/* Travaux extérieurs */}
+                {extItems.length > 0 && (
+                  <div style={{display:'flex', margin:`6px ${MARGIN}px 0`, gap:`${GAP}px`}}>
+                    {[extItems.slice(0, Math.ceil(extItems.length/2)), extItems.slice(Math.ceil(extItems.length/2))].map((half, hi) => (
+                      <div key={hi} style={{width:`${COL_W}px`, border:`0.5px solid ${GREY_M}`, overflow:'hidden'}}>
+                        <div style={{background:EXT_BG, color:'#fff', fontSize:'7.5px', fontWeight:'bold', padding:'5px 6px'}}>TRAVAUX EXTÉRIEURS — CALENDRIER FLEXIBLE</div>
+                        {renderColHeader()}
+                        {half.map((item, i) => renderRow(item.label, false, item.start, item.end, i))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div style={{margin:`6px ${MARGIN}px 0`}}>
+                  <div style={{background:NOTES_BG, color:'#fff', fontSize:'7.5px', fontWeight:'bold', padding:'5px 6px'}}>NOTES & TÂCHES SUPPLÉMENTAIRES</div>
+                  {[...Array(6)].map((_,i) => (
+                    <div key={i} style={{height:'22px', background: i%2===0?GREY_L:'#fff', borderBottom:`0.5px solid ${GREY_M}`, border:`0.5px solid ${GREY_M}`}} />
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div style={{display:'flex', justifyContent:'space-between', padding:'6px 18px 8px', marginTop:'4px'}}>
+                  <span style={{fontSize:'6.5px', color:'#64748b'}}>Habitations PBL  |  CrewFlo  |  Format 8.5×14</span>
+                  <span style={{fontSize:'6.5px', color:'#64748b'}}>Fond jaune = Livraison de matériaux</span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );
