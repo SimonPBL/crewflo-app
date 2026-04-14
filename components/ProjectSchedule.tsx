@@ -238,6 +238,7 @@ export const ProjectSchedule: React.FC<Props> = ({
   };
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">
@@ -403,8 +404,7 @@ export const ProjectSchedule: React.FC<Props> = ({
         )}
       </div>
     </div>
-
-      {/* ── PDF PRINTABLE TEMPLATE (off-screen) ─────────────────── */}
+    {/* ── PDF PRINTABLE TEMPLATE (off-screen) ─────────────────── */}
       <div style={{position:'fixed', top:0, left:'-9999px', width:'794px', pointerEvents:'none', zIndex:-1}}>
         <div ref={pdfRef} style={{width:'794px', background:'#fff', fontFamily:'Helvetica, Arial, sans-serif', fontSize:'10px'}}>
           {(() => {
@@ -545,6 +545,6 @@ export const ProjectSchedule: React.FC<Props> = ({
           })()}
         </div>
       </div>
-    </div>
+    </>
   );
 };
