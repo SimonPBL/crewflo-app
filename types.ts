@@ -29,7 +29,7 @@ export interface Task {
   taskStatus?: 'pending' | 'confirmed' | 'declined';
   confirmedBySupplier?: boolean;
   adminNote?: { text: string; updatedAt: string };
-  supplierNotes?: { text: string; updatedAt: string };
+  supplierNotes?: { text: string; updatedAt: string; authorName?: string; authorId?: string };
 }
 
 export interface Conflict {
