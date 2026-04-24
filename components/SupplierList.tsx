@@ -212,34 +212,33 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             </div>
           )}
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Champs texte */}
-            <div className="lg:col-span-4">
-              <label className="block text-sm font-medium text-slate-600 mb-1">Nom de l'entreprise</label>
-              <input
-  type="text"
-  value={newSupplierName}
-  disabled={!canEdit}
-  onChange={(e) => setNewSupplierName(e.target.value)}
-  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-  placeholder="Ex: Plomberie Tremblay Inc."
-/>
-
-            </div>
-            
-            <div className="lg:col-span-4">
-              <label className="block text-sm font-medium text-slate-600 mb-1">Initiales calendrier (optionnel, max 3 car.)</label>
-              <input
-                type="text"
-                maxLength={3}
-                value={newSupplierInitials}
-                onChange={e => setNewSupplierInitials(e.target.value.toUpperCase())}
-                placeholder="ex: PCV"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Email (connexion fournisseur)</label>
+          <div className="flex flex-col gap-4">
+            {/* Ligne 1 : Nom + Initiales + Email */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Nom de l'entreprise</label>
+                <input
+                  type="text"
+                  value={newSupplierName}
+                  disabled={!canEdit}
+                  onChange={(e) => setNewSupplierName(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                  placeholder="Ex: Plomberie Tremblay Inc."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Initiales calendrier (max 3 car.)</label>
+                <input
+                  type="text"
+                  maxLength={3}
+                  value={newSupplierInitials}
+                  onChange={e => setNewSupplierInitials(e.target.value.toUpperCase())}
+                  placeholder="ex: PCV"
+                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Email (connexion fournisseur)</label>
               <input
                 type="text"
                 value={newSupplierEmail}
@@ -398,6 +397,17 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                               ))}
                               </select>
                           </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Initiales calendrier (max 3)</label>
+                          <input
+                            type="text"
+                            maxLength={3}
+                            value={editForm.customInitials || ''}
+                            onChange={e => setEditForm({...editForm, customInitials: e.target.value.toUpperCase().slice(0,3) || undefined})}
+                            placeholder="ex: PCV"
+                            className="w-full p-1.5 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none bg-white"
+                          />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase">Emails (séparés par virgule)</label>
