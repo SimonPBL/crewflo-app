@@ -227,6 +227,17 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             </div>
             
             <div className="lg:col-span-4">
+              <label className="block text-sm font-medium text-slate-600 mb-1">Initiales calendrier (optionnel, max 3 car.)</label>
+              <input
+                type="text"
+                maxLength={3}
+                value={newSupplierInitials}
+                onChange={e => setNewSupplierInitials(e.target.value.toUpperCase())}
+                placeholder="ex: PCV"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Email (connexion fournisseur)</label>
               <input
                 type="text"
@@ -352,7 +363,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
 
         {/* Liste des cartes */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[...suppliers].sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })).map(supplier => {
+          {suppliers.map(supplier => {
               const isEditing = editingId === supplier.id;
 
               return (

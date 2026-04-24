@@ -235,7 +235,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Helper pour formater le texte
   // Initiales à partir du nom (max 3 lettres)
-  const getInitials = (name: string) => {
+  const getInitials = (name: string, supplier?: Supplier) => {
+    if (supplier?.customInitials) return supplier.customInitials.toUpperCase().slice(0, 3);
     const words = name.trim().split(/\s+/);
     if (words.length === 1) return name.slice(0, 3).toUpperCase();
     return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
@@ -464,7 +465,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   const parts = (supplier?.color || 'bg-slate-300 text-slate-800 border-slate-400').split(' ');
                   const chipBg = isDelivery ? '#fef9c3' : (BG[parts[0]] ?? '#e2e8f0');
                   const chipTc = isDelivery ? '#92400e' : (TC[parts[1]] ?? '#1e293b');
-                  const init = supplier ? getInitials(supplier.name) : '?';
+                  const init = supplier ? getInitials(supplier.name, supplier) : '?';
                   const startStr = new Date(task.start).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
                   const endStr = new Date(task.end).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
                   const sameDay = task.start.slice(0,10) === task.end.slice(0,10);
@@ -575,7 +576,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           className={`rounded-lg px-3 py-2 text-sm font-medium cursor-pointer ${colorClass} border flex items-center gap-2`}>
                           {isDelivery && <span className="text-base">📦</span>}
                           <div className="min-w-0 flex-1">
-                            <div className="font-bold truncate">{supplier ? getInitials(supplier.name) : '?'} <span className="font-normal">{task.title}</span></div>
+                            <div className="font-bold truncate">{supplier ? getInitials(supplier.name, supplier) : '?'} <span className="font-normal">{task.title}</span></div>
                             {supplier && <div className="text-xs opacity-75 truncate">{supplier.name}</div>}
                           </div>
                         </div>
@@ -683,10 +684,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 bg-white flex flex-col relative group 
                                 ${isPdf ? 'min-h-[100px] p-1 border-r border-b border-slate-200' : isMobile && monthsToShow === 1 ? 'min-h-[90px] p-1.5' : 'min-h-[100px] p-1'}
                                 ${!isCurrentMonth ? 'bg-slate-50/50' : ''} 
-                                ${isCurrentMonth && getCCQHoliday(day) ? '!bg-orange-50' : ''}
-                                ${isCurrentMonth && !getCCQHoliday(day) && (day.getDay() === 0 || day.getDay() === 6) ? '!bg-blue-50' : ''}
-                                ${(interactive || !canEdit) ? 'hover:bg-slate-50 cursor-pointer' : ''} 
-                                ${selected ? '!bg-blue-100 ring-inset ring-2 ring-blue-300' : ''}
+                                ${isToday ? '!bg-blue-600' : ''}
+                                ${!isToday && isCurrentMonth && getCCQHoliday(day) ? '!bg-orange-50' : ''}
+                                ${!isToday && isCurrentMonth && !getCCQHoliday(day) && (day.getDay() === 0 || day.getDay() === 6) ? '!bg-blue-50' : ''}
+                                ${(interactive || !canEdit) ? 'hover:brightness-95 cursor-pointer' : ''} 
+                                ${!isToday && selected ? '!bg-blue-100 ring-inset ring-2 ring-blue-300' : ''}
                                 transition-colors
                             `}
                             onClick={(e) => {
@@ -720,14 +722,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             onMouseDown={(e) => interactive && handleDayMouseDown(day, e)}
                             onMouseEnter={() => interactive && handleDayMouseEnter(day)}
                         >
-                            <div className={`text-right font-medium mb-0.5 ${isToday ? 'text-blue-600 font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'} ${isPdf ? 'text-sm mb-2' : ''} ${isMobile && monthsToShow === 1 ? 'text-sm' : 'text-xs'}`}>
-                            <span className={`${isToday ? 'bg-blue-100 px-1.5 py-0.5 rounded-full' : ''}`}>
+                            <div className={`text-right font-medium mb-0.5 ${isToday ? 'text-white font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'} ${isPdf ? 'text-sm mb-2' : ''} ${isMobile && monthsToShow === 1 ? 'text-sm' : 'text-xs'}`}>
+                            <span>
                                 {day.getDate()}
                             </span>
                             </div>
                             {/* Congé CCQ */}
                             {isCurrentMonth && !isPdf && getCCQHoliday(day) && (
-                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight bg-orange-100 border border-orange-300 truncate" style={{fontSize:'6px', color:'#c2410c'}} title={getCCQHoliday(day) ?? ''}>
+                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight truncate" style={{fontSize:'6px', background: isToday ? 'rgba(255,255,255,0.2)' : '#ffedd5', color: isToday ? '#fff' : '#c2410c', border: isToday ? '1px solid rgba(255,255,255,0.3)' : '1px solid #fdba74'}} title={getCCQHoliday(day) ?? ''}>
                                 {getCCQHoliday(day)}
                               </div>
                             )}
@@ -745,17 +747,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                   ? 'bg-amber-200 text-amber-900 border-amber-400'
                                   : supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
                                 // Conflit seulement sur les jours précis où les tâches se chevauchent
-                                const hasConflict = conflicts.some(c => {
-                                  if (c.taskA.id !== task.id && c.taskB.id !== task.id) return false;
-                                  // L'autre tâche du conflit
-                                  const other = c.taskA.id === task.id ? c.taskB : c.taskA;
-                                  // Vérifier si CE jour précis est dans la plage de l'autre tâche
-                                  const otherStart = new Date(other.start); otherStart.setHours(0,0,0,0);
-                                  const otherEnd = new Date(other.end); otherEnd.setHours(23,59,59,999);
+                                const hasConflict = (() => {
+                                  // Pas de rouge si le jour est passé
+                                  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
                                   const dayStart = new Date(day); dayStart.setHours(0,0,0,0);
-                                  const dayEnd = new Date(day); dayEnd.setHours(23,59,59,999);
-                                  return dayStart <= otherEnd && dayEnd >= otherStart;
-                                });
+                                  if (dayStart < todayStart) return false;
+                                  return conflicts.some(c => {
+                                    if (c.taskA.id !== task.id && c.taskB.id !== task.id) return false;
+                                    const other = c.taskA.id === task.id ? c.taskB : c.taskA;
+                                    const otherStart = new Date(other.start); otherStart.setHours(0,0,0,0);
+                                    const otherEnd = new Date(other.end); otherEnd.setHours(23,59,59,999);
+                                    const dayEnd = new Date(day); dayEnd.setHours(23,59,59,999);
+                                    return dayStart <= otherEnd && dayEnd >= otherStart;
+                                  });
+                                })();
 
                                 const isNew = !isPdf && task.createdAt
                                   ? (Date.now() - new Date(task.createdAt).getTime()) < 48 * 60 * 60 * 1000
@@ -802,36 +807,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                               {project?.address && <div className="opacity-75 leading-tight text-[9px]">📍 {project.address}</div>}
                                             </>
                                           )
-                                        ) : (!isMobile && monthsToShow === 1) ? (
-                                          // Desktop 1 mois : texte complet
+                                        ) : (!isMobile) ? (
+                                          // Desktop toutes vues : titre en premier, nom fournisseur dessous
                                           currentProjectId ? (
                                             <>
                                               <div className="font-bold leading-tight break-words">{formatLabel(task.title)}</div>
-                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10">{formatLabel(supplier?.name)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10 truncate">{formatLabel(supplier?.name)}</div>
                                             </>
                                           ) : (
                                             <>
-                                              <div className="font-bold leading-tight break-words">{formatLabel(supplier?.name)}</div>
-                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10">{project?.name}</div>
-                                              {project?.address && <div className="opacity-75 leading-tight text-[9px] mt-0.5">📍 {project.address}</div>}
+                                              <div className="font-bold leading-tight break-words">{formatLabel(task.title)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10 truncate">{formatLabel(supplier?.name)}</div>
                                             </>
                                           )
                                         ) : (
-                                          // Mobile ou vue 4 mois : initiales + adresse courte
+                                          // Mobile : titre en premier, initiales dessous
                                           <>
                                             <div className="font-bold leading-tight truncate" style={{fontSize:'8px'}}>
-                                              {supplier ? getInitials(supplier.name) : '?'}
+                                              {formatLabel(task.title)}
                                             </div>
-                                            {!currentProjectId && project?.address && (
-                                              <div className="leading-tight truncate opacity-75" style={{fontSize:'7px'}}>
-                                                {project.address.split(',')[0].trim()}
-                                              </div>
-                                            )}
-                                            {currentProjectId && task.title && (
-                                              <div className="leading-tight truncate opacity-90" style={{fontSize:'7px'}}>
-                                                {task.title}
-                                              </div>
-                                            )}
+                                            <div className="leading-tight truncate opacity-90" style={{fontSize:'7px'}}>
+                                              {supplier ? getInitials(supplier.name, supplier) : '?'}
+                                            </div>
                                           </>
                                         )}
                                     </div>

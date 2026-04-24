@@ -5,6 +5,7 @@ export interface Supplier {
   trade: string; // e.g., Electricien, Plombier
   color: string;
   email?: string;
+  customInitials?: string; // max 3 caractères
 }
 
 export interface Project {
