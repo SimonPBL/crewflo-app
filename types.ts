@@ -6,6 +6,7 @@ export interface Supplier {
   color: string;
   email?: string;
   customInitials?: string; // max 3 caractères
+  supabaseUserId?: string;
 }
 
 export interface Project {
@@ -25,6 +26,10 @@ export interface Task {
   start: string;      // ISO Date String
   end: string;        // ISO Date String
   createdAt?: string; // ISO Date String — set at creation, never modified
+  taskStatus?: 'pending' | 'confirmed' | 'declined';
+  confirmedBySupplier?: boolean;
+  adminNote?: { text: string; updatedAt: string };
+  supplierNotes?: { text: string; updatedAt: string };
 }
 
 export interface Conflict {
@@ -34,7 +39,7 @@ export interface Conflict {
   message: string;
 }
 
-export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai';
+export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks';
 
 export const TRADES = [
   'Électricien',
