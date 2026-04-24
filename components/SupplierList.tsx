@@ -29,6 +29,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [newSupplierTrade, setNewSupplierTrade] = useState(TRADES[0]);
   const [newSupplierEmail, setNewSupplierEmail] = useState('');
+  const [newSupplierInitials, setNewSupplierInitials] = useState('');
   const [newSupplierColor, setNewSupplierColor] = useState(COLORS[0]);
 
   // State pour l'édition
