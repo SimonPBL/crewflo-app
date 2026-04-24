@@ -212,33 +212,34 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             </div>
           )}
           
-          <div className="flex flex-col gap-4">
-            {/* Ligne 1 : Nom + Initiales + Email */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Nom de l'entreprise</label>
-                <input
-                  type="text"
-                  value={newSupplierName}
-                  disabled={!canEdit}
-                  onChange={(e) => setNewSupplierName(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-                  placeholder="Ex: Plomberie Tremblay Inc."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Initiales calendrier (max 3 car.)</label>
-                <input
-                  type="text"
-                  maxLength={3}
-                  value={newSupplierInitials}
-                  onChange={e => setNewSupplierInitials(e.target.value.toUpperCase())}
-                  placeholder="ex: PCV"
-                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Email (connexion fournisseur)</label>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Nom */}
+            <div className="lg:col-span-4">
+              <label className="block text-sm font-medium text-slate-600 mb-1">Nom de l'entreprise</label>
+              <input
+                type="text"
+                value={newSupplierName}
+                disabled={!canEdit}
+                onChange={(e) => setNewSupplierName(e.target.value)}
+                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                placeholder="Ex: Plomberie Tremblay Inc."
+              />
+            </div>
+            {/* Initiales */}
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-slate-600 mb-1">Initiales (max 3)</label>
+              <input
+                type="text"
+                maxLength={3}
+                value={newSupplierInitials}
+                onChange={e => setNewSupplierInitials(e.target.value.toUpperCase())}
+                placeholder="ex: PCV"
+                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+              />
+            </div>
+            {/* Email */}
+            <div className="lg:col-span-4">
+              <label className="block text-sm font-medium text-slate-600 mb-1">Email (connexion fournisseur)</label>
               <input
                 type="text"
                 value={newSupplierEmail}
@@ -248,7 +249,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                 placeholder="ex: contact@abc.com"
               />
             </div>
-
+            {/* Métier */}
             <div className="lg:col-span-4">
               <label className="block text-sm font-medium text-slate-600 mb-1">Corps de métier</label>
               <select
