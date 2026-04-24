@@ -350,6 +350,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           const end2 = new Date(t2.end).getTime();
 
           if (start1 < end2 && end1 > start2) {
+            // Ignorer si le chevauchement est entièrement dans le passé
+            const overlapEnd = Math.min(end1, end2);
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+            if (overlapEnd < todayStart.getTime()) continue;
+
             const supplier = suppliers.find(s => s.id === t1.supplierId);
             const p1 = projects.find(p => p.id === t1.projectId);
             const p2 = projects.find(p => p.id === t2.projectId);
