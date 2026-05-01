@@ -235,8 +235,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Helper pour formater le texte
   // Initiales à partir du nom (max 3 lettres)
-  const getInitials = (name: string, supplier?: Supplier) => {
-    if (supplier?.customInitials) return supplier.customInitials.toUpperCase().slice(0, 3);
+  const getInitials = (name: string) => {
     const words = name.trim().split(/\s+/);
     if (words.length === 1) return name.slice(0, 3).toUpperCase();
     return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
@@ -350,11 +349,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           const end2 = new Date(t2.end).getTime();
 
           if (start1 < end2 && end1 > start2) {
-            // Ignorer si le chevauchement est entièrement dans le passé
-            const overlapEnd = Math.min(end1, end2);
-            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-            if (overlapEnd < todayStart.getTime()) continue;
-
             const supplier = suppliers.find(s => s.id === t1.supplierId);
             const p1 = projects.find(p => p.id === t1.projectId);
             const p2 = projects.find(p => p.id === t2.projectId);
@@ -470,7 +464,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   const parts = (supplier?.color || 'bg-slate-300 text-slate-800 border-slate-400').split(' ');
                   const chipBg = isDelivery ? '#fef9c3' : (BG[parts[0]] ?? '#e2e8f0');
                   const chipTc = isDelivery ? '#92400e' : (TC[parts[1]] ?? '#1e293b');
-                  const init = supplier ? getInitials(supplier.name, supplier) : '?';
+                  const init = supplier ? getInitials(supplier.name) : '?';
                   const startStr = new Date(task.start).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
                   const endStr = new Date(task.end).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
                   const sameDay = task.start.slice(0,10) === task.end.slice(0,10);
@@ -581,7 +575,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           className={`rounded-lg px-3 py-2 text-sm font-medium cursor-pointer ${colorClass} border flex items-center gap-2`}>
                           {isDelivery && <span className="text-base">📦</span>}
                           <div className="min-w-0 flex-1">
-                            <div className="font-bold truncate">{supplier ? getInitials(supplier.name, supplier) : '?'} <span className="font-normal">{task.title}</span></div>
+                            <div className="font-bold truncate">{supplier ? getInitials(supplier.name) : '?'} <span className="font-normal">{task.title}</span></div>
                             {supplier && <div className="text-xs opacity-75 truncate">{supplier.name}</div>}
                           </div>
                         </div>
@@ -689,11 +683,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 bg-white flex flex-col relative group 
                                 ${isPdf ? 'min-h-[100px] p-1 border-r border-b border-slate-200' : isMobile && monthsToShow === 1 ? 'min-h-[90px] p-1.5' : 'min-h-[100px] p-1'}
                                 ${!isCurrentMonth ? 'bg-slate-50/50' : ''} 
-                                ${isToday ? '!bg-blue-600' : ''}
-                                ${!isToday && isCurrentMonth && getCCQHoliday(day) ? '!bg-orange-50' : ''}
-                                ${!isToday && isCurrentMonth && !getCCQHoliday(day) && (day.getDay() === 0 || day.getDay() === 6) ? '!bg-blue-50' : ''}
-                                ${(interactive || !canEdit) ? 'hover:brightness-95 cursor-pointer' : ''} 
-                                ${!isToday && selected ? '!bg-blue-100 ring-inset ring-2 ring-blue-300' : ''}
+                                ${isCurrentMonth && getCCQHoliday(day) ? '!bg-orange-50' : ''}
+                                ${isCurrentMonth && !getCCQHoliday(day) && (day.getDay() === 0 || day.getDay() === 6) ? '!bg-blue-50' : ''}
+                                ${(interactive || !canEdit) ? 'hover:bg-slate-50 cursor-pointer' : ''} 
+                                ${selected ? '!bg-blue-100 ring-inset ring-2 ring-blue-300' : ''}
                                 transition-colors
                             `}
                             onClick={(e) => {
@@ -727,14 +720,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             onMouseDown={(e) => interactive && handleDayMouseDown(day, e)}
                             onMouseEnter={() => interactive && handleDayMouseEnter(day)}
                         >
-                            <div className={`text-right font-medium mb-0.5 ${isToday ? 'text-white font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'} ${isPdf ? 'text-sm mb-2' : ''} ${isMobile && monthsToShow === 1 ? 'text-sm' : 'text-xs'}`}>
-                            <span>
+                            <div className={`text-right font-medium mb-0.5 ${isToday ? 'text-blue-600 font-bold' : isCurrentMonth ? 'text-slate-700' : 'text-slate-400'} ${isPdf ? 'text-sm mb-2' : ''} ${isMobile && monthsToShow === 1 ? 'text-sm' : 'text-xs'}`}>
+                            <span className={`${isToday ? 'bg-blue-100 px-1.5 py-0.5 rounded-full' : ''}`}>
                                 {day.getDate()}
                             </span>
                             </div>
                             {/* Congé CCQ */}
                             {isCurrentMonth && !isPdf && getCCQHoliday(day) && (
-                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight truncate" style={{fontSize:'6px', background: isToday ? 'rgba(255,255,255,0.2)' : '#ffedd5', color: isToday ? '#fff' : '#c2410c', border: isToday ? '1px solid rgba(255,255,255,0.3)' : '1px solid #fdba74'}} title={getCCQHoliday(day) ?? ''}>
+                              <div className="w-full mb-0.5 px-0.5 py-px rounded text-center leading-tight bg-orange-100 border border-orange-300 truncate" style={{fontSize:'6px', color:'#c2410c'}} title={getCCQHoliday(day) ?? ''}>
                                 {getCCQHoliday(day)}
                               </div>
                             )}
@@ -752,20 +745,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                   ? 'bg-amber-200 text-amber-900 border-amber-400'
                                   : supplier?.color || 'bg-gray-200 text-gray-800 border-gray-300';
                                 // Conflit seulement sur les jours précis où les tâches se chevauchent
-                                const hasConflict = (() => {
-                                  // Pas de rouge si le jour est passé
-                                  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+                                const hasConflict = conflicts.some(c => {
+                                  if (c.taskA.id !== task.id && c.taskB.id !== task.id) return false;
+                                  // L'autre tâche du conflit
+                                  const other = c.taskA.id === task.id ? c.taskB : c.taskA;
+                                  // Vérifier si CE jour précis est dans la plage de l'autre tâche
+                                  const otherStart = new Date(other.start); otherStart.setHours(0,0,0,0);
+                                  const otherEnd = new Date(other.end); otherEnd.setHours(23,59,59,999);
                                   const dayStart = new Date(day); dayStart.setHours(0,0,0,0);
-                                  if (dayStart < todayStart) return false;
-                                  return conflicts.some(c => {
-                                    if (c.taskA.id !== task.id && c.taskB.id !== task.id) return false;
-                                    const other = c.taskA.id === task.id ? c.taskB : c.taskA;
-                                    const otherStart = new Date(other.start); otherStart.setHours(0,0,0,0);
-                                    const otherEnd = new Date(other.end); otherEnd.setHours(23,59,59,999);
-                                    const dayEnd = new Date(day); dayEnd.setHours(23,59,59,999);
-                                    return dayStart <= otherEnd && dayEnd >= otherStart;
-                                  });
-                                })();
+                                  const dayEnd = new Date(day); dayEnd.setHours(23,59,59,999);
+                                  return dayStart <= otherEnd && dayEnd >= otherStart;
+                                });
 
                                 const isNew = !isPdf && task.createdAt
                                   ? (Date.now() - new Date(task.createdAt).getTime()) < 48 * 60 * 60 * 1000
@@ -812,28 +802,36 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                               {project?.address && <div className="opacity-75 leading-tight text-[9px]">📍 {project.address}</div>}
                                             </>
                                           )
-                                        ) : (!isMobile) ? (
-                                          // Desktop toutes vues : titre en premier, nom fournisseur dessous
+                                        ) : (!isMobile && monthsToShow === 1) ? (
+                                          // Desktop 1 mois : texte complet
                                           currentProjectId ? (
                                             <>
                                               <div className="font-bold leading-tight break-words">{formatLabel(task.title)}</div>
-                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10 truncate">{formatLabel(supplier?.name)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10">{formatLabel(supplier?.name)}</div>
                                             </>
                                           ) : (
                                             <>
-                                              <div className="font-bold leading-tight break-words">{formatLabel(task.title)}</div>
-                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10 truncate">{formatLabel(supplier?.name)}</div>
+                                              <div className="font-bold leading-tight break-words">{formatLabel(supplier?.name)}</div>
+                                              <div className="opacity-90 leading-tight text-[9px] mt-0.5 pt-0.5 border-t border-black/10">{project?.name}</div>
+                                              {project?.address && <div className="opacity-75 leading-tight text-[9px] mt-0.5">📍 {project.address}</div>}
                                             </>
                                           )
                                         ) : (
-                                          // Mobile : titre en premier, initiales dessous
+                                          // Mobile ou vue 4 mois : initiales + adresse courte
                                           <>
                                             <div className="font-bold leading-tight truncate" style={{fontSize:'8px'}}>
-                                              {formatLabel(task.title)}
+                                              {supplier ? getInitials(supplier.name) : '?'}
                                             </div>
-                                            <div className="leading-tight truncate opacity-90" style={{fontSize:'7px'}}>
-                                              {supplier ? getInitials(supplier.name, supplier) : '?'}
-                                            </div>
+                                            {!currentProjectId && project?.address && (
+                                              <div className="leading-tight truncate opacity-75" style={{fontSize:'7px'}}>
+                                                {project.address.split(',')[0].trim()}
+                                              </div>
+                                            )}
+                                            {currentProjectId && task.title && (
+                                              <div className="leading-tight truncate opacity-90" style={{fontSize:'7px'}}>
+                                                {task.title}
+                                              </div>
+                                            )}
                                           </>
                                         )}
                                     </div>
@@ -947,6 +945,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
             
             <div className="grid grid-cols-7 gap-1">
+                {/* Cellules vides pour aligner le 1er du mois avec le bon jour */}
+                {Array.from({length: new Date(grid.year, grid.monthIndex, 1).getDay()}).map((_,pi) => (
+                  <div key={`pad-${pi}`} />
+                ))}
                 {grid.days.map((day, i) => {
                     const isCurrentMonth = day.getMonth() === grid.monthIndex;
                     const selected = isSelected(day);
@@ -1002,7 +1004,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     if (editingTaskId) {
       setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...newTask } as Task : t));
     } else {
-      setTasks([...tasks, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...newTask } as Task]);
+      setTasks([...tasks, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...newTask as Task }]);
     }
     setIsModalOpen(false);
                 setIsViewOnly(false);
@@ -1574,113 +1576,18 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             })()}
           </div>
 
-          <div className="pdf-page bg-white" data-pdf-type="tasklist" data-project-id={project.id}
-            style={{width:'794px', fontFamily:'Helvetica, Arial, sans-serif'}}>
-            {(() => {
-              const projTasks = tasks.filter(t => t.projectId === project.id);
-              const fmtDate = (iso: string) => {
-                if (!iso) return '';
-                const d = new Date(iso + (iso.includes('T') ? '' : 'T12:00:00'));
-                return d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
-              };
-              const getTaskDates = (label: string) => {
-                const t = projTasks.find(tk => tk.title === label);
-                return t ? { start: fmtDate(t.start), end: fmtDate(t.end) } : { start:'', end:'' };
-              };
-              const MAIN_ITEMS = [
-                {label:'Excavation',del:false},{label:'Footing',del:false},{label:'Coffrage fondation',del:false},{label:'Backfill',del:false},
-                {label:'Livraison trust/poutrelle',del:true},{label:'Structure',del:false},{label:'Trust',del:false},{label:'Bardeaux',del:false},
-                {label:'Livraison fenêtres',del:true},{label:'Mat électrique',del:false},{label:'Plomberie SS',del:false},
-                {label:'Uréthane roche',del:false},{label:'Division',del:false},{label:'Coulée béton',del:false},
-                {label:'Prise de mesure Intermat',del:false},{label:'Élévation plomberie',del:false},{label:'Élévation ventilation',del:false},
-                {label:'Tuyauterie aspiration centrale',del:false},{label:'Électricité élévation',del:false},{label:'Uréthane mur',del:false},
-                {label:'Porte de garage',del:false},{label:'Cellulose',del:false},{label:'Tôle système centrale',del:false},
-                {label:'Livraison gypse',del:true},{label:'Installation gypse',del:false},{label:'Joints',del:false},
-                {label:'Ménage',del:false},{label:'Peinture',del:false},{label:'Livraison céramique',del:true},
-                {label:'Installation céramique',del:false},{label:'Livraison plancher',del:true},{label:'Livraison escalier',del:true},
-                {label:'Installation escalier',del:false},{label:'Installation plancher',del:false},{label:'Livraison armoires',del:true},
-                {label:'Installation armoire',del:false},{label:'Livraison boiseries',del:true},{label:'Installation boiseries',del:false},
-                {label:'Plomberie finale',del:false},{label:'Finition électricité',del:false},{label:'Finition ventilation',del:false},
-                {label:'Ménage rough',del:false},{label:'Peinture finale',del:false},{label:'Ménage final',del:false},
-              ];
-              const EXT_L = [{label:'Brique'},{label:'Revêtement'},{label:'Balcon bois'}];
-              const EXT_R = [{label:'Ligne gaz / thermopompe'},{label:'Gouttière'},{label:'Nivellement final'}];
-              const SPLIT = Math.ceil(MAIN_ITEMS.length / 2);
-              const leftItems = MAIN_ITEMS.slice(0, SPLIT);
-              const rightItems = MAIN_ITEMS.slice(SPLIT);
-              const NAVY='#1a3a5c', HDR='#2a4a6b', EXT='#2d4a2d', NOTES='#3a3a3a';
-              const YEL='#fef9c3', YELD='#ca8a04', GL='#f5f7fa', GM='#d0d0d0';
-              const CW=363, TW=180, DW=91, RH=22, GAP=16, MG=14;
-              const ColHdr = () => (
-                <div style={{display:'flex',height:'21px',background:HDR}}>
-                  <div style={{width:TW,padding:'0 5px',display:'flex',alignItems:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',borderRight:`0.5px solid #456`,flexShrink:0}}>TÂCHE</div>
-                  <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',borderRight:`0.5px solid #456`,flexShrink:0}}>DATE DÉBUT</div>
-                  <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'7.5px',fontWeight:'bold',flexShrink:0}}>DATE FIN</div>
-                </div>
-              );
-              const Row = ({label,del,idx}:{label:string,del:boolean,idx:number}) => {
-                const {start,end} = getTaskDates(label);
-                return (
-                  <div style={{display:'flex',height:RH,background:del?YEL:idx%2===0?GL:'#fff',borderBottom:`0.5px solid ${GM}`}}>
-                    <div style={{width:TW,padding:'0 4px',display:'flex',alignItems:'center',borderRight:`0.5px solid ${GM}`,flexShrink:0}}>
-                      {del && <span style={{width:'7px',height:'7px',borderRadius:'50%',background:YELD,display:'inline-block',marginRight:'4px',flexShrink:0}}/>}
-                      <span style={{fontSize:'8px',fontWeight:del?'bold':'normal',color:del?'#7a5000':'#1a1a1a',lineHeight:'1.2'}}>{label}</span>
-                    </div>
-                    <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'7.5px',color:'#444',borderRight:`0.5px solid ${GM}`,flexShrink:0}}>{start}</div>
-                    <div style={{width:DW,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'7.5px',color:'#444',flexShrink:0}}>{end}</div>
-                  </div>
-                );
-              };
-              return (
-                <div>
-                  {/* Header */}
-                  <div style={{background:NAVY,padding:'9px 14px 7px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <div>
-                      <div style={{color:'#fff',fontSize:'16px',fontWeight:'bold',letterSpacing:'0.02em'}}>CÉDULE DE CHANTIER</div>
-                      <div style={{color:'#a0b8cc',fontSize:'8px',marginTop:'4px',display:'flex',alignItems:'center',gap:'3px'}}>
-                        Chantier :
-                        <span style={{color:'#fff',borderBottom:'0.5px solid #5a7a9a',paddingBottom:'1px',minWidth:'160px',display:'inline-block',marginLeft:'3px'}}>{project.address || project.name}</span>
-                      </div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:'4px',marginTop:'3px'}}>
-                      <span style={{width:'9px',height:'9px',borderRadius:'50%',background:YELD,border:'1px solid #a07000',display:'inline-block'}}/>
-                      <span style={{color:'#e0c060',fontSize:'7px',fontStyle:'italic'}}>= Livraison de matériaux</span>
-                    </div>
-                  </div>
-                  {/* 2 colonnes principales */}
-                  <div style={{display:'flex',margin:`3px ${MG}px 0`,gap:GAP}}>
-                    <div style={{width:CW,border:`0.5px solid ${GM}`,overflow:'hidden'}}>
-                      <ColHdr />
-                      {leftItems.map((item,i) => <Row key={item.label} label={item.label} del={item.del} idx={i} />)}
-                    </div>
-                    <div style={{width:CW,border:`0.5px solid ${GM}`,overflow:'hidden'}}>
-                      <ColHdr />
-                      {rightItems.map((item,i) => <Row key={item.label} label={item.label} del={item.del} idx={i} />)}
-                    </div>
-                  </div>
-                  {/* Travaux extérieurs */}
-                  <div style={{display:'flex',margin:`4px ${MG}px 0`,gap:GAP}}>
-                    {[EXT_L, EXT_R].map((half,hi) => (
-                      <div key={hi} style={{width:CW,border:`0.5px solid ${GM}`,overflow:'hidden'}}>
-                        <div style={{background:EXT,color:'#fff',fontSize:'7px',fontWeight:'bold',padding:'4px 5px'}}>TRAVAUX EXTÉRIEURS — CALENDRIER FLEXIBLE</div>
-                        <ColHdr />
-                        {half.map((item,i) => <Row key={item.label} label={item.label} del={false} idx={i} />)}
-                      </div>
-                    ))}
-                  </div>
-                  {/* Notes */}
-                  <div style={{margin:`4px ${MG}px 0`}}>
-                    <div style={{background:NOTES,color:'#fff',fontSize:'7px',fontWeight:'bold',padding:'4px 5px'}}>NOTES & TÂCHES SUPPLÉMENTAIRES</div>
-                    {[...Array(6)].map((_,i) => <div key={i} style={{height:'21px',background:i%2===0?GL:'#fff',borderBottom:`0.5px solid ${GM}`,border:`0.5px solid ${GM}`}}/>)}
-                  </div>
-                  {/* Footer */}
-                  <div style={{display:'flex',justifyContent:'space-between',padding:'5px 14px 8px'}}>
-                    <span style={{fontSize:'6px',color:'#64748b'}}>Habitations PBL  |  CrewFlo  |  Format 8.5×14</span>
-                    <span style={{fontSize:'6px',color:'#64748b'}}>Fond jaune = Livraison de matériaux</span>
-                  </div>
-                </div>
-              );
-            })()}
+          <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="tasklist" data-project-id={project.id}>
+            <div className="flex justify-between items-center mb-6 border-b pb-4">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">Détails des tâches</h1>
+                <div className="text-slate-500 text-sm">{project.name}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold bg-slate-100 px-3 py-1 rounded">{allMonthsData[0]?.monthLabel}</div>
+              </div>
+            </div>
+            <TaskDetailsTable tasksForPage={tasks.filter(t => t.projectId === project.id)} />
+            <div className="mt-4 text-xs text-slate-400 text-center">CrewFlo - Généré le {new Date().toLocaleString()}</div>
           </div>
 
           <div className="pdf-page bg-white p-8 mb-8 min-h-[800px]" data-pdf-type="finitions" data-project-id={project.id}>
