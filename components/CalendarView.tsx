@@ -1008,7 +1008,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     if (editingTaskId) {
       setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...newTask } as Task : t));
     } else {
-      setTasks([...tasks, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...newTask as Task }]);
+      setTasks([...tasks, { ...newTask as Task, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]);
     }
     setIsModalOpen(false);
                 setIsViewOnly(false);
@@ -1845,8 +1845,6 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           ...newTask,
           adminNote: {
             text: e.target.value,
-            authorName: 'Admin',
-            authorId: 'admin',
             updatedAt: new Date().toISOString(),
           }
         })}
