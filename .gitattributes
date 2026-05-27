@@ -1,0 +1,32 @@
+# Normalisation des fins de ligne — évite les diffs "phantom" CRLF/LF
+# Tous les fichiers texte sont stockés en LF dans git, convertis en CRLF sur Windows à checkout
+
+* text=auto eol=lf
+
+# Fichiers binaires (jamais convertis)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Source code — toujours LF
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sql text eol=lf
+
+# Scripts shell — LF obligatoire
+*.sh text eol=lf
