@@ -39,7 +39,16 @@ export interface Conflict {
   message: string;
 }
 
-export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks';
+// Admin d'une compagnie (lecture seule depuis la fonction RPC get_admins)
+export interface AdminUser {
+  id: string;              // auth.users.id (UUID)
+  email: string;
+  name?: string;           // ex: "Pierre", "Benoit", "Simon"
+  createdAt?: string;      // ISO Date String — depuis auth.users
+  lastSignInAt?: string;   // ISO Date String — depuis auth.users
+}
+
+export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks' | 'admins';
 
 export const TRADES = [
   'Électricien',

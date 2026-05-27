@@ -2,12 +2,13 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Project, Supplier, Task, ViewMode, COLORS } from '../types';
 import { CalendarView } from '../components/CalendarView';
 import { SupplierList } from '../components/SupplierList';
+import { AdminList } from '../components/AdminList';
 import { ProjectList } from '../components/ProjectList';
 import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
-import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building, ClipboardList } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building, ClipboardList, Shield } from 'lucide-react';
 import { getSupabase, guardedRefreshSession } from "../services/supabase";
 import { MyTasksView } from '../components/MyTasksView';
 // @ts-ignore
@@ -567,6 +568,8 @@ const App = () => {
             onUpdateSupplierNote={handleUpdateSupplierNote}
           />
         );
+      case 'admins':
+        return <AdminList canEdit={canEdit} />;
       default:
         return <div>Vue inconnue</div>;
     }
@@ -700,6 +703,12 @@ const App = () => {
           {canEdit && (
             <button onClick={() => { setCurrentView('suppliers'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'suppliers' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
               <Users className="w-5 h-5" /> Fournisseurs
+            </button>
+          )}
+
+          {canEdit && (
+            <button onClick={() => { setCurrentView('admins'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'admins' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+              <Shield className="w-5 h-5" /> Admins
             </button>
           )}
 
