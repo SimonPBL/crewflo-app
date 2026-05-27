@@ -3,6 +3,11 @@ import { Project, Supplier, Task, ViewMode, COLORS } from '../types';
 import { CalendarView } from '../components/CalendarView';
 import { SupplierList } from '../components/SupplierList';
 import { AdminList } from '../components/AdminList';
+import { NotificationBell } from '../components/NotificationBell';
+import { NotificationsView } from '../components/NotificationsView';
+import { useNotifications } from '../hooks/useNotifications';
+import { createNotifications } from '../services/notifications';
+import { diffTasksToEvents } from '../lib/notificationsDiff';
 import { ProjectList } from '../components/ProjectList';
 import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
@@ -79,6 +84,7 @@ const App = () => {
   const isLoggedInRef = useRef(false); // ref pour éviter stale closure dans onAuthStateChange
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
   const [userEmail, setUserEmail] = useState<string>('');
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [profileIncomplete, setProfileIncomplete] = useState(false);
 
@@ -90,6 +96,7 @@ const App = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       if (user?.email) setUserEmail(user.email.toLowerCase());
+      if (user?.id) setUserId(user.id);
 
 
       const { data, error } = await supabase
@@ -289,7 +296,35 @@ const App = () => {
 
   const [projects, setProjects, isCloudP, statusP, undoP, canUndoP, lastModP, forceRetryP] = useSyncStore<Project[]>('crewflo_projects', defaultProjects, roleChecked, isSupplier);
   const [suppliers, setSuppliers, isCloudS, statusS, undoS, canUndoS, lastModS, forceRetryS] = useSyncStore<Supplier[]>('crewflo_suppliers', defaultSuppliers, roleChecked, isSupplier);
-  const [tasks, setTasks, isCloudT, statusT, undoT, canUndoT, lastModT, forceRetryT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked, false); // tasks: fournisseur peut écrire
+  const [tasks, setTasksRaw, isCloudT, statusT, undoT, canUndoT, lastModT, forceRetryT] = useSyncStore<Task[]>('crewflo_tasks', defaultTasks, roleChecked, false); // tasks: fournisseur peut écrire
+
+  // setTasks wrappé pour déclencher les notifications quand les tâches changent.
+  // Le wrapper utilise le setter fonctionnel pour avoir accès à l'état courant ET au nouvel état,
+  // ce qui permet de calculer le diff sans s'appuyer sur des refs périmées.
+  // Note : les updates realtime (autre user qui pousse depuis sa machine) passent par
+  // useSyncStore.setValue DIRECT, pas par ce wrapper — donc on n'a pas de doublons.
+  const setTasks = React.useCallback<typeof setTasksRaw>((newValueOrFn) => {
+    setTasksRaw((current: Task[]) => {
+      const next = typeof newValueOrFn === 'function'
+        ? (newValueOrFn as (v: Task[]) => Task[])(current)
+        : newValueOrFn;
+
+      // Détection des changements + envoi des notifications en background.
+      // On n'attend pas la RPC pour ne pas bloquer le rendu.
+      try {
+        if (Array.isArray(current) && Array.isArray(next)) {
+          const events = diffTasksToEvents(current, next, suppliers, projects, role === 'supplier');
+          if (events.length > 0) {
+            createNotifications(events).catch(e => console.warn('[Notifs] échec création:', e?.message));
+          }
+        }
+      } catch (e: any) {
+        console.warn('[Notifs] diff failed:', e?.message);
+      }
+
+      return next;
+    });
+  }, [setTasksRaw, suppliers, projects, role]);
 
   const isCloudConnected = isCloudP || isCloudS || isCloudT;
 
@@ -385,6 +420,9 @@ const App = () => {
   ) => {
     setTasks((prev: Task[]) => prev.map(t => t.id === taskId ? { ...t, supplierNotes: note } : t));
   };
+
+  // Hook notifications : récupère les notifs du user connecté, écoute le realtime
+  const notif = useNotifications(userId, isLoggedIn);
 
   const [currentView, setCurrentView] = useState<ViewMode>('calendar');
 
@@ -570,6 +608,17 @@ const App = () => {
         );
       case 'admins':
         return <AdminList canEdit={canEdit} />;
+      case 'notifications':
+        return (
+          <NotificationsView
+            notifications={notif.notifications}
+            unreadCount={notif.unreadCount}
+            loading={notif.loading}
+            onMarkAllRead={notif.markAllRead}
+            onMarkRead={notif.markRead}
+            onDismiss={notif.dismiss}
+          />
+        );
       default:
         return <div>Vue inconnue</div>;
     }
@@ -763,6 +812,35 @@ const App = () => {
             <button onClick={toggleSidebar} className="text-slate-600 hover:text-slate-900"><Menu className="w-6 h-6" /></button>
             <h1 className="font-bold text-slate-800">CrewFlo</h1>
           </div>
+          <div className="flex items-center gap-1">
+            <NotificationBell
+              notifications={notif.notifications}
+              unreadCount={notif.unreadCount}
+              loading={notif.loading}
+              onMarkAllRead={notif.markAllRead}
+              onMarkRead={notif.markRead}
+              onDismiss={notif.dismiss}
+              onOpenFullView={() => { setCurrentView('notifications'); setIsSidebarOpen(false); }}
+            />
+            {canGlobalUndo && (
+              <button onClick={handleGlobalUndo} className="p-2 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors" title="Annuler">
+                <Undo2 className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Header desktop — seulement la cloche + undo + statut, alignés à droite */}
+        <header className="hidden lg:flex bg-white border-b border-slate-200 px-6 py-3 items-center justify-end gap-2">
+          <NotificationBell
+            notifications={notif.notifications}
+            unreadCount={notif.unreadCount}
+            loading={notif.loading}
+            onMarkAllRead={notif.markAllRead}
+            onMarkRead={notif.markRead}
+            onDismiss={notif.dismiss}
+            onOpenFullView={() => setCurrentView('notifications')}
+          />
           {canGlobalUndo && (
             <button onClick={handleGlobalUndo} className="p-2 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200 transition-colors" title="Annuler">
               <Undo2 className="w-5 h-5" />
