@@ -4,6 +4,11 @@
 PWA de gestion de chantiers pour **Habitations PBL** (triplex/multiplex au Québec).  
 Propriétaires : Benoit et Pierre. Développeur : Simon (débutant — Claude écrit tout le code).
 
+- **URL production** : https://crewflo-pro.vercel.app
+- **Repo GitHub** : https://github.com/SimonPBL/crewflo-app (branche `main`)
+- **Supabase project ref** : `sfmdlovlpwelehoughgv`
+- **Company ID** : PBL
+
 ---
 
 ## Stack technique
@@ -12,51 +17,91 @@ Propriétaires : Benoit et Pierre. Développeur : Simon (débutant — Claude é
 - **Backend** : Supabase (Auth + PostgreSQL + Realtime + Edge Functions)
 - **Déploiement** : Vercel (auto-deploy sur push)
 - **PWA** : vite-plugin-pwa
-- **Supabase project ref** : `sfmdlovlpwelehoughgv`
+- **IA** : Google Gemini (@google/genai)
+- **PDF** : jsPDF
 
 ---
 
 ## Workflow standard
 
 1. Simon décrit la modification à Claude AI (claude.ai)
-2. Claude AI génère les fichiers corrigés dans `/outputs`
+2. Claude AI génère les fichiers corrigés
 3. Simon copie les fichiers dans le projet via Claude Code
-4. Push sur une **branche de test** (ex: `ameliorations-v2`)
-5. Vérification sur le preview Vercel
-6. Si OK → merge sur `main` → déploiement production
-
-> **Règle :** Claude Code fait uniquement `git add + git commit + git push` — ne jamais modifier le code directement.
+4. Push sur `main` → déploiement production automatique (Vercel)
+5. Vérification sur l'URL de production
 
 ---
 
 ## Branches actives
 
-- `main` — production stable
+- `main` — production stable (déploiement auto Vercel)
 - `ameliorations-v2` — branche de test courante
 - `cedule-v2` — nouvelle cédule révisée (template v2)
 
 ---
 
-## Fichiers clés
+## Structure des fichiers (chemins réels)
 
 ```
-src/
-├── App.tsx                    — Layout principal, routing, sidebar, auth, rôles
-├── types.ts                   — Interfaces TypeScript (Task, Supplier, Project...)
-└── components/
-    ├── CalendarView.tsx        — Calendrier principal (FICHIER PRINCIPAL)
-    ├── ProjectSchedule.tsx     — Modale cédule de chantier
-    ├── ScheduleTemplate.ts     — Template des tâches de la cédule
-    ├── SupplierList.tsx        — Gestion fournisseurs (CRUD + Auth sync)
-    ├── ConflictAlert.tsx       — Alerte conflits d'horaire
-    └── MyTasksView.tsx         — Vue tâches du fournisseur connecté
+crewflo-pro/               ← racine du projet
+├── src/                   ← SEULEMENT App.tsx, main.tsx, index.css
+│   ├── App.tsx            ← Layout principal, routing, sidebar, auth, rôles
+│   ├── main.tsx
+│   └── index.css
+├── components/            ← TOUS les composants React (PAS dans src/)
+│   ├── CalendarView.tsx        ← Calendrier principal (FICHIER PRINCIPAL)
+│   ├── ProjectSchedule.tsx     ← Modale cédule de chantier
+│   ├── ScheduleTemplate.ts     ← Template des tâches de la cédule
+│   ├── SupplierList.tsx        ← Gestion fournisseurs (CRUD + Auth sync)
+│   ├── ProjectList.tsx         ← Liste chantiers
+│   ├── ProjectFinishingsPanel.tsx
+│   ├── FinishingsPDFExport.ts
+│   ├── finishingTemplate.ts
+│   ├── ConflictAlert.tsx       ← Alerte conflits d'horaire
+│   ├── MyTasksView.tsx         ← Vue tâches du fournisseur connecté
+│   ├── AIAssistant.tsx
+│   ├── AuthScreen.tsx
+│   ├── CloudSetup.tsx
+│   └── SwipeToConfirmButton.tsx
+├── hooks/                 ← Hooks custom (PAS dans src/)
+│   └── useSyncStore.ts    ← Synchronisation Supabase (debounce, safety timer)
+├── services/              ← Services externes (PAS dans src/)
+│   ├── supabase.ts        ← Client Supabase + guardedRefreshSession
+│   └── geminiService.ts
+├── supabase/
+│   └── functions/
+│       ├── update-supplier-email/   ← Edge Function sync email Auth
+│       └── delete-supplier-auth/    ← Edge Function suppression Auth user
+├── types.ts               ← Interfaces TypeScript — À LA RACINE (pas dans src/)
+├── index.html
+├── index.tsx
+├── vite.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
-Also:
-| Fichier | Rôle |
-|---|---|
-| `hooks/useSyncStore.ts` | Synchronisation Supabase (debounce, safety timer) |
-| `services/supabase.ts` | Client Supabase + `guardedRefreshSession` centralisé |
+---
+
+## ⚠️ RÈGLE CRITIQUE — Chemins d'import
+
+`components/`, `hooks/`, `services/` et `types.ts` sont à la **racine**, **pas dans `src/`**.  
+`src/` contient **uniquement** `App.tsx`, `main.tsx` et `index.css`.
+
+```typescript
+// ✅ Correct (depuis components/)
+import { Task, Supplier } from '../types';
+import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
+
+// ❌ Faux
+import { Task } from './types';
+import { Task } from '../../types';
+import { Task } from 'src/types';
+```
+
+Les commandes git utilisent les bons chemins :
+- `components/CalendarView.tsx` ✅ (pas `src/components/CalendarView.tsx`)
+- `types.ts` ✅ (pas `src/types.ts`)
+- `src/App.tsx` ✅ (celui-là est bien dans `src/`)
 
 ---
 
@@ -77,6 +122,10 @@ SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --pr
 - **admin** — accès complet
 - **supplier** — vue lecture seule de ses tâches assignées, pas la liste des fournisseurs
 
+### Règle sécurité
+- Le rôle est **validé côté serveur uniquement** — ne jamais lire depuis localStorage
+- `canEdit = roleChecked && role === 'admin'` — propagé en prop à tous les composants
+
 ---
 
 ## Conventions importantes
@@ -88,7 +137,7 @@ SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --pr
 
 ### TypeScript
 - Préférer `as Type` sur l'objet entier plutôt que sur un spread partiel
-- Les interfaces Task, Supplier, Project sont dans `src/types.ts`
+- Les interfaces Task, Supplier, Project sont dans `types.ts` (racine du projet)
 
 ### PDF
 - Utiliser **jsPDF vectoriel** (pas html2canvas) pour les PDFs de cédule
@@ -99,6 +148,10 @@ SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --pr
 - Pas de freeze panes
 - Pas de classes Tailwind dans les scripts Python openpyxl
 - Format monétaire : `'#,##0.00\\ "$"'`
+
+### Icône app
+- La sidebar et la page login utilisent `/icon-192.png` (pas d'icône lucide Hammer)
+- Vérifier après chaque copie d'`App.tsx`
 
 ---
 
@@ -167,4 +220,7 @@ git status
 
 # Commit standard
 git add <fichiers> && git commit -m "message" && git push
+
+# Déployer une Edge Function
+SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --project-ref sfmdlovlpwelehoughgv
 ```
