@@ -48,7 +48,35 @@ export interface AdminUser {
   lastSignInAt?: string;   // ISO Date String — depuis auth.users
 }
 
-export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks' | 'admins';
+// Notification in-app (générée par les changements dans le système)
+export type NotificationEventType =
+  | 'task_created'
+  | 'task_moved'           // dates changées
+  | 'task_reassigned'      // supplier changé pour cette tâche
+  | 'task_unassigned'      // ancien supplier d'une tâche réassignée
+  | 'task_project_changed' // projet changé
+  | 'task_updated'         // autres champs (titre, description, notes)
+  | 'task_deleted'
+  | 'task_confirmed'       // supplier a confirmé
+  | 'task_declined';       // supplier a refusé
+
+export interface Notification {
+  id: string;
+  userId: string;          // destinataire
+  actorId?: string;        // qui a fait l'action
+  actorName?: string;      // ex: "Pierre"
+  companyId: string;
+  eventType: NotificationEventType;
+  targetType: string;      // 'task' pour v1
+  targetId?: string;       // task.id
+  title: string;
+  description: string;
+  metadata?: Record<string, any>;
+  readAt?: string;         // ISO — null si pas lu
+  createdAt: string;       // ISO
+}
+
+export type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks' | 'admins' | 'notifications';
 
 export const TRADES = [
   'Électricien',
