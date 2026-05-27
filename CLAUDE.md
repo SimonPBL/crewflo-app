@@ -22,21 +22,75 @@ Propriétaires : Benoit et Pierre. Développeur : Simon (débutant — Claude é
 
 ---
 
-## Workflow standard
+## Workflow autonome (Claude Cowork)
 
-1. Simon décrit la modification à Claude AI (claude.ai)
-2. Claude AI génère les fichiers corrigés
-3. Simon copie les fichiers dans le projet via Claude Code
-4. Push sur `main` → déploiement production automatique (Vercel)
-5. Vérification sur l'URL de production
+Depuis mai 2026, Simon utilise **Claude Cowork** (app desktop) qui peut écrire les fichiers et pusher vers GitHub directement. Plus de copier-coller manuel.
+
+### Environnement de travail Claude
+- Claude clone le repo dans `/tmp/crewflo-work` (sandbox Linux, full permissions git)
+- Le dossier Windows monté (`C:\Users\simon\Desktop\CrewFlow Code\crewflo-pro\crewflo-pro`) ne permet pas les `rm` → git plante si on travaille directement dedans
+- Toutes les opérations git (commit, push, branch) se font dans `/tmp/crewflo-work`
+- Le user pull les changements sur son Windows pour les voir localement
+
+### Cycle de développement standard
+
+```
+1. git checkout main && git pull              ← partir d'un main à jour
+2. git checkout -b <type>/<nom-court>         ← nouvelle feature branch
+3. [Claude code les modifications]
+4. npm run build                              ← VÉRIF OBLIGATOIRE avant push
+5. git add <fichiers> && git commit -m "..."
+6. git push origin <branche>
+7. [Simon teste sur Vercel preview ou local]
+8. Simon valide → Claude merge dans main
+9. git checkout main && git merge <branche> && git push
+10. git branch -d <branche> && git push origin --delete <branche>   ← fermer la branche
+```
+
+### Convention nommage des branches
+- `feature/<nom>` — nouvelle fonctionnalité (ex: `feature/notifications-horaire`)
+- `fix/<nom>` — correction de bug (ex: `fix/conflit-horaire-passe`)
+- `refactor/<nom>` — refactorisation (ex: `refactor/syncstore-cleanup`)
+- `chore/<nom>` — maintenance, config, deps (ex: `chore/update-deps`)
+
+### Convention messages de commit (conventional commits)
+- `feat:` nouvelle fonctionnalité
+- `fix:` correction de bug
+- `refactor:` refactorisation sans changement de comportement
+- `chore:` config, build, deps
+- `docs:` documentation seulement
+- `style:` formatting (pas de logic change)
+
+Exemple : `feat: notifications fournisseurs sur changement horaire`
+
+### Vérifications obligatoires AVANT chaque push
+
+1. `npm run build` doit passer sans erreur
+2. Pas de `console.log` de debug oublié
+3. Imports respectent la règle critique (voir section "Chemins d'import")
+4. Si modif Supabase : tester avec un compte admin ET un compte supplier
+
+### Côté Simon (Windows) — pour récupérer les changements
+
+Après chaque push de Claude :
+```bash
+cd ~/Desktop/CrewFlow\ Code/crewflo-pro/crewflo-pro
+git pull
+```
+
+Si erreurs de lock files (résidus d'anciennes sessions Claude Cowork) :
+```bash
+find .git -name "*.lock" -delete
+git fetch --prune
+git pull
+```
 
 ---
 
 ## Branches actives
 
 - `main` — production stable (déploiement auto Vercel)
-- `ameliorations-v2` — branche de test courante
-- `cedule-v2` — nouvelle cédule révisée (template v2)
+- Branches feature/fix/refactor/chore créées et supprimées au besoin
 
 ---
 
