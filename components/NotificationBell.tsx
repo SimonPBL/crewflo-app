@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bell, Check, X, ChevronRight } from 'lucide-react';
-import { Notification, NotificationEventType } from '../types';
+import type { AppNotification, NotificationEventType } from '../types';
 
 interface NotificationBellProps {
-  notifications: Notification[];
+  notifications: AppNotification[];
   unreadCount: number;
   loading: boolean;
   onMarkAllRead: () => void;
@@ -169,15 +169,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             )}
           </div>
 
-          {/* Footer */}
-          {notifications.length > 0 && (
-            <button
-              onClick={() => { setOpen(false); onOpenFullView(); }}
-              className="px-4 py-3 border-t border-slate-200 text-sm font-medium text-blue-600 hover:bg-slate-50 flex items-center justify-center gap-1 flex-none"
-            >
-              Voir tout l'historique <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
+          {/* Footer — toujours visible pour accéder aux réglages push */}
+          <button
+            onClick={() => { setOpen(false); onOpenFullView(); }}
+            className="px-4 py-3 border-t border-slate-200 text-sm font-medium text-blue-600 hover:bg-slate-50 flex items-center justify-center gap-1 flex-none"
+          >
+            {notifications.length > 0 ? "Voir tout & réglages push" : "Activer les notifications push"} <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>

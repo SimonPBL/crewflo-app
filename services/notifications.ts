@@ -1,5 +1,5 @@
 import { getSupabase } from './supabase';
-import { Notification, NotificationEventType } from '../types';
+import type { AppNotification, NotificationEventType } from '../types';
 
 // Event qu'on envoie à la RPC create_notifications côté Supabase
 export interface NotificationEvent {
@@ -18,7 +18,7 @@ export interface NotificationEvent {
 }
 
 // Mapper un row Supabase vers le type Notification frontend
-const rowToNotification = (row: any): Notification => ({
+const rowToNotification = (row: any): AppNotification => ({
   id: row.id,
   userId: row.user_id,
   actorId: row.actor_id ?? undefined,
@@ -54,7 +54,7 @@ export async function createNotifications(events: NotificationEvent[]): Promise<
 }
 
 // Récupère les notifications du user connecté (les N plus récentes)
-export async function fetchNotifications(limit = 50): Promise<Notification[]> {
+export async function fetchNotifications(limit = 50): Promise<AppNotification[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
 

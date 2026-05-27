@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Notification } from '../types';
+import type { AppNotification } from '../types';
 import { getSupabase } from '../services/supabase';
 import { fetchNotifications, markRead, markAllRead, deleteNotification, rowToNotification } from '../services/notifications';
 
@@ -12,7 +12,7 @@ import { fetchNotifications, markRead, markAllRead, deleteNotification, rowToNot
  * Si pas de session Supabase, retourne une liste vide.
  */
 export function useNotifications(userId: string | null, enabled: boolean = true) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const channelRef = useRef<any>(null);
   const isMounted = useRef(true);
