@@ -6,6 +6,7 @@ import { AdminList } from '../components/AdminList';
 import { NotificationBell } from '../components/NotificationBell';
 import { NotificationsView } from '../components/NotificationsView';
 import { PushPermissionPrompt } from '../components/PushPermissionPrompt';
+import { StartupNotificationsModal } from '../components/StartupNotificationsModal';
 import { useNotifications } from '../hooks/useNotifications';
 import { createNotifications } from '../services/notifications';
 import { diffTasksToEvents } from '../lib/notificationsDiff';
@@ -463,6 +464,21 @@ const App = () => {
   // Hook notifications : récupère les notifs du user connecté, écoute le realtime
   const notif = useNotifications(userId, isLoggedIn);
 
+  // Startup modal — affiché 1x au chargement de l'appli s'il y a des notifs non lues
+  const [startupModalShown, setStartupModalShown] = useState(false);
+  const [showStartupModal, setShowStartupModal] = useState(false);
+
+  React.useEffect(() => {
+    if (startupModalShown) return;
+    if (notif.loading) return;
+    if (notif.unreadCount === 0) return;
+    const t = setTimeout(() => {
+      setShowStartupModal(true);
+      setStartupModalShown(true);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [notif.loading, notif.unreadCount, startupModalShown]);
+
   const [currentView, setCurrentView] = useState<ViewMode>('calendar');
 
   useEffect(() => {
@@ -817,18 +833,24 @@ const App = () => {
               <Download className="w-3 h-3" /> Installer sur iPhone
             </button>
           )}
+          {/* Status indicator — sa propre ligne pour ne pas écraser les boutons */}
+          {isCloudConnected && (
+            <div className="flex justify-end mb-1 min-h-[14px]">
+              <StatusIndicator />
+            </div>
+          )}
+
           {/* Compact row: Cloud + Backup + Restaurer */}
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setIsCloudModalOpen(true)} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex-1 ${isCloudConnected ? 'bg-green-900/20 text-green-400 border-green-900 hover:bg-green-900/40' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}>
+            <button onClick={() => setIsCloudModalOpen(true)} className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] font-medium transition-colors border flex-1 min-w-0 ${isCloudConnected ? 'bg-green-900/20 text-green-400 border-green-900 hover:bg-green-900/40' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}>
               {isCloudConnected ? <Wifi className="w-3 h-3 flex-shrink-0" /> : <Cloud className="w-3 h-3 flex-shrink-0" />}
               <span className="truncate">{isCloudConnected ? 'Config.' : 'Cloud'}</span>
-              <StatusIndicator />
             </button>
-            <button onClick={exportData} className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded text-[10px] transition-colors" title="Backup">
-              <Save className="w-3 h-3" /> Backup
+            <button onClick={exportData} className="flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded text-[10px] transition-colors flex-1 min-w-0" title="Backup">
+              <Save className="w-3 h-3 flex-shrink-0" /> <span className="truncate">Backup</span>
             </button>
-            <button onClick={handleImportClick} className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded text-[10px] transition-colors" title="Restaurer">
-              <Upload className="w-3 h-3" /> Rest.
+            <button onClick={handleImportClick} className="flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded text-[10px] transition-colors flex-1 min-w-0" title="Restaurer">
+              <Upload className="w-3 h-3 flex-shrink-0" /> <span className="truncate">Rest.</span>
             </button>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
@@ -903,13 +925,25 @@ const App = () => {
           )}
         </header>
 
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
           {renderContent()}
         </div>
       </main>
 
       {/* Prompt auto pour activer les push (anciens users) */}
       <PushPermissionPrompt enabled={isLoggedIn && roleChecked} />
+
+      {/* Modal au démarrage qui montre les derniers changements */}
+      {showStartupModal && (
+        <StartupNotificationsModal
+          notifications={notif.notifications}
+          onClose={() => setShowStartupModal(false)}
+          onSeeAll={() => {
+            setShowStartupModal(false);
+            setCurrentView('notifications');
+          }}
+        />
+      )}
     </div>
   );
 };
