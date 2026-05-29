@@ -14,7 +14,7 @@ import { AIAssistant } from '../components/AIAssistant';
 import { useSyncStore } from '../hooks/useSyncStore';
 import { CloudSetup } from '../components/CloudSetup';
 import { AuthScreen } from '../components/AuthScreen';
-import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building, ClipboardList, Shield } from 'lucide-react';
+import { Users, Calendar as CalendarIcon, Sparkles, Building2, Menu, X, CloudOff, RefreshCw, Upload, Save, Cloud, Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, Download, Share, PlusSquare, Info, Undo2, Building, ClipboardList, Shield, LogOut } from 'lucide-react';
 import { getSupabase, guardedRefreshSession } from "../services/supabase";
 import { MyTasksView } from '../components/MyTasksView';
 // @ts-ignore
@@ -86,6 +86,44 @@ const App = () => {
   const [role, setRole] = useState<string>(''); // toujours vide au démarrage — validé côté serveur
   const [userEmail, setUserEmail] = useState<string>('');
   const [userId, setUserId] = useState<string | null>(null);
+
+  // ── Déconnexion propre ─────────────────────────────────────────────────────
+  // 1. Désinscrire les push de cet appareil (sinon les notifs continueraient
+  //    à arriver pour l'ancien user)
+  // 2. signOut() révoque la session Supabase
+  // 3. Nettoyer le localStorage des clés de l'app
+  // 4. Reload → page de login
+  const handleSignOut = React.useCallback(async () => {
+    if (!window.confirm('Vous voulez vraiment vous déconnecter ?')) return;
+
+    // 1. Désinscrire push (best-effort, ignore les erreurs)
+    try {
+      const mod = await import('../services/pushNotifications');
+      await mod.unsubscribe();
+    } catch {}
+
+    // 2. Sign out Supabase
+    try { await supabase?.auth.signOut(); } catch {}
+
+    // 3. Nettoyer localStorage
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (
+          k.startsWith('crewflo_') ||
+          k.startsWith('PBL_crewflo_') ||
+          k.startsWith('sb-')
+        )) {
+          keysToRemove.push(k);
+        }
+      }
+      for (const k of keysToRemove) localStorage.removeItem(k);
+    } catch {}
+
+    // 4. Reload — l'app va voir pas de session et afficher AuthScreen
+    window.location.reload();
+  }, []);
 
   const [profileIncomplete, setProfileIncomplete] = useState(false);
 
@@ -794,6 +832,22 @@ const App = () => {
             </button>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+          {/* User info + déconnexion — toujours visible quand connecté */}
+          {isLoggedIn && userEmail && (
+            <div className="mt-2 pt-2 border-t border-slate-800/80">
+              <div className="text-[10px] text-slate-500 truncate mb-1.5 px-0.5" title={userEmail}>
+                Connecté : <span className="text-slate-300">{userEmail}</span>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-bold transition-colors bg-red-900/30 text-red-300 hover:bg-red-900/60 hover:text-red-200 border border-red-900/50"
+                title="Se déconnecter complètement et revenir à l'écran de connexion"
+              >
+                <LogOut className="w-3 h-3" /> Se déconnecter
+              </button>
+            </div>
+          )}
+
           {/* Reset + version — même ligne, discret */}
           <div className="flex justify-between items-center mt-1">
             {!isCloudConnected && <span className="text-[9px] text-yellow-600 opacity-70 flex items-center gap-0.5"><CloudOff className="w-2.5 h-2.5" /> Local</span>}
