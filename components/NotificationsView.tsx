@@ -1,9 +1,10 @@
-import React from 'react';
-import { Bell, Check, Trash2, CheckCircle, AlertCircle, MapPin, Calendar as CalendarIcon, UserPlus, UserMinus, Edit, ThumbsUp, ThumbsDown } from 'lucide-react';
-import { Notification, NotificationEventType } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Bell, Check, Trash2, AlertCircle, MapPin, Calendar as CalendarIcon, UserPlus, UserMinus, Edit, ThumbsUp, ThumbsDown, Smartphone, BellOff, Loader2 } from 'lucide-react';
+import type { AppNotification, NotificationEventType } from '../types';
+import { subscribe as pushSubscribe, unsubscribe as pushUnsubscribe, getStatus as getPushStatus, isPushSupported, PushStatus } from '../services/pushNotifications';
 
 interface NotificationsViewProps {
-  notifications: Notification[];
+  notifications: AppNotification[];
   unreadCount: number;
   loading: boolean;
   onMarkAllRead: () => void;
@@ -51,6 +52,106 @@ const dayBucket = (iso: string): string => {
   } catch { return 'Plus tôt'; }
 };
 
+// ─── Section "Réglages push" affichée en haut de la page ──────────────────
+const PushToggle: React.FC = () => {
+  const [status, setStatus] = useState<PushStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = async () => {
+    const s = await getPushStatus();
+    setStatus(s);
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const handleEnable = async () => {
+    setBusy(true);
+    const ok = await pushSubscribe();
+    setBusy(false);
+    await refresh();
+    if (!ok && AppNotification.permission === 'denied') {
+      alert("Tu as bloqué les notifications dans ton navigateur. Pour les activer, va dans les réglages du navigateur pour ce site, puis recharge la page.");
+    }
+  };
+
+  const handleDisable = async () => {
+    setBusy(true);
+    await pushUnsubscribe();
+    setBusy(false);
+    await refresh();
+  };
+
+  if (!isPushSupported() || status === 'unsupported') {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-start gap-3">
+        <BellOff className="w-5 h-5 text-slate-400 flex-none mt-0.5" />
+        <div className="text-sm text-slate-600">
+          <strong>Notifications push non supportées</strong> sur ce navigateur. Utilise Chrome, Edge ou Safari récent.
+        </div>
+      </div>
+    );
+  }
+
+  if (status === null) {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-500 flex items-center gap-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Vérification...
+      </div>
+    );
+  }
+
+  if (status === 'denied') {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+        <BellOff className="w-5 h-5 text-amber-600 flex-none mt-0.5" />
+        <div className="text-sm text-amber-900">
+          <strong>Notifications bloquées dans le navigateur.</strong>
+          <p className="mt-1">Va dans les réglages du site (icône cadenas dans la barre d'adresse → Notifications) pour les autoriser, puis recharge la page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isOn = status === 'subscribed';
+
+  return (
+    <div className={`border rounded-lg p-4 flex items-start gap-3 ${isOn ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+      <Smartphone className={`w-5 h-5 flex-none mt-0.5 ${isOn ? 'text-green-600' : 'text-blue-600'}`} />
+      <div className="flex-1">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className={`font-semibold ${isOn ? 'text-green-900' : 'text-blue-900'}`}>
+              {isOn ? 'Notifications push activées sur cet appareil' : 'Activer les notifications push'}
+            </div>
+            <div className="text-xs text-slate-600 mt-0.5">
+              {isOn
+                ? 'Tu recevras un résumé quotidien à 12h s\'il y a des changements.'
+                : 'Reçois un push quotidien à 12h sur ton téléphone/ordi quand y\'a des changements.'}
+            </div>
+          </div>
+          <button
+            onClick={isOn ? handleDisable : handleEnable}
+            disabled={busy}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 disabled:opacity-50 ${
+              isOn
+                ? 'bg-white border border-green-300 text-green-700 hover:bg-green-50'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {busy ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> ...</>
+            ) : isOn ? (
+              <><BellOff className="w-4 h-4" /> Désactiver</>
+            ) : (
+              <><Bell className="w-4 h-4" /> Activer</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const NotificationsView: React.FC<NotificationsViewProps> = ({
   notifications,
   unreadCount,
@@ -69,7 +170,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   }, [loading, notifications, onMarkRead]);
 
   // Grouper par jour
-  const grouped = notifications.reduce<Record<string, Notification[]>>((acc, n) => {
+  const grouped = notifications.reduce<Record<string, AppNotification[]>>((acc, n) => {
     const bucket = dayBucket(n.createdAt);
     if (!acc[bucket]) acc[bucket] = [];
     acc[bucket].push(n);
@@ -105,6 +206,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
           </button>
         )}
       </div>
+
+      {/* Toggle push notifications */}
+      <PushToggle />
 
       {/* Liste */}
       {loading ? (

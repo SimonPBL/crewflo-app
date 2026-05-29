@@ -60,7 +60,7 @@ export type NotificationEventType =
   | 'task_confirmed'       // supplier a confirmé
   | 'task_declined';       // supplier a refusé
 
-export interface Notification {
+export interface AppNotification {
   id: string;
   userId: string;          // destinataire
   actorId?: string;        // qui a fait l'action

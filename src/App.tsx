@@ -5,6 +5,7 @@ import { SupplierList } from '../components/SupplierList';
 import { AdminList } from '../components/AdminList';
 import { NotificationBell } from '../components/NotificationBell';
 import { NotificationsView } from '../components/NotificationsView';
+import { PushPermissionPrompt } from '../components/PushPermissionPrompt';
 import { useNotifications } from '../hooks/useNotifications';
 import { createNotifications } from '../services/notifications';
 import { diffTasksToEvents } from '../lib/notificationsDiff';
@@ -852,6 +853,9 @@ const App = () => {
           {renderContent()}
         </div>
       </main>
+
+      {/* Prompt auto pour activer les push (anciens users) */}
+      <PushPermissionPrompt enabled={isLoggedIn && roleChecked} />
     </div>
   );
 };

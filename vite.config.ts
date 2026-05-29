@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
           skipWaiting: false,          // contrôlé manuellement via updateServiceWorker(true)
           clientsClaim: true,          // le nouveau SW prend le contrôle dès activation
           cleanupOutdatedCaches: true, // supprime les anciens caches automatiquement
+          importScripts: ['push-handler.js'], // handler push notifications (Feature C)
         },
       }),
     ],
