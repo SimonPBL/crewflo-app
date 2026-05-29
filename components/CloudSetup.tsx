@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { saveSupabaseConfig, getSupabaseConfig, clearSupabaseConfig } from '../services/supabase';
+import { saveSupabaseConfig, getSupabaseConfig, clearSupabaseConfig, getSupabase } from '../services/supabase';
 import { Cloud, Wifi, WifiOff, X, Check, Globe, Users, Building, Shuffle, Lock, Database, ChevronDown, ChevronUp, Copy, Settings } from 'lucide-react';
 
 interface CloudSetupProps {
@@ -26,10 +26,32 @@ export const CloudSetup: React.FC<CloudSetupProps> = ({ isOpen, onClose, isCloud
     saveSupabaseConfig(url, key, companyId);
   };
 
-  const handleDisconnect = () => {
-    if (confirm("Voulez-vous vraiment vous déconnecter du mode Collaboration ? Vous repasserez en mode local.")) {
-      clearSupabaseConfig();
-    }
+  const handleDisconnect = async () => {
+    if (!confirm("Vous voulez vraiment vous déconnecter ? Vous reviendrez à l'écran de connexion.")) return;
+
+    // Déconnexion complète : push unsubscribe + auth signOut + clear localStorage + reload
+    try {
+      const mod = await import('../services/pushNotifications');
+      await mod.unsubscribe();
+    } catch {}
+
+    try {
+      const supabase = getSupabase();
+      await supabase?.auth.signOut();
+    } catch {}
+
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('crewflo_') || k.startsWith('PBL_crewflo_') || k.startsWith('sb-'))) {
+          keysToRemove.push(k);
+        }
+      }
+      for (const k of keysToRemove) localStorage.removeItem(k);
+    } catch {}
+
+    window.location.reload();
   };
 
   const generateSecureId = () => {
