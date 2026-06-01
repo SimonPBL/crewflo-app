@@ -7,6 +7,8 @@ import { NotificationBell } from '../components/NotificationBell';
 import { NotificationsView } from '../components/NotificationsView';
 import { PushPermissionPrompt } from '../components/PushPermissionPrompt';
 import { StartupNotificationsModal } from '../components/StartupNotificationsModal';
+import { ChangelogModal } from '../components/ChangelogModal';
+import { entriesSince } from '../lib/changelog';
 import { useNotifications } from '../hooks/useNotifications';
 import { createNotifications } from '../services/notifications';
 import { diffTasksToEvents } from '../lib/notificationsDiff';
@@ -22,7 +24,7 @@ import { MyTasksView } from '../components/MyTasksView';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 // VERSION DE L'APPLICATION
-const APP_VERSION = "2.1.1";
+const APP_VERSION = "2.2.0";
 
 const STORE_KEY_ROLE = "crewflo_role";
 
@@ -479,6 +481,49 @@ const App = () => {
     return () => clearTimeout(t);
   }, [notif.loading, notif.unreadCount, startupModalShown]);
 
+  // Changelog modal — montré quand la version a changé depuis la dernière visite
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [changelogEntries, setChangelogEntries] = useState<ReturnType<typeof entriesSince>>([]);
+
+  React.useEffect(() => {
+    const LS_KEY = 'crewflo_last_seen_version';
+    let lastSeen: string | null = null;
+    try { lastSeen = localStorage.getItem(LS_KEY); } catch {}
+
+    if (!lastSeen) {
+      // Premier lancement (ou localStorage vide) — on enregistre la version sans rien montrer
+      try { localStorage.setItem(LS_KEY, APP_VERSION); } catch {}
+      return;
+    }
+
+    if (lastSeen === APP_VERSION) return; // déjà à jour
+
+    // Version différente — montrer le changelog des nouveautés
+    const entries = entriesSince(lastSeen, APP_VERSION);
+    if (entries.length === 0) {
+      // Pas d'entry dans le changelog pour cette version — juste enregistrer
+      try { localStorage.setItem(LS_KEY, APP_VERSION); } catch {}
+      return;
+    }
+
+    setChangelogEntries(entries);
+    setShowChangelog(true);
+  }, []);
+
+  const handleCloseChangelog = () => {
+    setShowChangelog(false);
+    try { localStorage.setItem('crewflo_last_seen_version', APP_VERSION); } catch {}
+  };
+
+  const handleOpenChangelogManually = () => {
+    // Trigger ouvre le changelog de la version courante seulement
+    const entries = entriesSince(null, APP_VERSION);
+    if (entries.length > 0) {
+      setChangelogEntries(entries);
+      setShowChangelog(true);
+    }
+  };
+
   const [currentView, setCurrentView] = useState<ViewMode>('calendar');
 
   useEffect(() => {
@@ -876,7 +921,7 @@ const App = () => {
             <button onClick={resetData} className="flex items-center gap-0.5 text-[9px] text-slate-700 hover:text-red-400 transition-colors ml-auto mr-2">
               <RefreshCw className="w-2.5 h-2.5" /> Reset
             </button>
-            <button onClick={handleUpdateApp} className="flex items-center gap-0.5 text-[9px] text-slate-700 hover:text-white transition-colors" title="Mettre à jour">
+            <button onClick={handleOpenChangelogManually} className="flex items-center gap-0.5 text-[9px] text-slate-700 hover:text-white transition-colors" title="Voir les nouveautés de cette version">
               <Info className="w-2.5 h-2.5" /> v{APP_VERSION}
             </button>
           </div>
@@ -932,6 +977,11 @@ const App = () => {
 
       {/* Prompt auto pour activer les push (anciens users) */}
       <PushPermissionPrompt enabled={isLoggedIn && roleChecked} />
+
+      {/* Modal changelog après une mise à jour de version */}
+      {showChangelog && (
+        <ChangelogModal entries={changelogEntries} onClose={handleCloseChangelog} />
+      )}
 
       {/* Modal au démarrage qui montre les derniers changements */}
       {showStartupModal && (
