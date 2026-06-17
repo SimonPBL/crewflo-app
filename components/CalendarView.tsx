@@ -1225,10 +1225,21 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   const visibleTasks = useMemo(() => {
     let filtered = tasks;
-    if (currentProjectId) filtered = filtered.filter(t => t.projectId === currentProjectId);
+    if (currentProjectId) {
+      // Vue par chantier — montre tout (même les projets cachés du global)
+      filtered = filtered.filter(t => t.projectId === currentProjectId);
+    } else {
+      // Vue globale — exclure les chantiers marqués 'hiddenFromGlobalCalendar'
+      const hiddenIds = new Set(
+        projects.filter(p => p.hiddenFromGlobalCalendar).map(p => p.id)
+      );
+      if (hiddenIds.size > 0) {
+        filtered = filtered.filter(t => !hiddenIds.has(t.projectId));
+      }
+    }
     if (filterSupplierId !== 'all') filtered = filtered.filter(t => t.supplierId === filterSupplierId);
     return filtered;
-  }, [tasks, currentProjectId, filterSupplierId]);
+  }, [tasks, currentProjectId, filterSupplierId, projects]);
 
   // Fournisseurs ET mobile : afficher mois couverts par les tâches + mois d'aujourd'hui
   const autoMonthsData = useMemo(() => {
