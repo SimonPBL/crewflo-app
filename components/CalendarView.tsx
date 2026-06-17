@@ -231,6 +231,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const goToToday = () => {
     setCurrentDate(new Date());
+    // Sur mobile/fournisseur, autoMonthsData n'utilise pas currentDate.
+    // On scroll vers le mois d'aujourd'hui dans la liste rendue.
+    const today = new Date();
+    const key = `${today.getFullYear()}-${today.getMonth()}`;
+    setTimeout(() => {
+      const el = document.querySelector(`[data-month-key="${key}"]`);
+      if (el && 'scrollIntoView' in el) {
+        (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 80);
   };
 
   // Helper pour formater le texte
@@ -640,8 +650,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               return autoMonthsData; // default: show all assigned months
             })() : allMonthsData).map((monthData, idx) => (
                 <div 
-                    key={`${monthData.year}-${monthData.monthIndex}`} 
-                    className={`border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm h-fit ${isPdf ? 'break-inside-avoid border-2 border-slate-800' : ''}`}
+                    key={`${monthData.year}-${monthData.monthIndex}`}
+                    data-month-key={`${monthData.year}-${monthData.monthIndex}`}
+                    className={`border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm h-fit scroll-mt-4 ${isPdf ? 'break-inside-avoid border-2 border-slate-800' : ''}`}
                 >
                     {/* Month Header — cliquable en vue 4 mois */}
                     <div
@@ -1219,35 +1230,74 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     return filtered;
   }, [tasks, currentProjectId, filterSupplierId]);
 
-  // Fournisseurs ET mobile : afficher tous les mois couverts par les tâches
+  // Fournisseurs ET mobile : afficher mois couverts par les tâches + mois d'aujourd'hui
   const autoMonthsData = useMemo(() => {
     const useAuto = isMobileScreen || !canEdit; // mobile OU fournisseur
     if (!useAuto) return allMonthsData;
     try {
+      const today = new Date();
+      const todayMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
       const dates = visibleTasks
         .flatMap((t: any) => [new Date(t.start), new Date(t.end)])
         .filter(d => !isNaN(d.getTime()));
-      if (dates.length === 0) return allMonthsData; // admin mobile sans tâches → utilise allMonthsData pour permettre navigation
-      const minTs = Math.min(...dates.map(d => d.getTime()));
-      const maxTs = Math.max(...dates.map(d => d.getTime()));
-      if (isNaN(minTs) || isNaN(maxTs)) return [generateMonthGrid(currentDate, 0)];
-      const minD = new Date(minTs);
-      const maxD = new Date(maxTs);
-      const start = new Date(minD.getFullYear(), minD.getMonth(), 1);
-      const end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
+
+      let start: Date;
+      let end: Date;
+
+      if (dates.length === 0) {
+        start = new Date(todayMonth); start.setMonth(start.getMonth() - 1);
+        end = new Date(todayMonth); end.setMonth(end.getMonth() + 1);
+      } else {
+        const minTs = Math.min(...dates.map(d => d.getTime()));
+        const maxTs = Math.max(...dates.map(d => d.getTime()));
+        if (isNaN(minTs) || isNaN(maxTs)) return [generateMonthGrid(today, 0)];
+        const minD = new Date(minTs);
+        const maxD = new Date(maxTs);
+        start = new Date(minD.getFullYear(), minD.getMonth(), 1);
+        end = new Date(maxD.getFullYear(), maxD.getMonth(), 1);
+
+        if (todayMonth.getTime() < start.getTime()) start = new Date(todayMonth);
+        if (todayMonth.getTime() > end.getTime()) end = new Date(todayMonth);
+      }
+
       const grids = [];
       const cur = new Date(start);
       let safety = 0;
-      while (cur <= end && safety < 36) {
+      while (cur.getTime() <= end.getTime() && safety < 60) {
         grids.push(generateMonthGrid(cur, 0));
         cur.setMonth(cur.getMonth() + 1);
         safety++;
       }
-      return grids.length > 0 ? grids : [generateMonthGrid(currentDate, 0)];
+      return grids.length > 0 ? grids : [generateMonthGrid(today, 0)];
     } catch {
-      return [generateMonthGrid(currentDate, 0)];
+      return [generateMonthGrid(new Date(), 0)];
     }
-  }, [isMobileScreen, canEdit, visibleTasks, currentDate, allMonthsData]);
+  }, [isMobileScreen, canEdit, visibleTasks, allMonthsData]);
+
+  // ── Scroll automatique vers le mois d'aujourd'hui (mobile + fournisseur) ──
+  // PLACÉ APRÈS autoMonthsData pour éviter le ReferenceError (TDZ).
+  const initialScrollDoneRef = useRef(false);
+  useEffect(() => {
+    if (initialScrollDoneRef.current) return;
+    if (!autoMonthsData || autoMonthsData.length === 0) return;
+    const t = setTimeout(() => {
+      if (initialScrollDoneRef.current) return;
+      const today = new Date();
+      const key = `${today.getFullYear()}-${today.getMonth()}`;
+      const el = document.querySelector(`[data-month-key="${key}"]`);
+      if (el && 'scrollIntoView' in el) {
+        (el as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'start' });
+        initialScrollDoneRef.current = true;
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [autoMonthsData]);
+
+  // Reset le flag quand on change de projet — re-scroll vers aujourd'hui au prochain rendu
+  useEffect(() => {
+    initialScrollDoneRef.current = false;
+  }, [currentProjectId]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
