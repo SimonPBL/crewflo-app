@@ -65,10 +65,23 @@ Exemple : `feat: notifications fournisseurs sur changement horaire`
 
 ### Vérifications obligatoires AVANT chaque push
 
-1. `npm run build` doit passer sans erreur
-2. Pas de `console.log` de debug oublié
-3. Imports respectent la règle critique (voir section "Chemins d'import")
-4. Si modif Supabase : tester avec un compte admin ET un compte supplier
+1. **Build local** : `npm run build` doit passer sans erreur
+2. **Code-review mentale** des changements — checker pour chaque chose qu'on a modifié :
+   - [ ] Tous les imports nécessaires sont présents (lucide-react, hooks, types, services)
+   - [ ] Tout `useEffect` / `useMemo` / `useRef` / `useCallback` est placé **APRÈS** toute variable (`const`, `let`, `useMemo`, autre `useRef`) qu'il référence dans son corps ou ses dependencies. Sinon → ReferenceError (TDZ) au runtime → page blanche.
+   - [ ] Pas de hook dans une condition, une boucle, ou après un early return. L'ordre des hooks doit être identique à chaque render.
+   - [ ] Pas de stale closure : les `deps` des hooks contiennent TOUTES les variables externes utilisées dans leur corps
+   - [ ] Si on renomme un symbole (variable, fonction, type), le renommer **partout** où il est utilisé
+   - [ ] Pas de conflit de nom avec un global de l'environnement browser (ex: `Notification` vs notre interface — utiliser `AppNotification`)
+   - [ ] Si on ajoute un import depuis `../types` qui est uniquement un type (interface/type), utiliser `import type { ... }` à cause de `isolatedModules: true`
+3. **Diff inspection** : relire le diff complet (`git diff`) ligne par ligne avant le push
+4. Pas de `console.log` de debug oublié
+5. Imports respectent la règle critique (voir section "Chemins d'import")
+6. Si modif Supabase : tester avec un compte admin ET un compte supplier
+
+### Pourquoi cette checklist existe
+
+Le 17 juin 2026, un fix calendrier a été pushé directement en prod et a causé une **page blanche** pour tous les utilisateurs pendant ~5 min (jusqu'au revert). Cause : `useEffect` placé avant la déclaration de la variable qu'il référence → ReferenceError au runtime. Le build local a passé parce que TypeScript ne détecte pas les TDZ pour les hooks. Cette checklist (point 2 surtout) doit empêcher ce genre d'erreur.
 
 ### Côté Simon (Windows) — pour récupérer les changements
 

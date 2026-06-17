@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.1',
+    date: '2026-06-17',
+    title: 'Fix calendrier mobile',
+    changes: [
+      { type: 'fix', description: "Sur mobile, le calendrier démarre maintenant au mois d'aujourd'hui au lieu du début du chantier" },
+      { type: 'fix', description: "Le bouton 'Aujourd'hui' fait maintenant scroller la vue vers le mois courant (avant il ne faisait rien sur mobile)" },
+      { type: 'improvement', description: "On peut scroller librement vers le haut/bas pour voir les mois précédents et futurs" },
+    ],
+  },
+  {
     version: '2.2.0',
     date: '2026-05-29',
     title: 'Notifications + Multi-admin',
