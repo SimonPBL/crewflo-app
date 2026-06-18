@@ -231,17 +231,34 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const goToToday = () => {
     setCurrentDate(new Date());
-    // Sur mobile/fournisseur, autoMonthsData n'utilise pas currentDate.
-    // On scroll vers le mois d'aujourd'hui dans la liste rendue.
+    setTimeout(() => scrollToTodayMonth(true), 80);
+  };
+
+  // Scroll vers le mois d'aujourd'hui en ciblant SPÉCIFIQUEMENT le conteneur
+  // scrollable parent (pas le document) — évite que le header de l'app sorte du viewport.
+  function scrollToTodayMonth(smooth: boolean) {
     const today = new Date();
     const key = `${today.getFullYear()}-${today.getMonth()}`;
-    setTimeout(() => {
-      const el = document.querySelector(`[data-month-key="${key}"]`);
-      if (el && 'scrollIntoView' in el) {
-        (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 80);
-  };
+    const el = document.querySelector(`[data-month-key="${key}"]`) as HTMLElement | null;
+    if (!el) return;
+
+    // Trouver le premier ancêtre scrollable (overflow-y: auto/scroll)
+    let scrollParent: HTMLElement | null = el.parentElement;
+    while (scrollParent && scrollParent !== document.body) {
+      const style = window.getComputedStyle(scrollParent);
+      if (style.overflowY === 'auto' || style.overflowY === 'scroll') break;
+      scrollParent = scrollParent.parentElement;
+    }
+    if (!scrollParent || scrollParent === document.body) {
+      // Pas de conteneur scrollable identifié — on ne fait RIEN (ne scrolle pas window/document)
+      return;
+    }
+
+    const elRect = el.getBoundingClientRect();
+    const parentRect = scrollParent.getBoundingClientRect();
+    const targetScrollTop = scrollParent.scrollTop + (elRect.top - parentRect.top);
+    scrollParent.scrollTo({ top: targetScrollTop, behavior: smooth ? 'smooth' : 'auto' });
+  }
 
   // Helper pour formater le texte
   // Initiales à partir du nom (max 3 lettres)
@@ -1287,20 +1304,16 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
   }, [isMobileScreen, canEdit, visibleTasks, allMonthsData]);
 
   // ── Scroll automatique vers le mois d'aujourd'hui (mobile + fournisseur) ──
-  // PLACÉ APRÈS autoMonthsData pour éviter le ReferenceError (TDZ).
+  // Utilise scrollToTodayMonth qui scroll un conteneur SPÉCIFIQUE et pas le document.
+  // Placé APRÈS autoMonthsData pour éviter le TDZ.
   const initialScrollDoneRef = useRef(false);
   useEffect(() => {
     if (initialScrollDoneRef.current) return;
     if (!autoMonthsData || autoMonthsData.length === 0) return;
     const t = setTimeout(() => {
       if (initialScrollDoneRef.current) return;
-      const today = new Date();
-      const key = `${today.getFullYear()}-${today.getMonth()}`;
-      const el = document.querySelector(`[data-month-key="${key}"]`);
-      if (el && 'scrollIntoView' in el) {
-        (el as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'start' });
-        initialScrollDoneRef.current = true;
-      }
+      scrollToTodayMonth(false);
+      initialScrollDoneRef.current = true;
     }, 250);
     return () => clearTimeout(t);
   }, [autoMonthsData]);
