@@ -19,6 +19,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.3',
+    date: '2026-06-17',
+    title: 'Fix header mobile',
+    changes: [
+      { type: 'fix', description: "Le header mobile (CrewFlo + hamburger + cloche de notifs) ne disparaît plus en ouvrant le calendrier" },
+    ],
+  },
+  {
     version: '2.2.2',
     date: '2026-06-17',
     title: 'Cacher un chantier du calendrier global',
