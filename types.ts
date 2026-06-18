@@ -14,6 +14,7 @@ export interface Project {
   name: string;
   address: string;
   status: 'planning' | 'active' | 'completed';
+  hiddenFromGlobalCalendar?: boolean; // true = exclu de la vue calendrier global
 }
 
 export interface Task {

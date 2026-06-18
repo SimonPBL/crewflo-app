@@ -24,7 +24,7 @@ import { MyTasksView } from '../components/MyTasksView';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 // VERSION DE L'APPLICATION
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.2.3";
 
 const STORE_KEY_ROLE = "crewflo_role";
 

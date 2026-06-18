@@ -269,6 +269,22 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
                               <option value="completed">Terminé</option>
                             </select>
                           </div>
+                          <div className="md:col-span-2 bg-slate-50 border border-slate-200 rounded p-2.5">
+                            <label className="flex items-start gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!editForm.hiddenFromGlobalCalendar}
+                                onChange={e => setEditForm({ ...editForm, hiddenFromGlobalCalendar: e.target.checked })}
+                                className="mt-0.5 w-4 h-4 accent-blue-600 cursor-pointer"
+                              />
+                              <div>
+                                <span className="text-sm font-medium text-slate-700">Cacher du calendrier global</span>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Les tâches de ce chantier ne s'afficheront pas dans la vue d'ensemble. Utile pour les chantiers de gestion (ex: Location Merlot pour la machinerie). Le calendrier du chantier reste accessible dans la barre latérale.
+                                </p>
+                              </div>
+                            </label>
+                          </div>
                         </div>
                         <div className="flex gap-2 mt-2 justify-end sm:justify-start">
                           <button onClick={cancelEditing} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded hover:bg-slate-200">

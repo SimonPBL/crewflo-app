@@ -19,6 +19,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.3',
+    date: '2026-06-17',
+    title: 'Fix header mobile',
+    changes: [
+      { type: 'fix', description: "Le header mobile (CrewFlo + hamburger + cloche de notifs) ne disparaît plus en ouvrant le calendrier" },
+    ],
+  },
+  {
+    version: '2.2.2',
+    date: '2026-06-17',
+    title: 'Cacher un chantier du calendrier global',
+    changes: [
+      { type: 'feat', description: "Nouvelle option 'Cacher du calendrier global' dans l'édition de chantier — pour les chantiers de gestion (machinerie, etc.) qu'on veut suivre mais qui n'ont pas leur place dans la vue d'ensemble" },
+    ],
+  },
+  {
     version: '2.2.1',
     date: '2026-06-17',
     title: 'Fix calendrier mobile',
