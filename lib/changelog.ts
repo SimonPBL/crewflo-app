@@ -19,6 +19,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.4',
+    date: '2026-10-02',
+    title: 'Notifier la cédule par courriel et texto',
+    changes: [
+      { type: 'feat', description: "Le bouton de notification (icône avion en papier) envoie maintenant par courriel ET par texto — le texto s'ouvre dans l'app Messages du cellulaire" },
+      { type: 'improvement', description: "Les fournisseurs qui ont une tâche à venir dans la cédule du chantier sont pré-cochés automatiquement (courriel + téléphone); les autres restent dans la liste, décochés" },
+      { type: 'improvement', description: "Le bouton n'apparaît que dans la cédule d'un chantier (pas dans le calendrier global) et il est maintenant visible sur cellulaire" },
+      { type: 'feat', description: "Nouveau champ « Cellulaire (textos) » dans la création et la modification d'un fournisseur" },
+      { type: 'fix', description: "Les initiales saisies à la création d'un fournisseur sont maintenant enregistrées" },
+    ],
+  },
+  {
     version: '2.2.3',
     date: '2026-06-17',
     title: 'Fix header mobile',

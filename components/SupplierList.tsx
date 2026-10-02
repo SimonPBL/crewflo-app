@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Supplier, TRADES, COLORS } from '../types';
-import { Plus, User, Briefcase, Mail, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Plus, User, Briefcase, Mail, Phone, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2, Eye, EyeOff } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
@@ -29,6 +29,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [newSupplierTrade, setNewSupplierTrade] = useState(TRADES[0]);
   const [newSupplierEmail, setNewSupplierEmail] = useState('');
+  const [newSupplierPhone, setNewSupplierPhone] = useState('');
   const [newSupplierInitials, setNewSupplierInitials] = useState('');
   const [newSupplierColor, setNewSupplierColor] = useState(COLORS[0]);
 
@@ -104,6 +105,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
       name: newSupplierName,
       trade: newSupplierTrade,
       email: newSupplierEmail.trim() || undefined,
+      phone: newSupplierPhone.trim() || undefined,
+      customInitials: newSupplierInitials.trim() || undefined,
       color: newSupplierColor,
       supabaseUserId: newUserId,
     };
@@ -112,6 +115,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     // Reset form
     setNewSupplierName('');
     setNewSupplierEmail('');
+    setNewSupplierPhone('');
+    setNewSupplierInitials('');
     setNewSupplierPassword('');
     setNewSupplierPasswordConfirm('');
     setShowPassword(false);
@@ -247,6 +252,18 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                 disabled={!canEdit}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
                 placeholder="ex: contact@abc.com"
+              />
+            </div>
+            {/* Téléphone */}
+            <div className="lg:col-span-4">
+              <label className="block text-sm font-medium text-slate-600 mb-1">Cellulaire (textos)</label>
+              <input
+                type="tel"
+                value={newSupplierPhone}
+                onChange={(e) => setNewSupplierPhone(e.target.value)}
+                disabled={!canEdit}
+                className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                placeholder="ex: 418 555-1234"
               />
             </div>
             {/* Métier */}
@@ -420,6 +437,16 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                           />
                         </div>
                         <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Cellulaire(s) pour textos (séparés par virgule)</label>
+                          <input
+                            type="tel"
+                            value={editForm.phone || ''}
+                            onChange={e => setEditForm({...editForm, phone: e.target.value})}
+                            placeholder="ex: 418 555-1234"
+                            className="w-full p-1.5 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none bg-white"
+                          />
+                        </div>
+                        <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Couleur</label>
                           <ColorPicker 
                               selected={editForm.color || COLORS[0]} 
@@ -457,6 +484,15 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                             <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
                             <a href={`mailto:${supplier.email}`} className="hover:underline hover:text-blue-600 truncate block w-full">
                               {supplier.email}
+                            </a>
+                          </div>
+                        )}
+
+                        {supplier.phone && (
+                          <div className="flex items-center gap-2 text-slate-600 text-sm mt-1 overflow-hidden" title={supplier.phone}>
+                            <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                            <a href={`tel:${supplier.phone.split(',')[0].trim()}`} className="hover:underline hover:text-blue-600 truncate block w-full">
+                              {supplier.phone}
                             </a>
                           </div>
                         )}

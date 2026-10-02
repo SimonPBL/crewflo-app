@@ -5,6 +5,7 @@ export interface Supplier {
   trade: string; // e.g., Electricien, Plombier
   color: string;
   email?: string;
+  phone?: string;  // cellulaire(s) pour textos, séparés par virgule
   customInitials?: string; // max 3 caractères
   supabaseUserId?: string;
 }
