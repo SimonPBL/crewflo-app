@@ -226,7 +226,7 @@ SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --pr
 
 ```typescript
 interface Supplier {
-  id, name, trade, color, email?, customInitials?, supabaseUserId?
+  id, name, trade, color, email?, phone?, customInitials?, supabaseUserId?
 }
 
 interface Task {
@@ -253,6 +253,8 @@ type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks'
 - Calendrier global = **1 seul badge par fournisseur par jour** (déduplication)
 
 ---
+
+- **Notifier la cédule** (bouton avion en papier, admin seulement, visible seulement quand un chantier est sélectionné) : pré-coche courriel + texto des fournisseurs ayant une tâche à venir/en cours (fin ≥ aujourd'hui) dans ce chantier; les autres fournisseurs sont listés décochés. Courriel = `mailto:` en BCC; texto = lien `sms:` (app Messages du cell, texto de groupe envoyé du numéro de l'admin). Pas de Twilio pour l'instant.
 
 ## Cédule de chantier (template v2)
 
@@ -291,3 +293,9 @@ git add <fichiers> && git commit -m "message" && git push
 # Déployer une Edge Function
 SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --project-ref sfmdlovlpwelehoughgv
 ```
+
+---
+
+## Journal des sessions
+
+- **2026-10-02** — v2.2.4 (branche `feature/notif-cedule-sms`) : notification de cédule par courriel + texto (lien sms:), pré-sélection des fournisseurs de la cédule du chantier (tâches à venir), bouton caché en vue globale et visible sur mobile, nouveau champ `phone` sur Supplier (création + édition + affichage), fix initiales non enregistrées à la création.
