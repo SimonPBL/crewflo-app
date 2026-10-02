@@ -277,7 +277,7 @@ Ordre exact des tâches — **ne jamais réorganiser sans instruction explicite*
 
 ## Types de fournisseurs (TRADES)
 
-Électricien, Plombier, Ventilation, Charpentier, Peintre, Maçon, Couvreur, Paysagiste, Cuisiniste, Plâtrier, Cimentier, Général
+Électricien, Plombier, Ventilation, Charpentier, Peintre, Maçon, Couvreur, Paysagiste, Cuisiniste, Plâtrier, Cimentier, Isolation, Général
 
 ---
 
@@ -299,3 +299,4 @@ SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --pr
 ## Journal des sessions
 
 - **2026-10-02** — v2.2.4 (branche `feature/notif-cedule-sms`) : notification de cédule par courriel + texto (lien sms:), pré-sélection des fournisseurs de la cédule du chantier (tâches à venir), bouton caché en vue globale et visible sur mobile, nouveau champ `phone` sur Supplier (création + édition + affichage), fix initiales non enregistrées à la création.
+- **2026-10-02** — v2.2.5 : vue « 1 mois » desktop admin = tous les mois cédulés empilés et défilables (même logique `autoMonthsData` que mobile/fournisseur, plage étendue au mois navigué), flèches ◀ ▶ scrollent au mois; nouvelle catégorie fournisseur `Isolation` (icône ThermometerSnowflake). Push maintenant fait depuis le PC Windows de Simon (Desktop Commander, credentials git locaux) directement dans son dossier local.

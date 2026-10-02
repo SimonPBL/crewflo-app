@@ -19,6 +19,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.5',
+    date: '2026-10-02',
+    title: 'Vue 1 mois défilante + catégorie Isolation',
+    changes: [
+      { type: 'improvement', description: "Vue « 1 mois » sur ordinateur : tous les mois cédulés sont empilés, on peut défiler de haut en bas. Les flèches ◀ ▶ amènent au mois précédent / suivant" },
+      { type: 'feat', description: "Nouvelle catégorie de fournisseur : Isolation" },
+    ],
+  },
+  {
     version: '2.2.4',
     date: '2026-10-02',
     title: 'Notifier la cédule par courriel et texto',

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Supplier, TRADES, COLORS } from '../types';
-import { Plus, User, Briefcase, Mail, Phone, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Plus, User, Briefcase, Mail, Phone, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, ThermometerSnowflake, Loader2, Eye, EyeOff } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
@@ -175,6 +175,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
       case 'Couvreur': return <Home className="w-5 h-5 text-slate-600" />;
       case 'Paysagiste': return <Flower2 className="w-5 h-5 text-green-600" />;
       case 'Cuisiniste': return <Utensils className="w-5 h-5 text-orange-500" />;
+      case 'Isolation': return <ThermometerSnowflake className="w-5 h-5 text-pink-500" />;
       default: return <Briefcase className="w-5 h-5 text-slate-400" />;
     }
   };

@@ -221,15 +221,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
 
   // Navigation
+  // Mode « défilement » : tous les mois cédulés empilés (mobile, fournisseur, ou vue 1 mois)
+  const isScrollMonthsMode = () => isMobileScreen || !canEdit || monthsToShow === 1;
   const prevPeriod = () => {
     const d = new Date(currentDate);
     d.setMonth(d.getMonth() - 1);
     setCurrentDate(d);
+    if (isScrollMonthsMode()) setTimeout(() => scrollToMonth(d, true), 80);
   };
   const nextPeriod = () => {
     const d = new Date(currentDate);
     d.setMonth(d.getMonth() + 1);
     setCurrentDate(d);
+    if (isScrollMonthsMode()) setTimeout(() => scrollToMonth(d, true), 80);
   };
 
   const goToToday = () => {
@@ -240,8 +244,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Scroll vers le mois d'aujourd'hui en ciblant SPÉCIFIQUEMENT le conteneur
   // scrollable parent (pas le document) — évite que le header de l'app sorte du viewport.
   function scrollToTodayMonth(smooth: boolean) {
-    const today = new Date();
-    const key = `${today.getFullYear()}-${today.getMonth()}`;
+    scrollToMonth(new Date(), smooth);
+  }
+
+  function scrollToMonth(target: Date, smooth: boolean) {
+    const key = `${target.getFullYear()}-${target.getMonth()}`;
     const el = document.querySelector(`[data-month-key="${key}"]`) as HTMLElement | null;
     if (!el) return;
 
@@ -664,11 +671,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     return (
         <div className={gridColsClass}>
-            {(isMobile ? autoMonthsData : (!canEdit && !isMobileScreen) ? (() => {
-              // Fournisseur desktop : auto-plage ou monthsToShow selon toggle
-              if (monthsToShow > 1) return allMonthsData; // toggle pressed by supplier
-              return autoMonthsData; // default: show all assigned months
-            })() : allMonthsData).map((monthData, idx) => (
+            {((isMobile || monthsToShow === 1) ? autoMonthsData : allMonthsData).map((monthData, idx) => (
                 <div 
                     key={`${monthData.year}-${monthData.monthIndex}`}
                     data-month-key={`${monthData.year}-${monthData.monthIndex}`}
@@ -679,8 +682,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       className={`py-2 px-4 border-b border-slate-200 font-bold text-slate-700 text-center ${isPdf ? 'bg-slate-100 text-lg' : 'bg-slate-50'} ${monthsToShow === 4 && !isPdf ? 'cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors select-none' : ''}`}
                       onClick={() => {
                         if (monthsToShow === 4 && !isPdf) {
-                          setCurrentDate(new Date(monthData.year, monthData.monthIndex, 1));
+                          const target = new Date(monthData.year, monthData.monthIndex, 1);
+                          setCurrentDate(target);
                           setMonthsToShow(1);
+                          setTimeout(() => scrollToMonth(target, false), 150);
                         }
                       }}
                     >
@@ -1323,7 +1328,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
 
   // Fournisseurs ET mobile : afficher mois couverts par les tâches + mois d'aujourd'hui
   const autoMonthsData = useMemo(() => {
-    const useAuto = isMobileScreen || !canEdit; // mobile OU fournisseur
+    const useAuto = isMobileScreen || !canEdit || monthsToShow === 1; // mobile, fournisseur, ou vue 1 mois
     if (!useAuto) return allMonthsData;
     try {
       const today = new Date();
@@ -1352,6 +1357,11 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         if (todayMonth.getTime() > end.getTime()) end = new Date(todayMonth);
       }
 
+      // Inclure le mois navigué avec les flèches, même s'il n'a pas de tâche
+      const navMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      if (navMonth.getTime() < start.getTime()) start = navMonth;
+      if (navMonth.getTime() > end.getTime()) end = navMonth;
+
       const grids = [];
       const cur = new Date(start);
       let safety = 0;
@@ -1364,7 +1374,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     } catch {
       return [generateMonthGrid(new Date(), 0)];
     }
-  }, [isMobileScreen, canEdit, visibleTasks, allMonthsData]);
+  }, [isMobileScreen, canEdit, monthsToShow, currentDate, visibleTasks, allMonthsData]);
 
   // ── Scroll automatique vers le mois d'aujourd'hui (mobile + fournisseur) ──
   // Utilise scrollToTodayMonth qui scroll un conteneur SPÉCIFIQUE et pas le document.
@@ -1426,7 +1436,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
             <button onClick={prevPeriod} className="p-1 hover:bg-white rounded shadow-sm transition-all"><ChevronLeft className="w-4 h-4" /></button>
             <span className="px-3 text-sm font-bold capitalize min-w-[130px] text-center">
-              {(isMobileScreen || !canEdit) && autoMonthsData.length > 1
+              {(isMobileScreen || !canEdit || monthsToShow === 1) && autoMonthsData.length > 1
                 ? `${autoMonthsData[0]?.monthLabel} — ${autoMonthsData[autoMonthsData.length-1]?.monthLabel}`
                 : allMonthsData[0]?.monthLabel}
             </span>
@@ -1442,7 +1452,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           {/* Toggle 1/4 mois — desktop */}
           {!isMobileScreen && calendarViewMode === 'calendar' && (
             <div className="flex bg-slate-100 rounded-lg p-1">
-              <button onClick={() => { setMonthsToShow(1); setWeekZoomDate(null); }} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 && !weekZoomDate ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
+              <button onClick={() => { setMonthsToShow(1); setWeekZoomDate(null); setTimeout(() => scrollToMonth(currentDate, false), 150); }} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 1 && !weekZoomDate ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>1 mois</button>
               <button onClick={() => { setMonthsToShow(4); setWeekZoomDate(null); }} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 4 && !weekZoomDate ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>4 mois</button>
               <button onClick={() => { setMonthsToShow(12); setWeekZoomDate(null); }} className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${monthsToShow === 12 && !weekZoomDate ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Tout</button>
             </div>

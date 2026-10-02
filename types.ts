@@ -92,6 +92,7 @@ export const TRADES = [
   'Cuisiniste',
   'Plâtrier',
   'Cimentier',
+  'Isolation',
   'Général'
 ];
 
