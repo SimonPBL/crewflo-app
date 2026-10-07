@@ -85,6 +85,9 @@ Le 17 juin 2026, un fix calendrier a été pushé directement en prod et a caus�
 
 ### Côté Simon (Windows) — pour récupérer les changements
 
+> **RÈGLE (Simon, 2026-10-07) : après CHAQUE push sur GitHub, toujours faire un `git pull` dans son dossier local** `C:\Users\simon\Desktop\CLAUDE COWORK\CrewFlow Code\crewflo-pro\crewflo-pro` (Desktop Commander, `git pull --ff-only origin main`) pour qu'il soit toujours à jour avec GitHub.
+
+
 Après chaque push de Claude :
 ```bash
 cd ~/Desktop/CrewFlow\ Code/crewflo-pro/crewflo-pro
