@@ -9,7 +9,8 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
 import { FINISHING_TEMPLATE } from './finishingTemplate';
-import { CCQ_HOLIDAYS, getCCQHoliday } from '../lib/ccqHolidays';
+import { CCQ_HOLIDAYS, getCCQHoliday, taskShowsOn } from '../lib/ccqHolidays';
+import { OffDayPrompt, OffDayItem, touchesOffDays } from './OffDayPrompt';
 import { ShiftTaskModal } from './ShiftTaskModal';
 
 interface CalendarViewProps {
@@ -62,6 +63,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [shiftCtx, setShiftCtx] = useState<{ taskId: string; initialNewStart?: string; edited?: Partial<Task> } | null>(null);
   // Chantier ciblé par la notif de cédule (null = chantier courant)
   const [notifProjectId, setNotifProjectId] = useState<string | null>(null);
+  // Question « le fournisseur travaille-t-il la fin de semaine / le congé? »
+  const [offDayCtx, setOffDayCtx] = useState<{ item: OffDayItem; commit: (worked: string[]) => void } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -256,7 +259,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return list.filter(t => {
       const tStart = new Date(t.start);
       const tEnd = new Date(t.end);
-      return tStart <= dayEnd && tEnd >= dayStart;
+      return tStart <= dayEnd && tEnd >= dayStart && taskShowsOn(t, date);
     });
   };
 
@@ -386,8 +389,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const cur = new Date(tStart);
       while (cur <= tEnd) {
         const key = cur.toISOString().slice(0,10);
-        if (!groups[key]) groups[key] = [];
-        if (!groups[key].find(t => t.id === task.id)) groups[key].push(task);
+        if (taskShowsOn(task, cur)) {
+          if (!groups[key]) groups[key] = [];
+          if (!groups[key].find(t => t.id === task.id)) groups[key].push(task);
+        }
         cur.setDate(cur.getDate() + 1);
       }
     });
@@ -530,7 +535,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             const dayEnd = new Date(day); dayEnd.setHours(23,59,59,999);
             const dayTasks = tasksToRender.filter(t => {
               const ts = new Date(t.start); const te = new Date(t.end);
-              return ts <= dayEnd && te >= dayStart;
+              return ts <= dayEnd && te >= dayStart && taskShowsOn(t, day);
             });
             const dayLabel = day.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
             return (
@@ -581,7 +586,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         const matched = tasksToRender.filter(t => {
           const tStart = new Date(t.start);
           const tEnd = new Date(t.end);
-          return tStart <= dayEnd && tEnd >= dayStart;
+          return tStart <= dayEnd && tEnd >= dayStart && taskShowsOn(t, date);
         });
         // Vue globale (pas de chantier sélectionné) : 1 seul badge par fournisseur par jour
         if (!currentProjectId) {
@@ -996,12 +1001,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           return;
         }
       }
-      setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...newTask } as Task : t));
-    } else {
-      setTasks([...tasks, { ...newTask as Task, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]);
     }
-    setIsModalOpen(false);
-                setIsViewOnly(false);
+
+    const original = editingTaskId ? tasks.find(t => t.id === editingTaskId) : undefined;
+    const sameDay = (a?: string, b?: string) => !!a && !!b && new Date(a).toDateString() === new Date(b).toDateString();
+    const rangeChanged = !original || !sameDay(original.start, newTask.start) || !sameDay(original.end, newTask.end);
+    const commit = (worked?: string[]) => {
+      const data: Partial<Task> = { ...newTask };
+      if (worked) data.workedOffDays = worked;
+      else if (!original || rangeChanged) data.workedOffDays = [];
+      if (editingTaskId) {
+        setTasks(prev => prev.map(t => t.id === editingTaskId ? { ...t, ...data } as Task : t));
+      } else {
+        setTasks(prev => [...prev, { ...data as Task, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]);
+      }
+      setOffDayCtx(null);
+      setIsModalOpen(false);
+      setIsViewOnly(false);
+    };
+    // La tâche touche une fin de semaine / un congé → demander les jours travaillés
+    if (touchesOffDays(newTask.start, newTask.end) && (rangeChanged || original?.workedOffDays === undefined)) {
+      setOffDayCtx({
+        item: {
+          id: editingTaskId || 'new', title: newTask.title,
+          start: newTask.start, end: newTask.end,
+          worked: rangeChanged ? [] : original?.workedOffDays,
+        },
+        commit,
+      });
+      return;
+    }
+    commit();
   };
 
   const deleteTask = () => {
@@ -1560,7 +1590,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                                 const ts=new Date(t.start);ts.setHours(0,0,0,0);
                                 const te=new Date(t.end);te.setHours(23,59,59,999);
                                 const dc=new Date(day);dc.setHours(12,0,0,0);
-                                return dc>=ts&&dc<=te;
+                                return dc>=ts&&dc<=te&&taskShowsOn(t,day);
                               });
                               const bg = !isCurrent?'#f8fafc':ccq?'#fff7ed':isWE?'#eff6ff':'#ffffff';
                               return (
@@ -2123,6 +2153,15 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </div>
       )}
 
+      {/* Question jours de fin de semaine / congé travaillés */}
+      {offDayCtx && (
+        <OffDayPrompt
+          items={[offDayCtx.item]}
+          onCancel={() => setOffDayCtx(null)}
+          onConfirm={(w) => offDayCtx.commit(w[offDayCtx.item.id] || [])}
+        />
+      )}
+
       {/* Fenêtre de décalage de tâches */}
       {shiftCtx && (() => {
         const shiftTask = tasks.find(t => t.id === shiftCtx.taskId);
@@ -2138,8 +2177,15 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             onApply={(updates) => setTasks(prev => prev.map(t => updates[t.id] ? { ...t, ...updates[t.id] } as Task : t))}
             onSaveOnly={shiftCtx.initialNewStart ? () => {
               const ed = shiftCtx.edited || {};
-              setTasks(prev => prev.map(t => t.id === shiftCtx.taskId ? { ...t, ...ed } as Task : t));
+              const id = shiftCtx.taskId;
+              const commit = (worked: string[]) => {
+                setTasks(prev => prev.map(t => t.id === id ? { ...t, ...ed, workedOffDays: worked } as Task : t));
+                setOffDayCtx(null);
+              };
               setShiftCtx(null);
+              if (ed.start && ed.end && touchesOffDays(ed.start, ed.end)) {
+                setOffDayCtx({ item: { id, title: ed.title || '', start: ed.start, end: ed.end }, commit });
+              } else commit([]);
             } : undefined}
             onNotify={handleShiftNotify}
             onClose={() => setShiftCtx(null)}

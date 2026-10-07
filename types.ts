@@ -32,6 +32,9 @@ export interface Task {
   confirmedBySupplier?: boolean;
   adminNote?: { text: string; updatedAt: string };
   supplierNotes?: { text: string; updatedAt: string; authorName?: string; authorId?: string };
+  // Jours de fin de semaine / congé CCQ où le fournisseur travaille (AAAA-MM-JJ).
+  // undefined = ancienne tâche : affichée tous les jours de sa période.
+  workedOffDays?: string[];
 }
 
 export interface Conflict {

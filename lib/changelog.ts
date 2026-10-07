@@ -28,6 +28,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'improvement', description: "Le décalage se compte en jours ouvrables : fins de semaine, fériés et congés CCQ (vacances de la construction, congés d'hiver) sont sautés" },
       { type: 'improvement', description: "Si on change la date de début d'une tâche directement dans sa fiche, la fenêtre de décalage s'ouvre aussi pour demander quelles tâches suivent" },
       { type: 'feat', description: "Après le décalage, on peut prévenir les fournisseurs touchés par courriel et texto en un geste" },
+      { type: 'feat', description: "Quand une tâche touche une fin de semaine, un férié ou les vacances de la construction, CrewFlo demande si le fournisseur travaille ces jours-là (samedi et/ou dimanche au choix). Les jours non travaillés sont sautés et la tâche n'y apparaît plus dans le calendrier" },
     ],
   },
   {

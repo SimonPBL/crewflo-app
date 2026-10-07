@@ -3,6 +3,7 @@ import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
 import { Project, Supplier, Task } from '../types';
 import { Check, X, ChevronDown, ChevronRight, AlertCircle, Truck, Calendar, Download, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { OffDayPrompt, touchesOffDays } from './OffDayPrompt';
 
 type ItemStatus = 'pending' | 'active' | 'na';
 
@@ -143,6 +144,8 @@ export const ProjectSchedule: React.FC<Props> = ({
     Object.fromEntries(SCHEDULE_TEMPLATE.map(c => [c.key, true]))
   );
   const [generated, setGenerated] = useState(false);
+  // Tâches à générer qui touchent une fin de semaine / un congé → on demande les jours travaillés
+  const [pendingGen, setPendingGen] = useState<Omit<Task,'id'|'createdAt'>[] | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   // Pré-remplir depuis les tâches existantes au chargement
@@ -197,7 +200,13 @@ export const ProjectSchedule: React.FC<Props> = ({
         notes: item.type === 'delivery' ? '📦 Livraison' : '',
       };
     });
+    if (newTasks.some(t => touchesOffDays(t.start, t.end))) { setPendingGen(newTasks); return; }
+    finishGenerate(newTasks.map(t => ({ ...t, workedOffDays: [] })));
+  };
+
+  const finishGenerate = (newTasks: Omit<Task,'id'|'createdAt'>[]) => {
     onGenerateTasks(newTasks);
+    setPendingGen(null);
     setEntries(prev => {
       const updated = { ...prev };
       readyToGenerate.forEach(e => {
@@ -453,6 +462,17 @@ export const ProjectSchedule: React.FC<Props> = ({
 
   return (
     <>
+    {pendingGen && (
+      <OffDayPrompt
+        items={pendingGen.map((t, i) => ({
+          id: String(i), title: t.title,
+          subtitle: suppliers.find(sp => sp.id === t.supplierId)?.name || '',
+          start: t.start, end: t.end,
+        })).filter(it => touchesOffDays(it.start, it.end))}
+        onCancel={() => setPendingGen(null)}
+        onConfirm={(w) => finishGenerate(pendingGen.map((t, i) => ({ ...t, workedOffDays: w[String(i)] || [] })))}
+      />
+    )}
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">

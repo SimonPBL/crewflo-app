@@ -3,6 +3,7 @@ import { CalendarDays, X, ArrowRight, Send, CheckCircle2, AlertTriangle } from '
 import type { Project, Supplier, Task } from '../types';
 import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
 import { addBusinessDays, businessDaysBetween, isBusinessDay, localDateKey, placeTask } from '../lib/ccqHolidays';
+import { OffDayPrompt, OffDayItem, touchesOffDays } from './OffDayPrompt';
 
 // ── Décalage de tâches ─────────────────────────────────────────
 // On déplace une tâche à une nouvelle date; la modale liste les tâches
@@ -47,7 +48,7 @@ const withDate = (iso: string, ymd: string) => {
 // Décale le début de `delta` jours ouvrables, puis garde la durée en jours ouvrables
 // (fins de semaine et congés CCQ sautés).
 const shiftTask = (t: Task, delta: number): { start: string; end: string } => {
-  const placed = placeTask(new Date(t.start), new Date(t.end), addBusinessDays(new Date(t.start), delta));
+  const placed = placeTask(new Date(t.start), new Date(t.end), addBusinessDays(new Date(t.start), delta), t.workedOffDays);
   return { start: placed.start.toISOString(), end: placed.end.toISOString() };
 };
 
@@ -86,12 +87,13 @@ export const ShiftTaskModal: React.FC<ShiftTaskModalProps> = ({
     () => new Set(candidates.filter(c => c.kind !== 'exterieur').map(c => c.task.id))
   );
   const [done, setDone] = useState<{ count: number; supplierIds: string[] } | null>(null);
+  const [pending, setPending] = useState<{ updates: Record<string, Partial<Task>>; supplierIds: string[] } | null>(null);
 
   const chosenStart = useMemo(() => withDate(base.start, newDate), [base.start, newDate]);
   const isOffDay = !isBusinessDay(chosenStart);
   // Tâche déplacée : début ramené au prochain jour ouvrable, même durée en jours ouvrables
-  const moved = useMemo(() => placeTask(new Date(base.start), new Date(base.end), chosenStart),
-    [base.start, base.end, chosenStart]);
+  const moved = useMemo(() => placeTask(new Date(base.start), new Date(base.end), chosenStart, base.workedOffDays),
+    [base.start, base.end, chosenStart, base.workedOffDays]);
   const newStart = moved.start;
   const movedEnd = moved.end;
   const delta = businessDaysBetween(new Date(task.start), newStart);
@@ -121,15 +123,59 @@ export const ShiftTaskModal: React.FC<ShiftTaskModalProps> = ({
         sup.add(c.task.supplierId);
       });
     }
-    onApply(updates);
-    setDone({ count: Object.keys(updates).length, supplierIds: Array.from(sup).filter(Boolean) });
+    const supplierIds = Array.from(sup).filter(Boolean);
+    // Une tâche touche une fin de semaine ou un congé → on demande les jours travaillés
+    const touching = Object.keys(updates).some(id => touchesOffDays(updates[id].start!, updates[id].end!));
+    if (touching) { setPending({ updates, supplierIds }); return; }
+    finalize(updates, {}, supplierIds);
   };
+
+  // Recalcule chaque tâche avec les jours travaillés choisis (ils comptent comme jours de travail)
+  const finalize = (updates: Record<string, Partial<Task>>, workedMap: Record<string, string[]>, supplierIds: string[]) => {
+    const final: Record<string, Partial<Task>> = {};
+    Object.entries(updates).forEach(([id, u]) => {
+      const orig = id === task.id ? base : tasks.find(t => t.id === id);
+      const newWorked = workedMap[id] || [];
+      if (!orig) { final[id] = { ...u, workedOffDays: newWorked }; return; }
+      const placed = placeTask(new Date(orig.start), new Date(orig.end), new Date(u.start!), orig.workedOffDays, newWorked);
+      const endKey = localDateKey(placed.end);
+      final[id] = {
+        ...u,
+        start: placed.start.toISOString(),
+        end: placed.end.toISOString(),
+        workedOffDays: newWorked.filter(k => k <= endKey),
+      };
+    });
+    onApply(final);
+    setPending(null);
+    setDone({ count: Object.keys(final).length, supplierIds });
+  };
+
+  const pendingItems: OffDayItem[] = pending
+    ? Object.entries(pending.updates).map(([id, u]) => {
+        const t = id === task.id ? base : tasks.find(x => x.id === id);
+        return {
+          id, title: t?.title || '', subtitle: t ? supplierName(t.supplierId) : '',
+          start: u.start!, end: u.end!,
+        };
+      }).filter(it => touchesOffDays(it.start, it.end))
+    : [];
 
   const kindTag = (kind: TaskKind) => {
     if (kind === 'exterieur') return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">Extérieur</span>;
     if (kind === 'manuelle') return <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">Ajoutée à la main</span>;
     return null;
   };
+
+  if (pending) {
+    return (
+      <OffDayPrompt
+        items={pendingItems}
+        onCancel={() => setPending(null)}
+        onConfirm={(w) => finalize(pending.updates, w, pending.supplierIds)}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">

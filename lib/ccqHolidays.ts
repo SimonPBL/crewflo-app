@@ -110,28 +110,69 @@ export const businessDaysBetween = (from: Date, to: Date): number => {
   return count * step;
 };
 
-/** Si la date tombe une fin de semaine ou un congé CCQ, avance au prochain jour ouvrable. Garde l'heure. */
-export const nextBusinessDay = (date: Date): Date => {
+// ── Jours travaillés (fins de semaine / congés travaillés par le fournisseur) ──
+
+type Worked = string[] | Set<string> | undefined;
+const hasWorked = (w: Worked, key: string) => !!w && (w instanceof Set ? w.has(key) : w.includes(key));
+
+/** Jour de travail = jour ouvrable, ou jour de congé que le fournisseur travaille. */
+export const isWorkDay = (d: Date, worked?: Worked): boolean =>
+  isBusinessDay(d) || hasWorked(worked, localDateKey(d));
+
+/** Libellé d'un jour non ouvrable (fin de semaine, férié, congé CCQ), sinon null. */
+export const offDayLabel = (d: Date): string | null => {
+  const h = CCQ_HOLIDAYS[localDateKey(d)];
+  if (h) return /CCQ/.test(h) ? 'Vacances / congé CCQ' : h;
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return 'Fin de semaine';
+  return null;
+};
+
+/** Jours non ouvrables compris dans la période (début et fin inclus). */
+export const offDaysInRange = (startIso: string, endIso: string): Date[] => {
+  const out: Date[] = [];
+  const d = new Date(startIso); d.setHours(12, 0, 0, 0);
+  const e = new Date(endIso); e.setHours(12, 0, 0, 0);
+  while (d <= e) { if (!isBusinessDay(d)) out.push(new Date(d)); d.setDate(d.getDate() + 1); }
+  return out;
+};
+
+/** La tâche doit-elle s'afficher ce jour-là? (suppose que le jour est dans sa période) */
+export const taskShowsOn = (t: { start: string; end: string; workedOffDays?: string[] }, day: Date): boolean => {
+  if (t.workedOffDays === undefined) return true;          // ancienne tâche
+  if (isWorkDay(day, t.workedOffDays)) return true;
+  // Filet : une tâche sans aucun jour de travail reste visible
+  const d = new Date(t.start); d.setHours(12, 0, 0, 0);
+  const e = new Date(t.end); e.setHours(12, 0, 0, 0);
+  while (d <= e) { if (isWorkDay(d, t.workedOffDays)) return false; d.setDate(d.getDate() + 1); }
+  return true;
+};
+
+/** Ramène la date au prochain jour de travail. Garde l'heure. */
+export const nextBusinessDay = (date: Date, worked?: Worked): Date => {
   const d = new Date(date);
-  while (!isBusinessDay(d)) d.setDate(d.getDate() + 1);
+  while (!isWorkDay(d, worked)) d.setDate(d.getDate() + 1);
   return d;
 };
 
-/** Nombre de jours ouvrables couverts par une tâche (début et fin inclus), minimum 1. */
-export const businessDuration = (start: Date, end: Date): number => {
+/** Nombre de jours de travail couverts par une tâche (début et fin inclus), minimum 1. */
+export const businessDuration = (start: Date, end: Date, worked?: Worked): number => {
   const d = new Date(start); d.setHours(12, 0, 0, 0);
   const e = new Date(end); e.setHours(12, 0, 0, 0);
   let n = 0;
-  while (d <= e) { if (isBusinessDay(d)) n++; d.setDate(d.getDate() + 1); }
+  while (d <= e) { if (isWorkDay(d, worked)) n++; d.setDate(d.getDate() + 1); }
   return Math.max(1, n);
 };
 
-/** Place une tâche à partir de `newStart` (ramené au prochain jour ouvrable) en gardant
- *  sa durée en jours ouvrables et l'heure de fin d'origine. */
-export const placeTask = (origStart: Date, origEnd: Date, newStart: Date): { start: Date; end: Date } => {
-  const n = businessDuration(origStart, origEnd);
-  const start = nextBusinessDay(newStart);
-  const end = addBusinessDays(start, n - 1);
+/** Place une tâche à partir de `newStart` (ramené au prochain jour de travail) en gardant
+ *  sa durée en jours de travail et l'heure de fin d'origine.
+ *  `origWorked` = jours de congé travaillés dans l'ancienne période, `newWorked` dans la nouvelle. */
+export const placeTask = (origStart: Date, origEnd: Date, newStart: Date, origWorked?: Worked, newWorked?: Worked): { start: Date; end: Date } => {
+  const n = businessDuration(origStart, origEnd, origWorked);
+  const start = nextBusinessDay(newStart, newWorked);
+  const end = new Date(start);
+  let counted = 1;
+  while (counted < n) { end.setDate(end.getDate() + 1); if (isWorkDay(end, newWorked)) counted++; }
   end.setHours(origEnd.getHours(), origEnd.getMinutes(), origEnd.getSeconds(), 0);
   if (end < start) end.setTime(start.getTime());
   return { start, end };
