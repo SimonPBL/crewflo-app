@@ -53,6 +53,26 @@ export const OffDayPrompt: React.FC<Props> = ({ items, onConfirm, onCancel }) =>
     return { ...prev, [id]: n };
   });
 
+  // Toutes les fins de semaine (samedis + dimanches) de toutes les tâches
+  const weekendKeys = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    prepared.forEach(it => {
+      m[it.id] = it.blocks.flat().filter(d => d.getDay() === 0 || d.getDay() === 6).map(localDateKey);
+    });
+    return m;
+  }, [prepared]);
+  const hasWeekends = Object.values(weekendKeys).some(k => k.length > 0);
+  const allWeekendsOn = hasWeekends && Object.entries(weekendKeys).every(([id, keys]) => keys.every(k => worked[id]?.has(k)));
+  const toggleAllWeekends = () => setWorked(prev => {
+    const next: Record<string, Set<string>> = { ...prev };
+    Object.entries(weekendKeys).forEach(([id, keys]) => {
+      const n = new Set(prev[id] || []);
+      keys.forEach(k => { if (allWeekendsOn) n.delete(k); else n.add(k); });
+      next[id] = n;
+    });
+    return next;
+  });
+
   const confirm = () => {
     const out: Record<string, string[]> = {};
     items.forEach(it => { out[it.id] = Array.from(worked[it.id] || []).sort(); });
@@ -74,6 +94,15 @@ export const OffDayPrompt: React.FC<Props> = ({ items, onConfirm, onCancel }) =>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {hasWeekends && (
+            <button type="button" onClick={toggleAllWeekends} aria-pressed={allWeekendsOn}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border text-left ${allWeekendsOn ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-300'}`}>
+              <span className="text-sm font-semibold text-slate-800">Travaille toutes les fins de semaine</span>
+              <span className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${allWeekendsOn ? 'bg-blue-600' : 'bg-slate-300'}`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${allWeekendsOn ? 'translate-x-6' : 'translate-x-1'}`} />
+              </span>
+            </button>
+          )}
           {prepared.map(it => (
             <div key={it.id} className="space-y-2">
               {prepared.length > 1 && (

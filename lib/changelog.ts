@@ -26,6 +26,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'feat', description: 'Champ de recherche dans les fournisseurs (nom, métier, courriel, téléphone, sans tenir compte des accents)' },
       { type: 'improvement', description: 'Liste compacte : une ligne par fournisseur (juste le nom), regroupée par métier, avec des filtres par métier' },
       { type: 'improvement', description: "On touche un fournisseur pour voir ses infos, le modifier ou le supprimer; le formulaire d'ajout est caché derrière le bouton « Ajouter »" },
+      { type: 'feat', description: "Fenêtre « Fin de semaine ou congé » : interrupteur « Travaille toutes les fins de semaine » qui coche d'un coup tous les samedis et dimanches (les fériés restent au choix)" },
     ],
   },
   {
