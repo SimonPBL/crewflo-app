@@ -84,6 +84,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({ projects, setProjects,
   const deleteProject = (id: string) => {
     if (!canEdit) return;
     setProjects(projects.filter(p => p.id !== id));
+    // Supprimer aussi les tâches du chantier (sinon elles restent en pastilles grises orphelines)
+    setTasks?.(prev => prev.filter(t => t.projectId !== id));
   };
 
   const startEditing = (project: Project) => {

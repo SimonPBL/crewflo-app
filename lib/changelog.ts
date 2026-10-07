@@ -19,6 +19,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.8',
+    date: '2026-10-07',
+    title: 'Chantiers terminés cachés du calendrier global',
+    changes: [
+      { type: 'fix', description: "Le calendrier global n'affiche plus les tâches des chantiers terminés (on les voit encore en ouvrant le chantier)" },
+      { type: 'fix', description: "Supprimer un chantier supprime aussi ses tâches : plus de pastilles grises vides dans le calendrier" },
+      { type: 'fix', description: "Une tâche dont le chantier ou le fournisseur n'existe plus affiche « Choisir... » au lieu du premier chantier ou fournisseur de la liste" },
+      { type: 'fix', description: "Les conflits d'horaire ignorent les chantiers terminés ou supprimés" },
+    ],
+  },
+  {
     version: '2.2.7',
     date: '2026-10-07',
     title: 'Liste des fournisseurs plus claire',

@@ -314,7 +314,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Détection des conflits (Global)
   const conflicts = useMemo(() => {
     const foundConflicts: Conflict[] = [];
-    const tasksToCheck = tasks; 
+    // Ignorer les tâches de chantiers terminés ou supprimés
+    const liveProjectIds = new Set(projects.filter(p => p.status !== 'completed').map(p => p.id));
+    const tasksToCheck = tasks.filter(t => liveProjectIds.has(t.projectId));
 
     for (let i = 0; i < tasksToCheck.length; i++) {
       for (let j = i + 1; j < tasksToCheck.length; j++) {
@@ -1315,13 +1317,12 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
       // Vue par chantier — montre tout (même les projets cachés du global)
       filtered = filtered.filter(t => t.projectId === currentProjectId);
     } else {
-      // Vue globale — exclure les chantiers marqués 'hiddenFromGlobalCalendar'
-      const hiddenIds = new Set(
-        projects.filter(p => p.hiddenFromGlobalCalendar).map(p => p.id)
+      // Vue globale — seulement les chantiers qui existent encore, pas terminés,
+      // et pas marqués 'hiddenFromGlobalCalendar'
+      const shownIds = new Set(
+        projects.filter(p => p.status !== 'completed' && !p.hiddenFromGlobalCalendar).map(p => p.id)
       );
-      if (hiddenIds.size > 0) {
-        filtered = filtered.filter(t => !hiddenIds.has(t.projectId));
-      }
+      filtered = filtered.filter(t => shownIds.has(t.projectId));
     }
     if (filterSupplierId !== 'all') filtered = filtered.filter(t => t.supplierId === filterSupplierId);
     return filtered;
@@ -2079,7 +2080,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chantier</label>
                     <select
-                    value={newTask.projectId || ''}
+                    value={projects.some(p => p.id === newTask.projectId) ? newTask.projectId : ''}
                     disabled={isViewOnly || (!!currentProjectId && !editingTaskId)}
                     onChange={e => setNewTask({...newTask, projectId: e.target.value})}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none truncate"
@@ -2091,7 +2092,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fournisseur</label>
                     <select
-                    value={newTask.supplierId || ''}
+                    value={suppliers.some(sp => sp.id === newTask.supplierId) ? newTask.supplierId : ''}
                     disabled={isViewOnly}
                   onChange={e => setNewTask({...newTask, supplierId: e.target.value})}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none truncate"

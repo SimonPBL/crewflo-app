@@ -251,6 +251,8 @@ type ViewMode = 'calendar' | 'suppliers' | 'projects' | 'ai' | 'mytasks'
 - Même fournisseur + même chantier = **PAS un conflit**
 - Conflits passés (avant aujourd'hui) = **ne pas afficher** le rouge ni l'alerte
 - Calendrier global = **1 seul badge par fournisseur par jour** (déduplication)
+- Calendrier global = **seulement les chantiers existants et non terminés** (`status !== 'completed'`, pas `hiddenFromGlobalCalendar`). La vue d'un chantier montre toujours toutes ses tâches. Les conflits ignorent aussi les chantiers terminés ou supprimés.
+- Supprimer un chantier supprime aussi ses tâches (`ProjectList.deleteProject`).
 
 ---
 
@@ -310,3 +312,4 @@ SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <nom> --use-api --pr
 - **2026-10-07** — v2.2.7 (branche `feature/liste-fournisseurs`) : `SupplierList` refaite en liste compacte (une ligne = le nom seulement), recherche sans accents (nom, métier, courriel, tél.), filtres + groupes par métier, la ligne s'ouvre en dessous (infos, Modifier, glisser pour supprimer, édition sur place), formulaire d'ajout caché derrière « Ajouter ».
 - **2026-10-07** — v2.2.7 (même branche) : `OffDayPrompt` — interrupteur « Travaille toutes les fins de semaine » qui coche/décoche tous les samedis et dimanches de toutes les tâches de la fenêtre; fériés et congés CCQ restent au choix un par un.
 - **2026-10-07** — v2.2.7 (même branche) : pastille couleur devant le nom dans `SupplierList`; fiche de tâche : section Notes remplacée par un lien discret « Note perso » (champ `notes`, admin seulement, caché aux fournisseurs aussi dans l'agenda et la fenêtre du jour), note admin et note fournisseur affichées seulement si elles contiennent déjà du texte (le fournisseur garde sa zone de note); `OffDayPrompt` : pastilles fin de semaine bleues, fériés/congés CCQ orange.
+- **2026-10-07** — v2.2.8 (branche `fix/chantiers-termines`) : pastilles grises vides dans le calendrier global = tâches orphelines du chantier « test » supprimé (la suppression de chantier ne supprimait pas ses tâches; la fiche affichait alors le 1er chantier/fournisseur de la liste, 3910 Caron / Armoires LM). Fix : global sans chantiers terminés/supprimés, suppression de chantier → tâches supprimées, listes déroulantes à « Choisir... » si l'id n'existe plus, conflits sans chantiers terminés.
