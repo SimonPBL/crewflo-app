@@ -109,3 +109,30 @@ export const businessDaysBetween = (from: Date, to: Date): number => {
   }
   return count * step;
 };
+
+/** Si la date tombe une fin de semaine ou un congé CCQ, avance au prochain jour ouvrable. Garde l'heure. */
+export const nextBusinessDay = (date: Date): Date => {
+  const d = new Date(date);
+  while (!isBusinessDay(d)) d.setDate(d.getDate() + 1);
+  return d;
+};
+
+/** Nombre de jours ouvrables couverts par une tâche (début et fin inclus), minimum 1. */
+export const businessDuration = (start: Date, end: Date): number => {
+  const d = new Date(start); d.setHours(12, 0, 0, 0);
+  const e = new Date(end); e.setHours(12, 0, 0, 0);
+  let n = 0;
+  while (d <= e) { if (isBusinessDay(d)) n++; d.setDate(d.getDate() + 1); }
+  return Math.max(1, n);
+};
+
+/** Place une tâche à partir de `newStart` (ramené au prochain jour ouvrable) en gardant
+ *  sa durée en jours ouvrables et l'heure de fin d'origine. */
+export const placeTask = (origStart: Date, origEnd: Date, newStart: Date): { start: Date; end: Date } => {
+  const n = businessDuration(origStart, origEnd);
+  const start = nextBusinessDay(newStart);
+  const end = addBusinessDays(start, n - 1);
+  end.setHours(origEnd.getHours(), origEnd.getMinutes(), origEnd.getSeconds(), 0);
+  if (end < start) end.setTime(start.getTime());
+  return { start, end };
+};

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CalendarDays, X, ArrowRight, Send, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { Project, Supplier, Task } from '../types';
 import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
-import { addBusinessDays, businessDaysBetween, isBusinessDay, localDateKey } from '../lib/ccqHolidays';
+import { addBusinessDays, businessDaysBetween, isBusinessDay, localDateKey, placeTask } from '../lib/ccqHolidays';
 
 // ── Décalage de tâches ─────────────────────────────────────────
 // On déplace une tâche à une nouvelle date; la modale liste les tâches
@@ -44,10 +44,12 @@ const withDate = (iso: string, ymd: string) => {
   return new Date(y, m - 1, d, src.getHours(), src.getMinutes(), 0, 0);
 };
 
-const shiftTask = (t: Task, delta: number): { start: string; end: string } => ({
-  start: addBusinessDays(new Date(t.start), delta).toISOString(),
-  end: addBusinessDays(new Date(t.end), delta).toISOString(),
-});
+// Décale le début de `delta` jours ouvrables, puis garde la durée en jours ouvrables
+// (fins de semaine et congés CCQ sautés).
+const shiftTask = (t: Task, delta: number): { start: string; end: string } => {
+  const placed = placeTask(new Date(t.start), new Date(t.end), addBusinessDays(new Date(t.start), delta));
+  return { start: placed.start.toISOString(), end: placed.end.toISOString() };
+};
 
 interface ShiftTaskModalProps {
   task: Task;                       // tâche telle qu'enregistrée (date d'origine)
@@ -85,18 +87,16 @@ export const ShiftTaskModal: React.FC<ShiftTaskModalProps> = ({
   );
   const [done, setDone] = useState<{ count: number; supplierIds: string[] } | null>(null);
 
-  const newStart = useMemo(() => withDate(base.start, newDate), [base.start, newDate]);
+  const chosenStart = useMemo(() => withDate(base.start, newDate), [base.start, newDate]);
+  const isOffDay = !isBusinessDay(chosenStart);
+  // Tâche déplacée : début ramené au prochain jour ouvrable, même durée en jours ouvrables
+  const moved = useMemo(() => placeTask(new Date(base.start), new Date(base.end), chosenStart),
+    [base.start, base.end, chosenStart]);
+  const newStart = moved.start;
+  const movedEnd = moved.end;
   const delta = businessDaysBetween(new Date(task.start), newStart);
-  const dateChanged = localDateKey(new Date(task.start)) !== newDate;
-  const isOffDay = !isBusinessDay(newStart);
-
-  // Nouvelle fin de la tâche déplacée : même durée en jours ouvrables
-  const movedEnd = useMemo(() => {
-    const endShift = businessDaysBetween(new Date(base.start), newStart);
-    const e = addBusinessDays(new Date(base.end), endShift);
-    if (e < newStart) { const f = new Date(newStart); f.setHours(new Date(base.end).getHours(), 0, 0, 0); return f; }
-    return e;
-  }, [base.start, base.end, newStart]);
+  const dateChanged = localDateKey(new Date(task.start)) !== localDateKey(newStart)
+    || localDateKey(new Date(task.end)) !== localDateKey(movedEnd);
 
   const toggle = (id: string) => setChecked(prev => {
     const n = new Set(prev);
@@ -179,8 +179,14 @@ export const ShiftTaskModal: React.FC<ShiftTaskModalProps> = ({
               {isOffDay && (
                 <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  <span>Cette date tombe une fin de semaine ou un congé CCQ.</span>
+                  <span>Cette date tombe une fin de semaine ou un congé CCQ : la tâche commencera le {fmt(newStart.toISOString())}.</span>
                 </div>
+              )}
+
+              {dateChanged && (
+                <p className="text-xs text-slate-500">
+                  Nouvelle période : <span className="font-semibold text-slate-700">{fmt(newStart.toISOString())} → {fmt(movedEnd.toISOString())}</span> (fins de semaine et congés sautés)
+                </p>
               )}
 
               {!dateChanged ? (
