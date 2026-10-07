@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Supplier, TRADES, COLORS } from '../types';
-import { Plus, User, Briefcase, Mail, Phone, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, ThermometerSnowflake, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Plus, User, Briefcase, Mail, Phone, Pencil, Check, X, Palette, Zap, Droplets, Hammer, Paintbrush, Building2, Home, Flower2, Fan, Utensils, ThermometerSnowflake, Loader2, Eye, EyeOff, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { SwipeToConfirmButton } from './SwipeToConfirmButton';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
@@ -36,6 +36,12 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
   // State pour l'édition
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Supplier>>({});
+
+  // Liste : recherche, filtre par métier, ligne ouverte, formulaire d'ajout
+  const [search, setSearch] = useState('');
+  const [tradeFilter, setTradeFilter] = useState<string>('Tous');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const addSupplier = async () => {
     if (!canEdit) return;
@@ -201,16 +207,44 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
     </div>
   );
 
+  // Recherche sans accents sur nom, métier, courriel, téléphone
+  const norm = (v?: string) => (v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const tradesPresent = useMemo(
+    () => Array.from(new Set(suppliers.map(s => s.trade))).sort((a, b) => a.localeCompare(b, 'fr')),
+    [suppliers]
+  );
+  const grouped = useMemo(() => {
+    const q = norm(search.trim());
+    const filtered = suppliers.filter(s =>
+      (tradeFilter === 'Tous' || s.trade === tradeFilter) &&
+      (!q || norm(`${s.name} ${s.trade} ${s.email || ''} ${s.phone || ''}`).includes(q))
+    );
+    const g: Record<string, Supplier[]> = {};
+    filtered.forEach(s => { (g[s.trade] = g[s.trade] || []).push(s); });
+    return Object.entries(g)
+      .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+      .map(([t, list]) => [t, list.sort((a, b) => a.name.trim().localeCompare(b.name.trim(), 'fr'))] as [string, Supplier[]]);
+  }, [suppliers, search, tradeFilter]);
+
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
       <div className="p-4 sm:p-6 max-w-6xl mx-auto pb-20 sm:pb-6">
-        <h2 className="text-2xl font-bold mb-6 text-slate-800 flex items-center gap-2">
-          <User className="w-6 h-6 text-blue-600" />
-          Gestion des Fournisseurs
-        </h2>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <User className="w-6 h-6 text-blue-600" />
+            Fournisseurs
+          </h2>
+          {canEdit && (
+            <button onClick={() => setShowAddForm(v => !v)}
+              className={`px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 ${showAddForm ? 'bg-slate-200 text-slate-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+              {showAddForm ? <><X className="w-4 h-4" /> Fermer</> : <><Plus className="w-4 h-4" /> Ajouter</>}
+            </button>
+          )}
+        </div>
 
-        {/* Formulaire d'ajout */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-8">
+        {/* Formulaire d'ajout (caché derrière « Ajouter ») */}
+        {canEdit && showAddForm && (
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
           <h3 className="text-lg font-semibold mb-4 text-slate-700">Ajouter un nouveau fournisseur</h3>
           {!canEdit && (
             <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -379,20 +413,50 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
             </div>
           </div>
         </div>
+        )}
 
-        {/* Liste des cartes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {suppliers.map(supplier => {
-              const isEditing = editingId === supplier.id;
+        {/* Recherche */}
+        <div className="relative mb-3">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher un fournisseur, un métier…"
+            className="w-full pl-9 pr-3 py-2.5 border border-slate-300 rounded-lg bg-white text-sm focus:border-blue-500 outline-none" />
+        </div>
 
-              return (
-                <div key={supplier.id} className={`p-4 rounded-xl border border-slate-200 shadow-sm relative group bg-white flex flex-col justify-between min-h-[200px]`}>
-                  {/* Bande latérale de couleur */}
-                  <div className={`absolute top-0 left-0 w-1.5 h-full rounded-l-xl ${isEditing && editForm.color ? editForm.color.split(' ')[0] : supplier.color.split(' ')[0]}`}></div>
-                  
-                  <div className="pl-3 w-full">
-                    {isEditing ? (
-                      // Mode Édition
+        {/* Filtres par métier */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-2 -mx-1 px-1">
+          {['Tous', ...tradesPresent].map(t => (
+            <button key={t} onClick={() => setTradeFilter(t)}
+              className={`whitespace-nowrap text-xs px-3 py-1.5 rounded-full border ${tradeFilter === t ? 'bg-blue-600 border-blue-600 text-white font-semibold' : 'bg-white border-slate-300 text-slate-600'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+
+        {/* Liste compacte groupée par métier */}
+        {grouped.length === 0 && (
+          <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-dashed border-slate-300 text-sm">
+            {suppliers.length === 0 ? 'Aucun fournisseur configuré.' : 'Aucun fournisseur trouvé.'}
+          </div>
+        )}
+        {grouped.map(([trade, list]) => (
+          <div key={trade} className="mb-4">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 px-1">{trade} · {list.length}</p>
+            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+              {list.map(supplier => {
+                const isEditing = editingId === supplier.id;
+                const isOpen = expandedId === supplier.id || isEditing;
+                return (
+                  <div key={supplier.id}>
+                    <button type="button"
+                      onClick={() => { if (isEditing) return; setExpandedId(isOpen ? null : supplier.id); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left ${isOpen ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
+                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800">{supplier.name}</span>
+                      {isOpen ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 pb-4 pt-1 bg-slate-50">
+                        {isEditing ? (
                       <div className="space-y-3 mb-4">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -455,91 +519,61 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                           />
                         </div>
                       </div>
-                    ) : (
-                      // Mode Lecture
-                      <>
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-3 truncate pr-2 w-full">
-                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0">
-                                {getTradeIcon(supplier.trade)}
+                        ) : (
+                          <div className="space-y-1.5 mb-3">
+                            <div className="flex items-center gap-2 text-slate-600 text-sm">
+                              {getTradeIcon(supplier.trade)}
+                              <span>{supplier.trade}</span>
                             </div>
-                            <h4 className="font-bold text-slate-800 text-lg truncate">{supplier.name}</h4>
-                          </div>
-                          <button 
-                            onClick={canEdit ? () => startEditing(supplier) : undefined}
-                            disabled={!canEdit}
-                            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${canEdit ? "text-slate-400 hover:text-blue-600 hover:bg-blue-50" : "text-slate-300 cursor-not-allowed"}`}
-                            title={canEdit ? "Modifier" : "Lecture seule"}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-slate-600 text-sm mt-1">
-                          <Briefcase className="w-4 h-4 text-slate-400" />
-                          <span>{supplier.trade}</span>
-                        </div>
-
-                        {supplier.email && (
-                          <div className="flex items-center gap-2 text-slate-600 text-sm mt-1 overflow-hidden" title={supplier.email}>
-                            <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                            <a href={`mailto:${supplier.email}`} className="hover:underline hover:text-blue-600 truncate block w-full">
-                              {supplier.email}
-                            </a>
+                            {supplier.email && (
+                              <div className="flex items-center gap-2 text-slate-600 text-sm overflow-hidden" title={supplier.email}>
+                                <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                <a href={`mailto:${supplier.email}`} className="hover:underline hover:text-blue-600 truncate">{supplier.email}</a>
+                              </div>
+                            )}
+                            {supplier.phone && (
+                              <div className="flex items-center gap-2 text-slate-600 text-sm overflow-hidden" title={supplier.phone}>
+                                <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                <a href={`tel:${supplier.phone.split(',')[0].trim()}`} className="hover:underline hover:text-blue-600 truncate">{supplier.phone}</a>
+                              </div>
+                            )}
+                            <div className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${supplier.color} shadow-sm border`}>
+                              {supplier.customInitials || supplier.name} · étiquette
+                            </div>
                           </div>
                         )}
-
-                        {supplier.phone && (
-                          <div className="flex items-center gap-2 text-slate-600 text-sm mt-1 overflow-hidden" title={supplier.phone}>
-                            <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                            <a href={`tel:${supplier.phone.split(',')[0].trim()}`} className="hover:underline hover:text-blue-600 truncate block w-full">
-                              {supplier.phone}
-                            </a>
-                          </div>
-                        )}
-
-                        <div className={`mt-3 inline-block px-2 py-1 rounded text-xs font-semibold ${supplier.color} shadow-sm border`}>
-                          Aperçu Étiquette
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100 pl-3">
-                      {isEditing ? (
-                        <div className="flex gap-2 justify-end">
-                            <button 
-                              onClick={cancelEditing}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded hover:bg-slate-200"
-                            >
+                        {isEditing ? (
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={cancelEditing}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-200 rounded hover:bg-slate-300">
                               <X className="w-3 h-3" /> Annuler
                             </button>
-                            <button 
-                              onClick={saveEditing}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
-                            >
+                            <button onClick={saveEditing}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700">
                               <Check className="w-3 h-3" /> Enregistrer
                             </button>
-                        </div>
-                      ) : (
-                        <>
-                          {canEdit ? (
-                            <SwipeToConfirmButton onConfirm={() => deleteSupplier(supplier.id)} label="Supprimer" className="h-8 text-[10px]" />
-                          ) : (
-                            <div className="text-xs text-slate-400">Lecture seule</div>
-                          )}
-                        </>
-                      )}
+                          </div>
+                        ) : canEdit ? (
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => startEditing(supplier)}
+                              className="flex items-center gap-1.5 px-3 h-8 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 flex-shrink-0">
+                              <Pencil className="w-3.5 h-3.5" /> Modifier
+                            </button>
+                            <div className="flex-1">
+                              <SwipeToConfirmButton onConfirm={() => deleteSupplier(supplier.id)} label="Supprimer" className="h-8 text-[10px]" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-400">Lecture seule</div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-          })}
-          {suppliers.length === 0 && (
-            <div className="col-span-full text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-              Aucun fournisseur configuré. Ajoutez-en un ci-dessus pour commencer.
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   );

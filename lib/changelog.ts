@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.7',
+    date: '2026-10-07',
+    title: 'Liste des fournisseurs plus claire',
+    changes: [
+      { type: 'feat', description: 'Champ de recherche dans les fournisseurs (nom, métier, courriel, téléphone, sans tenir compte des accents)' },
+      { type: 'improvement', description: 'Liste compacte : une ligne par fournisseur (juste le nom), regroupée par métier, avec des filtres par métier' },
+      { type: 'improvement', description: "On touche un fournisseur pour voir ses infos, le modifier ou le supprimer; le formulaire d'ajout est caché derrière le bouton « Ajouter »" },
+    ],
+  },
+  {
     version: '2.2.6',
     date: '2026-10-07',
     title: 'Déplacer une tâche et décaler la cédule',
