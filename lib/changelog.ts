@@ -19,6 +19,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.6',
+    date: '2026-10-07',
+    title: 'Déplacer une tâche et décaler la cédule',
+    changes: [
+      { type: 'feat', description: "Nouveau bouton « Déplacer et décaler la cédule » dans la fiche d'une tâche : on choisit la nouvelle date dans un calendrier" },
+      { type: 'feat', description: "Une fenêtre liste les tâches qui suivent dans le chantier. Les tâches intérieures et celles ajoutées à la main sont cochées d'avance, les tâches extérieures restent en place. On coche ou décoche avant d'appliquer" },
+      { type: 'improvement', description: "Le décalage se compte en jours ouvrables : fins de semaine, fériés et congés CCQ (vacances de la construction, congés d'hiver) sont sautés" },
+      { type: 'improvement', description: "Si on change la date de début d'une tâche directement dans sa fiche, la fenêtre de décalage s'ouvre aussi pour demander quelles tâches suivent" },
+      { type: 'feat', description: "Après le décalage, on peut prévenir les fournisseurs touchés par courriel et texto en un geste" },
+    ],
+  },
+  {
     version: '2.2.5',
     date: '2026-10-02',
     title: 'Vue 1 mois défilante + catégorie Isolation',

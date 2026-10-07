@@ -9,6 +9,8 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { getSupabase, getSupabaseConfig } from '../services/supabase';
 import { FINISHING_TEMPLATE } from './finishingTemplate';
+import { CCQ_HOLIDAYS, getCCQHoliday } from '../lib/ccqHolidays';
+import { ShiftTaskModal } from './ShiftTaskModal';
 
 interface CalendarViewProps {
   projects: Project[];
@@ -23,72 +25,6 @@ interface CalendarViewProps {
   userRole?: string;
 }
 
-// ── Congés CCQ ─────────────────────────────────────────────────
-// METTRE À JOUR CHAQUE ANNÉE — Source : https://www.ccq.org/calendrier
-// Congés annuels de la construction (industrie de la construction, Québec)
-const CCQ_HOLIDAYS: Record<string, string> = {
-  // 2026
-  '2026-01-01': "Jour de l'An",
-  '2026-01-02': "Lendemain du Jour de l'An",
-  '2026-04-03': "Vendredi Saint",
-  '2026-04-06': "Lundi de Pâques",
-  '2026-05-18': "Journée nationale des Patriotes",
-  '2026-06-24': "Fête nationale du Québec",
-  '2026-07-01': "Fête du Canada",
-  '2026-07-20': "Congé CCQ — début vacances construction",
-  '2026-07-21': "Congé CCQ",
-  '2026-07-22': "Congé CCQ",
-  '2026-07-23': "Congé CCQ",
-  '2026-07-24': "Congé CCQ",
-  '2026-07-27': "Congé CCQ",
-  '2026-07-28': "Congé CCQ",
-  '2026-07-29': "Congé CCQ",
-  '2026-07-30': "Congé CCQ",
-  '2026-07-31': "Congé CCQ — fin vacances construction",
-  '2026-09-07': "Fête du Travail",
-  '2026-10-12': "Action de grâce",
-  '2026-12-24': "Veille de Noël",
-  '2026-12-25': "Noël",
-  '2026-12-26': "Lendemain de Noël",
-  '2026-12-27': "Congé CCQ",
-  '2026-12-28': "Congé CCQ",
-  '2026-12-29': "Congé CCQ",
-  '2026-12-30': "Congé CCQ",
-  '2026-12-31': "Congé CCQ — fin congés hiver",
-  // 2027
-  '2027-01-01': "Jour de l'An",
-  '2027-03-26': "Vendredi Saint",
-  '2027-03-29': "Lundi de Pâques",
-  '2027-05-24': "Journée nationale des Patriotes",
-  '2027-06-24': "Fête nationale du Québec",
-  '2027-07-01': "Fête du Canada",
-  '2027-07-19': "Congé CCQ — début vacances construction",
-  '2027-07-20': "Congé CCQ",
-  '2027-07-21': "Congé CCQ",
-  '2027-07-22': "Congé CCQ",
-  '2027-07-23': "Congé CCQ",
-  '2027-07-26': "Congé CCQ",
-  '2027-07-27': "Congé CCQ",
-  '2027-07-28': "Congé CCQ",
-  '2027-07-29': "Congé CCQ",
-  '2027-07-30': "Congé CCQ — fin vacances construction",
-  '2027-09-06': "Fête du Travail",
-  '2027-10-11': "Action de grâce",
-  '2027-12-24': "Veille de Noël",
-  '2027-12-25': "Noël",
-  '2027-12-26': "Lendemain de Noël",
-  '2027-12-27': "Congé CCQ",
-  '2027-12-28': "Congé CCQ",
-  '2027-12-29': "Congé CCQ",
-  '2027-12-30': "Congé CCQ",
-  '2027-12-31': "Congé CCQ — fin congés hiver",
-};
-
-const getCCQHoliday = (date: Date): string | null => {
-  const key = date.toISOString().slice(0, 10);
-  return CCQ_HOLIDAYS[key] ?? null;
-};
-// ────────────────────────────────────────────────────────────────
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   projects,
@@ -122,6 +58,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [newTask, setNewTask] = useState<Partial<Task>>({});
   const [showNotes, setShowNotes] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  // Décalage de tâches (fenêtre « Déplacer »)
+  const [shiftCtx, setShiftCtx] = useState<{ taskId: string; initialNewStart?: string; edited?: Partial<Task> } | null>(null);
+  // Chantier ciblé par la notif de cédule (null = chantier courant)
+  const [notifProjectId, setNotifProjectId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -1042,6 +982,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
 
     if (editingTaskId) {
+      // Si la date de début change et que d'autres tâches suivent dans le chantier,
+      // on ouvre la fenêtre de décalage au lieu d'enregistrer directement.
+      const original = tasks.find(t => t.id === editingTaskId);
+      if (original && newTask.projectId === original.projectId) {
+        const day = (iso: string) => { const d = new Date(iso); d.setHours(0,0,0,0); return d.getTime(); };
+        const startChanged = day(newTask.start) !== day(original.start);
+        const hasFollowers = tasks.some(t => t.id !== original.id && t.projectId === original.projectId && day(t.start) >= day(original.start));
+        if (startChanged && hasFollowers) {
+          setShiftCtx({ taskId: original.id, initialNewStart: newTask.start, edited: { ...newTask } });
+          setIsModalOpen(false);
+          setIsViewOnly(false);
+          return;
+        }
+      }
       setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, ...newTask } as Task : t));
     } else {
       setTasks([...tasks, { ...newTask as Task, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]);
@@ -1063,13 +1017,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const hasPhone = (s: Supplier) => !!s.phone?.trim();
 
   // Fournisseurs qui ont une tâche à venir / en cours dans la cédule du chantier courant
+  const notifPid = notifProjectId ?? currentProjectId;
   const getScheduleSupplierIds = (): Set<string> => {
     const ids = new Set<string>();
-    if (!currentProjectId) return ids;
+    if (!notifPid) return ids;
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     tasks.forEach(t => {
-      if (t.projectId === currentProjectId && new Date(t.end) >= startOfToday) ids.add(t.supplierId);
+      if (t.projectId === notifPid && new Date(t.end) >= startOfToday) ids.add(t.supplierId);
     });
     return ids;
   };
@@ -1083,7 +1038,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const handlePrepareEmail = () => {
-    const inSchedule = getScheduleSupplierIds();
+    setNotifProjectId(null);
+    const inSchedule = new Set<string>();
+    if (currentProjectId) {
+      const sot = new Date(); sot.setHours(0, 0, 0, 0);
+      tasks.forEach(t => { if (t.projectId === currentProjectId && new Date(t.end) >= sot) inSchedule.add(t.supplierId); });
+    }
     const scheduleSuppliers = suppliers.filter(s => inSchedule.has(s.id));
     setSelectedEmailSuppliers(scheduleSuppliers.filter(hasEmail).map(s => s.id));
     setSelectedSmsSuppliers(scheduleSuppliers.filter(hasPhone).map(s => s.id));
@@ -1092,8 +1052,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setIsEmailModalOpen(true);
   };
 
+  const handleShiftNotify = (projectId: string, supplierIds: string[]) => {
+    setShiftCtx(null);
+    setNotifProjectId(projectId);
+    const touched = suppliers.filter(s => supplierIds.includes(s.id));
+    setSelectedEmailSuppliers(touched.filter(hasEmail).map(s => s.id));
+    setSelectedSmsSuppliers(touched.filter(hasPhone).map(s => s.id));
+    setNotifSentEmail(false);
+    setNotifSentSms(false);
+    setIsEmailModalOpen(true);
+  };
+
   const getNotifMessage = () => {
-    const projectName = currentProjectId ? notifProjectName(currentProjectId) : '';
+    const projectName = notifPid ? notifProjectName(notifPid) : '';
     return `Bonjour,\n\nVeuillez prendre note que la cédule du chantier ${projectName} a été mise à jour.\n\nConsultez-la dans CrewFlo : ${window.location.origin}\n\nMerci,\nHabitations PBL`;
   };
 
@@ -1111,7 +1082,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       .flatMap(s => s.email!.split(',').map(e => e.trim()).filter(Boolean))
       .join(',');
     if (!supplierEmails) return;
-    const projectName = currentProjectId ? notifProjectName(currentProjectId) : '';
+    const projectName = notifPid ? notifProjectName(notifPid) : '';
     const subject = encodeURIComponent(`Cédule ${projectName} - mise à jour ${new Date().toLocaleDateString('fr-CA')}`);
     const body = encodeURIComponent(getNotifMessage());
     openLink(`mailto:?bcc=${supplierEmails}&subject=${subject}&body=${body}`);
@@ -2094,6 +2065,13 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               </div>
 
               <div className="pt-2">
+                {editingTaskId && !isViewOnly && (
+                  <button type="button"
+                    onClick={() => { const orig = tasks.find(t => t.id === editingTaskId); if (!orig) return; setShiftCtx({ taskId: orig.id, edited: { ...newTask, start: orig.start, end: orig.end } }); setIsModalOpen(false); }}
+                    className="w-full mb-3 py-2.5 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 flex items-center justify-center gap-2">
+                    <CalendarDays className="w-4 h-4" /> Déplacer et décaler la cédule
+                  </button>
+                )}
                 <div className="flex justify-between items-center mb-2">
                      <span className="text-xs font-bold text-slate-500 uppercase">Dates</span>
                      <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
@@ -2144,6 +2122,30 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
           </div>
         </div>
       )}
+
+      {/* Fenêtre de décalage de tâches */}
+      {shiftCtx && (() => {
+        const shiftTask = tasks.find(t => t.id === shiftCtx.taskId);
+        if (!shiftTask) return null;
+        return (
+          <ShiftTaskModal
+            task={shiftTask}
+            tasks={tasks}
+            suppliers={suppliers}
+            projects={projects}
+            initialNewStart={shiftCtx.initialNewStart}
+            edited={shiftCtx.edited}
+            onApply={(updates) => setTasks(prev => prev.map(t => updates[t.id] ? { ...t, ...updates[t.id] } as Task : t))}
+            onSaveOnly={shiftCtx.initialNewStart ? () => {
+              const ed = shiftCtx.edited || {};
+              setTasks(prev => prev.map(t => t.id === shiftCtx.taskId ? { ...t, ...ed } as Task : t));
+              setShiftCtx(null);
+            } : undefined}
+            onNotify={handleShiftNotify}
+            onClose={() => setShiftCtx(null)}
+          />
+        );
+      })()}
 
       {/* PDF Export Modal */}
       {isPdfModalOpen && (
@@ -2273,7 +2275,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="min-w-0">
                 <h3 className="text-lg font-bold text-slate-800">Notifier les fournisseurs</h3>
-                <p className="text-xs text-slate-500 truncate">Cédule : {currentProjectId ? notifProjectName(currentProjectId) : ''}</p>
+                <p className="text-xs text-slate-500 truncate">Cédule : {notifPid ? notifProjectName(notifPid) : ''}</p>
               </div>
               <button onClick={() => setIsEmailModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
