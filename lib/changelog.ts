@@ -27,6 +27,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'improvement', description: 'Liste compacte : une ligne par fournisseur (juste le nom), regroupée par métier, avec des filtres par métier' },
       { type: 'improvement', description: "On touche un fournisseur pour voir ses infos, le modifier ou le supprimer; le formulaire d'ajout est caché derrière le bouton « Ajouter »" },
       { type: 'feat', description: "Fenêtre « Fin de semaine ou congé » : interrupteur « Travaille toutes les fins de semaine » qui coche d'un coup tous les samedis et dimanches (les fériés restent au choix)" },
+      { type: 'improvement', description: "Pastille de la couleur du fournisseur devant son nom dans la liste" },
+      { type: 'improvement', description: "Fiche d'une tâche : les grosses sections de notes sont remplacées par une petite « Note perso » discrète, visible seulement par l'admin. Les notes admin/fournisseur déjà écrites restent affichées" },
+      { type: 'improvement', description: "Fenêtre « Fin de semaine ou congé » : fins de semaine en bleu, fériés et congés CCQ en orange, comme dans le calendrier" },
     ],
   },
   {

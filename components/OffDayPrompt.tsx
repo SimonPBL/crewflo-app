@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarOff, X } from 'lucide-react';
-import { localDateKey, offDayLabel, offDaysInRange } from '../lib/ccqHolidays';
+import { CCQ_HOLIDAYS, localDateKey, offDayLabel, offDaysInRange } from '../lib/ccqHolidays';
 
 // ── « Le fournisseur travaille-t-il ces jours-là? » ────────────
 // Affichée chaque fois qu'une tâche touche une fin de semaine, un férié
@@ -120,11 +120,15 @@ export const OffDayPrompt: React.FC<Props> = ({ items, onConfirm, onCancel }) =>
                       {block.map(d => {
                         const key = localDateKey(d);
                         const on = worked[it.id]?.has(key);
+                        // Même code de couleur que le calendrier : fin de semaine = bleu, férié / congé CCQ = orange
+                        const isHoliday = !!CCQ_HOLIDAYS[key];
+                        const cls = isHoliday
+                          ? (on ? 'bg-orange-500 border-orange-500 text-white font-semibold' : 'bg-orange-50 border-orange-200 text-orange-700')
+                          : (on ? 'bg-blue-600 border-blue-600 text-white font-semibold' : 'bg-blue-50 border-blue-200 text-blue-800');
                         return (
                           <button key={key} type="button" onClick={() => toggle(it.id, key)} aria-pressed={on}
-                            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${on
-                              ? 'bg-blue-600 border-blue-600 text-white font-semibold'
-                              : 'bg-white border-slate-300 text-slate-600'}`}>
+                            title={isHoliday ? CCQ_HOLIDAYS[key] : 'Fin de semaine'}
+                            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${cls}`}>
                             {on ? '✓ ' : ''}{dayFmt(d)}
                           </button>
                         );

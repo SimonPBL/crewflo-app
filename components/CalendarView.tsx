@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Project, Supplier, Task, Conflict } from '../types';
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin, List, CalendarDays, MessageSquare, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Download, Loader2, Mail, Users, Calendar as CalendarIcon, Clock, CheckCircle2, X, MapPin, List, CalendarDays, MessageSquare, Send, StickyNote } from 'lucide-react';
 import { ConflictAlert } from './ConflictAlert';
 import { ProjectSchedule } from './ProjectSchedule';
 import { SCHEDULE_TEMPLATE } from './ScheduleTemplate';
@@ -487,7 +487,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 <MapPin className="w-3 h-3" />{project.name}
                               </span>
                             )}
-                            {task.notes && !isDelivery && (
+                            {canEdit && task.notes && !isDelivery && (
                               <span className="text-xs text-slate-400 truncate max-w-xs">{task.notes}</span>
                             )}
                           </div>
@@ -1818,7 +1818,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
                                   {t.supplierNotes?.text && <span className="font-normal">— {t.supplierNotes.text}</span>}
                                 </span>
                               )}
-                              {t.notes && <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.notes}</div>}
+                              {canEdit && t.notes && <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.notes}</div>}
                               {t.adminNote?.text && (
                                 <div className="mt-1 text-xs bg-blue-50 border border-blue-100 rounded px-2 py-1 text-blue-800">
                                   <span className="font-bold">Admin</span>: {t.adminNote.text}
@@ -1946,20 +1946,19 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
               </div>
 
 
-<div className="border border-slate-200 rounded-xl overflow-hidden">
-  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
-    <span className="text-xs font-bold text-slate-600 uppercase">Notes</span>
-  </div>
-  <div className="p-3 bg-white">
+{/* Note perso — discrète, pour l'admin seulement (cachée aux fournisseurs) */}
+{canEdit && !isViewOnly && (
+  (showNotes || newTask.notes) ? (
     <div className="relative">
       <textarea
+        rows={2}
         value={newTask.notes || ''}
-        disabled={isViewOnly}
+        autoFocus={showNotes && !newTask.notes}
         onChange={e => { setNewTask({ ...newTask, notes: e.target.value }); setShowNotesSuggestions(true); }}
         onFocus={() => setShowNotesSuggestions(true)}
         onBlur={() => setTimeout(() => setShowNotesSuggestions(false), 150)}
-        className="w-full min-h-[90px] p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-        placeholder="Notes internes…"
+        className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-400 outline-none text-xs text-slate-600 resize-none"
+        placeholder="Note pour moi-même (les fournisseurs ne la voient pas)…"
       />
       {showNotesSuggestions && !isViewOnly && (newTask.notes || '').length > 0 && notesHistory.filter((h: string) => h.toLowerCase().includes((newTask.notes || '').toLowerCase()) && h !== newTask.notes).length > 0 && (
         <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-32 overflow-y-auto">
@@ -1973,10 +1972,16 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
         </div>
       )}
     </div>
-  </div>
-</div>
+  ) : (
+    <button type="button" onClick={() => setShowNotes(true)}
+      className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
+      <StickyNote className="w-3.5 h-3.5" /> Note perso
+    </button>
+  )
+)}
 
-{/* Note admin — bleue, éditable par admin, lecture seule pour fournisseur */}
+{/* Note admin — affichée seulement si elle existe déjà (ancienne fonction peu utilisée) */}
+{!!newTask.adminNote?.text && (
 <div className="border border-blue-200 rounded-xl overflow-hidden">
   <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
     <span className="text-xs font-bold text-blue-700 uppercase">Note de l'administrateur</span>
@@ -2011,8 +2016,10 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     )}
   </div>
 </div>
+)}
 
-{/* Note du fournisseur — ambre, éditable par fournisseur, lecture seule pour admin */}
+{/* Note du fournisseur — le fournisseur peut écrire; l'admin la voit seulement si elle existe */}
+{(isViewOnly || !!newTask.supplierNotes?.text) && (
 <div className="border border-amber-200 rounded-xl overflow-hidden">
   <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
     <span className="text-xs font-bold text-amber-700 uppercase">Note du fournisseur</span>
@@ -2066,6 +2073,7 @@ const TaskDetailsTable: React.FC<{ tasksForPage: Task[] }> = ({ tasksForPage }) 
     )}
   </div>
 </div>
+)}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

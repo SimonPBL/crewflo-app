@@ -451,6 +451,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ suppliers, setSuppli
                     <button type="button"
                       onClick={() => { if (isEditing) return; setExpandedId(isOpen ? null : supplier.id); }}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-left ${isOpen ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
+                      <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 ${supplier.color}`} aria-hidden="true" />
                       <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800">{supplier.name}</span>
                       {isOpen ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />}
                     </button>
